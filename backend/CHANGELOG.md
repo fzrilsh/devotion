@@ -229,4 +229,21 @@ perubahannya.
   `unread_count`, tandai dibaca (idempoten, 404 bila bukan milik pemanggil atau
   id tak sah), GET dan PUT preferensi non-transaksional. Uji menunjuk FR-051,
   FR-054, FR-055, FR-085, FR-086, FR-091. (T023)
+- Tautan WhatsApp di `internal/admin`: klien whatsmeow berjalan sebagai
+  goroutine di dalam proses `serve` (research.md R-08), bukan layanan kedua,
+  jadi Gate I tetap dua. Sesinya disimpan di Postgres yang sama lewat handle
+  `database/sql` kedua (driver `pgx` stdlib), dibatasi `SetMaxOpenConns(2)` dan
+  dianggarkan dari lima koneksi yang disisakan di luar pool 15. `Manager`
+  membuka store, meng-upgrade skemanya, dan mengurus siklus hidup klien:
+  `Start` menyalurkan kode QR ke status saat perangkat belum terpasang lalu
+  `Connect`, `onEvent` membedakan `Connected` dari `LoggedOut`. `SendText`
+  memenuhi `notification.WhatsAppSender` sehingga kanal WhatsApp kini terkirim.
+  `GET /api/admin/whatsapp` khusus admin mengembalikan `WhatsAppStatus`
+  (`connected`, `qr_code`, `last_error`); nomor layanan tidak pernah muncul di
+  respons, log, maupun Sentry (FR-082), ditegakkan secara struktural karena
+  tipe status tak punya field untuk membawanya. Subcommand `user:verify
+  --email`/`--phone` memverifikasi akun tanpa antarmuka supaya nomor yang
+  terblokir sesaat tak menghalangi pembuatan akun. Dependency `go.mau.fi/whatsmeow`
+  dicatat di `docs/dependencies.md`. Uji menunjuk FR-082: gate admin (401/403/200),
+  null saat kosong, dan QR/galat sampai ke body. (T024a)
 
