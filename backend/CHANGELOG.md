@@ -35,3 +35,11 @@ perubahannya.
   ter-lokalisasi Asia/Jakarta), `TestClock` dengan `Set`/`Advance` ber-mutex,
   dan `WeekStart` (Senin awal minggu WIB) yang dipakai kedua lapisan penjadwal.
   Uji menyisir tree: `time.Now()` dilarang di luar `platform` dan `cmd`. (T008)
+- `internal/platform/config`: `Load(getenv)` memvalidasi konfigurasi tanpa
+  mengubah state proses. Wajib di semua environment: `APP_ENV`, `APP_BASE_URL`,
+  `DATABASE_URL`, `UPLOAD_PATH`; wajib hanya di produksi: TLS, CF client CA,
+  Mailjet, `MAIL_FROM`, `WHATSAPP_NUMBER`, `SENTRY_DSN`. Default
+  `UPLOAD_TOTAL_LIMIT_MB=500`, `UPLOAD_FILE_LIMIT_MB=5`. `APP_ENV` tak dikenal
+  adalah galat. Semua variabel hilang dikumpulkan dalam satu galat yang hanya
+  memuat nama, tidak pernah nilai. `IsProduction()` untuk penjaga
+  `seed:test-data`/`reset:test-data`. (T009)
