@@ -9,7 +9,28 @@ import (
 )
 
 type Querier interface {
+	// CountDistinctMembers counts the distinct members recorded under an address in
+	// the current window. Each (address, member) pair is one row, so the row count
+	// is the distinct-member count. The pattern is address + separator + '%'.
+	CountDistinctMembers(ctx context.Context, arg CountDistinctMembersParams) (int64, error)
+	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
+	// counting path (otp_address) serializes per source address. Without it, two
+	// new numbers from the same address could both pass the distinct-count check.
+	LockRateLimitKey(ctx context.Context, pgAdvisoryXactLock int64) error
+	// MemberRecorded reports whether member was already recorded under key in the
+	// current window. A re-send to a number already counted is not a new distinct
+	// number, so it does not consume more of the address budget.
+	MemberRecorded(ctx context.Context, arg MemberRecordedParams) (bool, error)
 	Ping(ctx context.Context) (int32, error)
+	// RecordMember records that member was used under key in the current window.
+	// DO NOTHING keeps it idempotent within the window.
+	RecordMember(ctx context.Context, arg RecordMemberParams) error
+	// TouchRateLimit increments the counter for one (target, key) in the current
+	// window bucket, creating the row on first use, and returns the new count. The
+	// ON CONFLICT DO UPDATE is atomic and takes a row lock, so two concurrent
+	// callers cannot both read the same count and both slip through: the second
+	// serializes behind the first and sees the incremented value.
+	TouchRateLimit(ctx context.Context, arg TouchRateLimitParams) (int32, error)
 }
 
 var _ Querier = (*Queries)(nil)

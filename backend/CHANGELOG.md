@@ -90,3 +90,16 @@ perubahannya.
   `Logger` (JSON: method, path, status, duration_ms) -> `RealIP`. `router.go`:
   `http.ServeMux` pola method+path Go 1.22 dengan catch-all `/api/` yang
   mengembalikan 404 `Problem`, bukan HTML. (T012)
+- `internal/platform/ratelimit`: empat jendela R-10 di `map[Target]window`
+  sebagai satu-satunya sumber angka (login 5/15m per akun, OTP 3/jam per nomor,
+  OTP 10 nomor berbeda/jam per alamat asal, request kuota 20/jam per pengguna).
+  State di tabel `rate_limit`, bukan memori, sehingga redeploy bukan jalan
+  pintas. `Check` menaikkan penghitung dan membandingkan dalam satu transaksi;
+  `INSERT ... ON CONFLICT DO UPDATE` mengunci baris sehingga dua pemanggil
+  berbarengan tak bisa sama-sama membaca hitungan sama lalu lolos. `CheckAddress`
+  menghitung **nomor berbeda**, bukan percobaan: kirim ulang ke nomor yang sudah
+  dihitung tak memakan kuota alamat, hanya nomor baru; sebuah
+  `pg_advisory_xact_lock` per alamat men-serialisasi hitung-lalu-catat. Semua
+  timestamp dari `Clock` sehingga uji kedaluwarsa jendela menggeser waktu, bukan
+  tidur; 429 membawa `Retry-After` sampai jendela bergulir. Kueri di
+  `db/queries/ratelimit.sql`, hasil `sqlc generate` di-commit. (T016)
