@@ -78,3 +78,15 @@ perubahannya.
   bila koneksi dari rentang tersebut. Konstanta `RetrievedAt` dan `docs/cloudflare-ips.md`
   dijaga sinkron oleh uji. Daftar diverifikasi ke sumber resmi, bukan dari
   research.md R-01. (T013)
+- `internal/platform/httpx`: lapisan HTTP dasar. `codes.go` mentranskripsi 29
+  kode galat dari openapi.yaml sebagai `type Code string` dan memegang peta
+  `Code -> {Status, Title}` sehingga status HTTP diturunkan dari kode dan tidak
+  bisa berbeda antar handler. `problem.go` menulis `application/problem+json`
+  (RFC 9457) lewat `WriteProblem`, `WriteValidation` (membawa `errors[]` bentuk
+  `ProblemValidation`), dan `WriteInternal` (500 generik). `logger.go`:
+  `contextHandler` yang menarik `request_id` ke tiap record slog sehingga tak ada
+  call site yang bisa lupa. `middleware.go`: rantai dari luar `RequestID` ->
+  `Recover` (panic jadi 500 problem+json, stack ke slog bukan ke klien) ->
+  `Logger` (JSON: method, path, status, duration_ms) -> `RealIP`. `router.go`:
+  `http.ServeMux` pola method+path Go 1.22 dengan catch-all `/api/` yang
+  mengembalikan 404 `Problem`, bukan HTML. (T012)
