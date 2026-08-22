@@ -217,21 +217,21 @@ Verifikasi setelah dipasang, jangan dipercaya begitu saja: jalankan `free -h` da
 Urutan di dalam transaksi:
 
 1. `BEGIN`
-2. `SELECT ... FROM periode_ketersediaan WHERE listing_id = $1 AND minggu_mulai BETWEEN $2 AND $3 ORDER BY minggu_mulai FOR UPDATE`, mengunci seluruh periode kandidat sekaligus, terurut.
+2. `SELECT ... FROM availability_period WHERE listing_id = $1 AND week_start BETWEEN $2 AND $3 ORDER BY week_start FOR UPDATE`, mengunci seluruh periode kandidat sekaligus, terurut.
 3. Jumlahkan kapasitas tersisa dari periode yang tidak ditandai penuh. Bila kurang dari jumlah pesanan, `ROLLBACK` dan tolak dengan menyebutkan total yang sebenarnya tersisa (FR-035).
 4. Sisipkan pesanan.
-5. Isi periode paling awal lebih dulu sampai jumlah terpenuhi (FR-018), lewati periode penuh atau habis (FR-078), sisipkan satu baris Alokasi Kapasitas per periode yang terpakai (FR-077), naikkan `kapasitas_terpakai`.
+5. Isi periode paling awal lebih dulu sampai jumlah terpenuhi (FR-018), lewati periode penuh atau habis (FR-078), sisipkan satu baris Alokasi Kapasitas per periode yang terpakai (FR-077), naikkan `used_capacity`.
 6. `COMMIT`
 
 Constraint yang menegakkan FR-079 pada tingkat penyimpanan data:
 
 ```sql
-ALTER TABLE periode_ketersediaan
-  ADD CONSTRAINT kapasitas_terpakai_tidak_melebihi_total
-  CHECK (kapasitas_terpakai >= 0 AND kapasitas_terpakai <= kapasitas_total);
+ALTER TABLE availability_period
+  ADD CONSTRAINT used_capacity_within_total
+  CHECK (used_capacity >= 0 AND used_capacity <= total_capacity);
 ```
 
-Pengurutan `ORDER BY minggu_mulai` pada langkah 2 adalah pencegah deadlock, bukan kerapian: dua transaksi yang mengunci periode yang sama dalam urutan berbeda akan saling menunggu. Dengan urutan yang selalu sama, yang kedua hanya menunggu lalu melihat kapasitas yang sudah berkurang.
+Pengurutan `ORDER BY week_start` pada langkah 2 adalah pencegah deadlock, bukan kerapian: dua transaksi yang mengunci periode yang sama dalam urutan berbeda akan saling menunggu. Dengan urutan yang selalu sama, yang kedua hanya menunggu lalu melihat kapasitas yang sudah berkurang.
 
 Pembatalan (FR-020) membalik seluruh baris alokasi di dalam satu transaksi, dengan pola penguncian yang sama.
 
@@ -253,10 +253,10 @@ Pembatalan (FR-020) membalik seluruh baris alokasi di dalam satu transaksi, deng
 Urutan penuh dan deterministik:
 
 ```sql
-ORDER BY skor_kecocokan DESC,
-         kapasitas_tersisa_sampai_deadline DESC,
-         jeda_kesiapan_mulai ASC,
-         nama_usaha ASC,
+ORDER BY score DESC,
+         remaining_capacity DESC,
+         readiness_lead_days ASC,
+         business_name ASC,
          listing_id ASC
 ```
 
@@ -265,13 +265,13 @@ ORDER BY skor_kecocokan DESC,
 Halaman berikutnya membandingkan tuple terhadap nilai baris terakhir halaman sebelumnya:
 
 ```sql
-WHERE (skor, kapasitas_tersisa, -jeda, nama, id) < (:skor, :kapasitas, -:jeda, :nama, :id)
+WHERE (score, remaining_capacity, -readiness_lead_days, business_name, listing_id) < (:score, :remaining_capacity, -:readiness_lead_days, :business_name, :listing_id)
 ```
 
 Skor kecocokan dihitung sebagai jumlah empat nilai boolean, sesuai FR-023, sehingga nilainya 0 sampai 4 dan dapat diurutkan langsung di SQL:
 
 ```sql
-(produk_cocok::int + mesin_cocok::int + jeda_cocok::int + kapasitas_cukup::int) AS skor_kecocokan
+(product_match::int + machine_match::int + lead_match::int + capacity_enough::int) AS score
 ```
 
 **Rationale**: `OFFSET` melanggar SC-013 secara struktural. Ketika ada listing baru tayang di antara dua permintaan halaman, seluruh baris bergeser: satu kandidat muncul dua kali dan satu lainnya terlewat. Itu persis yang dilarang Acceptance Scenario 5 pada User Story 2. Kursor tuple tidak terpengaruh penyisipan baris baru karena posisinya ditentukan nilai, bukan hitungan. Kebetulan juga lebih cepat pada halaman jauh, meski pada 50 usaha demo perbedaannya tidak akan terasa. Yang penting di sini kebenarannya, bukan kecepatannya.

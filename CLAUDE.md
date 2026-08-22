@@ -251,7 +251,7 @@ Perubahan tanpa entri CHANGELOG dianggap belum selesai.
 - **Setiap endpoint memeriksa peran pemanggil.** Endpoint tanpa pemeriksaan
   peran dianggap cacat, bukan sekadar belum lengkap.
 - **Alokasi kapasitas dalam satu transaksi** dengan `SELECT ... FOR UPDATE`
-  terurut menaik menurut `minggu_mulai`. Urutan itu pencegah deadlock, bukan
+  terurut menaik menurut `week_start`. Urutan itu pencegah deadlock, bukan
   kerapian.
 - **Sesi**: cookie `httpOnly`, `Secure`, `SameSite=Lax`. Yang disimpan di
   database adalah **hash** token, bukan token mentah.
@@ -295,18 +295,18 @@ Tailwind CSS, Leaflet + OpenStreetMap, Jest.
   disimpan di `localStorage` maupun `sessionStorage`. Satu celah XSS akan
   langsung berarti pengambilalihan akun, dan aplikasi ini memuat dokumen
   identitas.
-- **Jangan duplikasi mesin keadaan pesanan.** `PesananDetail` sudah mengirim
-  `transisi_diizinkan` dan `boleh_dibatalkan_sendiri`. Render tombol dari array
+- **Jangan duplikasi mesin keadaan pesanan.** `WorkOrderDetail` sudah mengirim
+  `allowed_transitions` dan `self_cancellable`. Render tombol dari array
   itu. Kalau logikanya ditulis ulang di React, dua tempat akan berbeda pada
   suatu titik.
-- **Kursor paginasi bersifat opaque.** Teruskan `kursor_berikutnya` apa adanya.
+- **Kursor paginasi bersifat opaque.** Teruskan `next_cursor` apa adanya.
   Jangan diurai, jangan diubah jadi `?page=2`. Itu langsung melanggar jaminan
   urutan stabil antar halaman.
 - **Tampilkan penjelasan kriteria** pada hasil pencarian. Respons mengirim
-  `kriteria` per kandidat; pengguna harus bisa melihat kriteria mana yang tidak
+  `criteria` per kandidat; pengguna harus bisa melihat kriteria mana yang tidak
   terpenuhi.
 - **Tingkat penyelesaian** hanya ditampilkan sebagai persentase bila
-  `cukup_data: true`. Kalau tidak, tampilkan keterangannya.
+  `enough_data: true`. Kalau tidak, tampilkan keterangannya.
 - **Peta** memakai Leaflet dengan tile OpenStreetMap. Tanpa kunci API. Jarak
   bersifat informatif saja.
 - **Validasi di frontend tidak menggantikan validasi di backend.** Keduanya ada.

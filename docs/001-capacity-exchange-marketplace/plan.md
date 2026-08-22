@@ -18,7 +18,7 @@ Pendekatan teknis: satu biner Go yang menyajikan frontend React hasil build, men
 
 ## Technical Context
 
-**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip VI, tidak ada rentang terbuka.
+**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip IV, tidak ada rentang terbuka.
 
 **Primary Dependencies**:
 
@@ -57,7 +57,7 @@ Empat pertentangan antar artefak yang ditemukan `/analyze` dan diselesaikan pada
 | Isu | Keputusan | Dampak |
 |-----|-----------|--------|
 | Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `jeda_kesiapan_hari`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `pesanan.minggu_kesiapan_mulai` + trigger; kueri pencarian |
-| Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `listing_kapasitas.horizon_sampai` |
+| Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `capacity_listing.horizon_until` |
 | Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh 25 tabel; menegakkan Prinsip V pada tingkat data |
 | Kriteria mesin tidak terdefinisi ketika filternya dikosongkan | Kriteria yang filternya tidak diisi dihitung **terpenuhi**; respons menyebut kriteria mana yang dievaluasi. Skor tetap 0–4, tanpa normalisasi | FR-023, FR-026 |
 
