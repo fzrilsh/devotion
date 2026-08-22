@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging, "develop/**"]
+  pull_request:
+
+env:
+  GO_VERSION: "1.23.4"
+  NODE_VERSION: "20"
+  IMAGE: ghcr.io/fzrilsh/devotion
+
+jobs:
+  # go vet and go test. Postgres here is CI infrastructure for the test schema,
+  # not a runtime service, so Gate I (exactly two runtime services in
+  # docker-compose.yml) is unaffected.
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: devotion
+          POSTGRES_PASSWORD: devotion
+          POSTGRES_DB: devotion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devotion"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_TEST: postgres://devotion:devotion@localhost:5432/devotion_test?sslmode=disable
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - run: go vet ./...
+      - run: go test ./...
+
+  # Build the frontend, embed it into the backend image, and push to GHCR.
+  # Runs only on branch pushes, not pull requests. The frontend lives in
+  # frontend/ (handled by another contributor); its build output is copied into
+  # backend/webdist/ before the Docker build so the go:embed directive resolves.
+  image:
+    needs: backend
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      # Copy dist into webdist before the Docker build. This ordering matters:
+      # the go:embed in the serve command is a compile error on an empty dir.
+      - name: Stage frontend into webdist
+        run: |
+          rm -rf backend/webdist
+          mkdir -p backend/webdist
+          cp -r frontend/dist/. backend/webdist/
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+  # Deploy on main only: SSH to the VPS, pull the new image, restart.
+  deploy:
+    needs: image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/devotion
+            docker compose pull backend
+            docker compose up -d
+            docker image prune -f
