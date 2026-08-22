@@ -70,3 +70,11 @@ perubahannya.
   yang berbeda tak saling memblokir; ekstensi `citext`/`pgcrypto` dipasang
   `WITH SCHEMA public` dan down 000001 dikosongkan karena ekstensi milik seluruh
   database, bukan per skema. (T011)
+- `internal/platform/cloudflare`: rentang IP Cloudflare resmi dipatok sebagai
+  konstanta, di-parse sekali di `init` menjadi `[]*net.IPNet` dan panic pada
+  entri rusak supaya typo gagal saat startup. `RealIP` memisah `RemoteAddr`,
+  mengembalikan kosong bila tak terurai, host mentah bila koneksi di luar rentang
+  Cloudflare (tanpa menyentuh header), dan baru mempercayai `CF-Connecting-IP`
+  bila koneksi dari rentang tersebut. Konstanta `RetrievedAt` dan `docs/cloudflare-ips.md`
+  dijaga sinkron oleh uji. Daftar diverifikasi ke sumber resmi, bukan dari
+  research.md R-01. (T013)
