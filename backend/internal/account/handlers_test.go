@@ -282,3 +282,18 @@ func hashRawToken(raw string) []byte {
 	sum := sha256.Sum256([]byte(raw))
 	return sum[:]
 }
+
+// TestRegister_LeavesNoUncoveredRoutes proves every /api route the account
+// package registers is either declared public or placed behind an auth gate, so
+// the coverage test cannot pass while an account endpoint ships without a role
+// decision. FR: T015 route coverage. This runs without a database: Register only
+// records patterns, it does not touch the pool.
+func TestRegister_LeavesNoUncoveredRoutes(t *testing.T) {
+	svc := &Service{}
+	r := httpx.NewRouter(quietLogger())
+	svc.Register(r)
+
+	if got := r.UncoveredAPIRoutes(); len(got) != 0 {
+		t.Fatalf("rute akun tak tercakup = %v, mau kosong", got)
+	}
+}
