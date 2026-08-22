@@ -2155,17 +2155,19 @@ components:
           enum:
             - request_received
             - offer_received
-            - counter_offer_received
-            - agreement_reached
-            - status_changed
-            - shipment_confirmed
-            - auto_confirm_soon
-            - auto_confirmed
-            - dispute_reported
-            - dispute_resolved
-            - review_received
-            - verification_decided
-            - proposal_decided
+            - counter_offer
+            - agreement_formed
+            - order_status_changed
+            - payment_record
+            - deadline_approaching
+            - deadline_passed
+            - verification_decision
+            - rating_request
+            - order_cancelled
+            - confirmation_due_approaching
+            - order_auto_closed
+            - item_proposal_decision
+            - calendar_stale
         title: { type: string }
         body: { type: string }
         work_order_id: { type: string, format: uuid, nullable: true }

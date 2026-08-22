@@ -99,7 +99,7 @@ Satu keputusan bersyarat dan tiga hal yang wajib diverifikasi sebelum task terka
 |--------|-------|--------|
 | Setiap story dapat didemokan lewat antarmuka | `quickstart.md` §F: 83 langkah verifikasi manual, tujuh story | LOLOS |
 | Data contoh keadaan berhasil dan gagal | T075: hasil pencarian kosong, penawaran tertolak karena kapasitas, kalender basi, request kedaluwarsa | LOLOS |
-| Data acuan terisi dengan satu perintah | `seed:wilayah`, `seed:master-data` (T019) | LOLOS |
+| Data acuan terisi dengan satu perintah | `seed:regions`, `seed:master-data` (T019) | LOLOS |
 | Demo tidak bergantung layanan yang bisa mati | Notifikasi di dalam platform sebagai jalur pengamatan; WhatsApp dan email boleh gagal tanpa merusak alur (FR-054, FR-086) | LOLOS |
 
 Turunan yang mengikat urutan: pengisian daftar baku dan wilayah adalah prasyarat data bagi US1 dan US2, sehingga masuk fase Foundational (T019), terpisah dari antarmuka admin yang tetap di prioritas terakhir (T073). Tanpa itu, US7 harus naik ke awal padahal prioritasnya P7.
@@ -152,7 +152,7 @@ Sebelas dependency runtime, seluruhnya dengan pembenaran di `plan.md` versi ini 
 | Batasan | Bukti | Status |
 |---------|-------|--------|
 | Batas keuangan | Tidak ada payment gateway; `catatan_pembayaran` tanpa kolom jumlah uang. Escrow yang menahan dana dan merilisnya saat pesanan dikonfirmasi selesai [1] sengaja tidak dibangun | LOLOS |
-| Unggahan tidak lewat path statis | `GET /api/berkas/{id}` memeriksa peran sebelum mengirim byte | LOLOS |
+| Unggahan tidak lewat path statis | `GET /api/files/{fileId}` memeriksa peran sebelum mengirim byte | LOLOS |
 | Nama berkas dibuat sistem, tipe dari isi | UUID sebagai `path_penyimpanan`; magic bytes | LOLOS |
 | Metadata lokasi gambar dibuang | Dekode–enkode ulang saat unggah | LOLOS |
 | Segmen origin terenkripsi, koneksi non-Cloudflare ditolak | R-01: tiga lapisan (firewall, Origin Certificate + Full (strict), Authenticated Origin Pulls) | LOLOS |

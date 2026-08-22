@@ -21,7 +21,7 @@ sebagai celah.
 | FR-037 | Perilaku penjadwal: request tak dibalas melewati batas ditandai kedaluwarsa |
 | FR-040 | Larangan: tidak ada endpoint pembayaran, dan itu memang tujuannya |
 | FR-055, FR-056 | Antarmuka frontend |
-| FR-075 | Subcommand `seed:wilayah` dan `seed:master-data` |
+| FR-075 | Subcommand `seed:regions` dan `seed:master-data` |
 | FR-076 | Bentuk `ListingRequest`: tidak ada kolom kapasitas per jenis produk |
 | FR-079 | Constraint basis data |
 | FR-085, FR-086 | Perilaku pengirim notifikasi |
@@ -30,13 +30,13 @@ sebagai celah.
 
 | Story | Endpoint utama |
 |-------|----------------|
-| US1 Listing kapasitas | `POST /auth/registrasi`, `PUT /profil/saya`, `POST /listing/saya`, `POST /master/usulan` |
-| US2 Pencarian | `GET /pencarian`, `GET /master/produk`, `GET /wilayah/kota`, `GET /profil/{id}` |
-| US3 Request kuota | `POST /request-kuota`, `POST /kandidat/{id}/penawaran`, `POST /penawaran/{id}/counter`, `POST /penawaran/{id}/terima` |
-| US4 Kalender | `GET PUT /listing/saya/periode` |
-| US5 Pesanan | `GET /pesanan`, `POST /pesanan/{id}/status`, `/konfirmasi`, `/batalkan`, `/pembayaran`, `/sengketa` |
-| US6 Reputasi | `POST /pesanan/{id}/ulasan`, `GET /profil/{id}/ulasan` |
-| US7 Admin | `/admin/verifikasi`, `/admin/master/item`, `/admin/usulan`, `/admin/ulasan`, `/admin/pesanan-telat`, `/admin/sengketa`, `/admin/whatsapp` |
+| US1 Listing kapasitas | `POST /auth/register`, `PUT /profile/me`, `POST /listing/me`, `POST /master/proposals` |
+| US2 Pencarian | `GET /search`, `GET /master/products`, `GET /regions/cities`, `GET /profile/{profileId}` |
+| US3 Request kuota | `POST /quota-requests`, `POST /candidates/{candidateId}/offers`, `POST /offers/{offerId}/counter`, `POST /offers/{offerId}/accept` |
+| US4 Kalender | `GET PUT /listing/me/periods` |
+| US5 Pesanan | `GET /work-orders`, `POST /work-orders/{workOrderId}/status`, `/confirm`, `/cancel`, `/payments`, `/disputes` |
+| US6 Reputasi | `POST /work-orders/{workOrderId}/reviews`, `GET /profile/{profileId}/reviews` |
+| US7 Admin | `/admin/verification`, `/admin/master/items`, `/admin/proposals`, `/admin/reviews`, `/admin/late-orders`, `/admin/disputes`, `/admin/whatsapp` |
 
 ## Kewajiban pengujian per endpoint
 
@@ -49,14 +49,14 @@ yang disebut khusus konstitusi.
 
 | Endpoint | Yang diuji |
 |----------|------------|
-| `GET /pencarian` | Urutan dapat diulang; stabil antar halaman; skor tidak terpengaruh verifikasi dan reputasi; kapasitas terjumlah lintas periode; listing sendiri dikecualikan |
-| `POST /penawaran/{id}/terima` | Dua kesepakatan berbarengan atas periode sama; alokasi mengisi minggu terawal; kegagalan sebagian membatalkan seluruhnya |
-| `POST /kandidat/{id}/penawaran` | Penolakan saat kapasitas kurang, dengan angka tersisa yang benar |
-| `POST /pesanan/{id}/batalkan` | Seluruh alokasi dibalik; tertutup setelah produksi |
-| `POST /pesanan/{id}/status` | Transisi melompat ditolak beserta daftar transisi yang diizinkan |
-| `POST /pesanan/{id}/sengketa` | Menghentikan hitungan konfirmasi otomatis |
-| `GET /berkas/{id}` | Bukan pemilik dan bukan admin ditolak |
-| `POST /request-kuota` | Listing sendiri ditolak, termasuk tanpa melalui pencarian |
+| `GET /search` | Urutan dapat diulang; stabil antar halaman; skor tidak terpengaruh verifikasi dan reputasi; kapasitas terjumlah lintas periode; listing sendiri dikecualikan |
+| `POST /offers/{offerId}/accept` | Dua kesepakatan berbarengan atas periode sama; alokasi mengisi minggu terawal; kegagalan sebagian membatalkan seluruhnya |
+| `POST /candidates/{candidateId}/offers` | Penolakan saat kapasitas kurang, dengan angka tersisa yang benar |
+| `POST /work-orders/{workOrderId}/cancel` | Seluruh alokasi dibalik; tertutup setelah produksi |
+| `POST /work-orders/{workOrderId}/status` | Transisi melompat ditolak beserta daftar transisi yang diizinkan |
+| `POST /work-orders/{workOrderId}/disputes` | Menghentikan hitungan konfirmasi otomatis |
+| `GET /files/{fileId}` | Bukan pemilik dan bukan admin ditolak |
+| `POST /quota-requests` | Listing sendiri ditolak, termasuk tanpa melalui pencarian |
 | Konfirmasi otomatis | Dengan sumber waktu digantikan, bukan menunggu tujuh hari |
 
 ## Catatan penerapan

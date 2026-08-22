@@ -32,8 +32,8 @@ Respons dibungkus objek `data`, bukan array langsung. Field berbahasa Inggris:
 Kode kabupaten/kota dari sumber memakai titik (`32.73`). Seeder **wajib**
 membuang titiknya sebelum menyimpan, sehingga menjadi `3273`.
 
-Tanpa normalisasi, dua constraint gagal: `kota_kode_format` menuntut empat digit
-tanpa pemisah, dan `kota_milik_provinsinya` membandingkan dua karakter pertama
+Tanpa normalisasi, dua constraint gagal: `city_code_format` menuntut empat digit
+tanpa pemisah, dan `city_belongs_to_province` membandingkan dua karakter pertama
 kode kota dengan kode provinsinya. Pattern `^[0-9]{4}$` pada `openapi.yaml` juga
 mengasumsikan bentuk tanpa titik.
 
@@ -43,11 +43,11 @@ setelah titik.
 ## Verifikasi setelah seed
 
 ```sql
-SELECT count(*) FROM wilayah_provinsi;   -- harus 38
-SELECT count(*) FROM wilayah_kota
- WHERE provinsi_kode = '32';             -- harus 27
-SELECT count(*) FROM wilayah_kota
- WHERE left(kode, 2) <> provinsi_kode;   -- harus 0
+SELECT count(*) FROM province;            -- harus 38
+SELECT count(*) FROM city
+ WHERE province_code = '32';              -- harus 27
+SELECT count(*) FROM city
+ WHERE left(code, 2) <> province_code;    -- harus 0
 ```
 
 Baris ketiga adalah yang paling penting: bila lebih dari nol, normalisasi tidak
@@ -55,7 +55,7 @@ berjalan dan constraint akan menolak.
 
 ## Cadangan
 
-`seed:wilayah --refresh` menulis hasil normalisasi ke `wilayah.json` di direktori
+`seed:regions --refresh` menulis hasil normalisasi ke `regions.json` di direktori
 ini. Pemakaian berikutnya membaca berkas itu, bukan memanggil jaringan. Prinsip V
 melarang bergantung pada sumber luar saat melayani permintaan pengguna, dan
 salinan ini juga menyelamatkan penyiapan demo bila layanannya sedang mati.

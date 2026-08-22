@@ -383,6 +383,7 @@ CREATE TABLE availability_period (
     total_capacity integer NOT NULL,
     used_capacity  integer NOT NULL DEFAULT 0,
     marked_full    boolean NOT NULL DEFAULT false,
+    created_at     timestamptz NOT NULL,
     updated_at     timestamptz NOT NULL,
 
     CONSTRAINT one_period_per_week UNIQUE (listing_id, week_start),
@@ -493,7 +494,7 @@ Sekarang aplikasi mengirim kedua nilai dari `Clock`, dan constraint hanya menjag
 
 ```sql
 CREATE TYPE candidate_status AS ENUM (
-    'awaiting_reply', 'countered', 'rejected', 'expired', 'discontinued', 'agreed'
+    'awaiting_reply', 'offered', 'rejected', 'expired', 'not_continued', 'agreed'
 );
 
 CREATE TABLE request_candidate (
@@ -960,10 +961,14 @@ scored AS (
     FROM base_candidate c
     JOIN capacity cap ON cap.listing_id = c.listing_id
     CROSS JOIN param p
+),
+ranked AS (
+    SELECT *,
+           (product_match + machine_match + lead_match + capacity_enough) AS score
+    FROM scored
 )
-SELECT *,
-       (product_match + machine_match + lead_match + capacity_enough) AS score
-FROM scored
+SELECT *
+FROM ranked
 WHERE (score, remaining_capacity, -readiness_lead_days, business_name, listing_id)
       < ($10, $11, -$12, $13, $14)                                -- keyset, R-05
 ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
@@ -971,7 +976,9 @@ ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
 LIMIT $15;
 ```
 
-Empat hal yang perlu diperhatikan tentang kueri ini.
+Lima hal yang perlu diperhatikan tentang kueri ini.
+
+**`score` dihitung di CTE `ranked`, bukan langsung di `SELECT` terluar.** Postgres tidak mengizinkan alias kolom keluaran dipakai di `WHERE` pada level yang sama, sedangkan keyset R-05 harus menyaring dengan `score`. Membungkus perhitungan skor di satu CTE lalu menyaring di atasnya membuat `score` dan `remaining_capacity` tersedia sebagai kolom biasa di `WHERE` maupun `ORDER BY`.
 
 **Perhitungan minggu memakai `date_trunc('week', …)`** yang di PostgreSQL memulai minggu pada Senin, sama dengan Prinsip V. Aplikasi tetap yang membulatkan `deadline` ke Senin sebelum mengirimnya, agar satu-satunya sumber kebenaran pembulatan ada di kode Go yang dapat diuji.
 
@@ -1023,8 +1030,8 @@ Mengikuti arah ketergantungan kunci asing:
 001_extensions            citext, pgcrypto
 002_region                province, city
 003_account               user_account, session
-004_master_data           catalog_item, item_proposal
-005_profile               business_profile
+004_master_data           catalog_item
+005_profile               business_profile, item_proposal
 006_file_verification     uploaded_file, verification_request
 007_listing               capacity_listing (+ horizon_until), listing_product,
                           listing_machine, item type triggers
@@ -1037,5 +1044,7 @@ Mengikuti arah ketergantungan kunci asing:
 013_notification          notification (+ transactional), notification_channel
 014_rate_limit            rate_limit
 ```
+
+`item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.
 
 `011_allocation` harus setelah `010_work_order` karena merujuk keduanya, dan triggernya membaca `work_order.readiness_week_start`. Migrasi dijalankan otomatis saat startup dengan `pg_try_advisory_lock`, agar dua kontainer yang sempat hidup bersamaan saat penerapan versi baru tidak menjalankannya serentak.

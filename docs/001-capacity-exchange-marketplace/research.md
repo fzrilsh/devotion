@@ -98,14 +98,14 @@ Alamat asli ini dipakai untuk dua hal saja: pembatasan laju per-IP pada pengirim
 
 ## R-02. Sumber data wilayah
 
-**Decision**: `devotion seed:wilayah` mengambil **dua tingkat saja**, provinsi dan kabupaten/kota, dari wilayah.id, menyimpannya ke Postgres, dan **sekaligus menulis salinan** ke `docs/master-data/wilayah.json`. Bila berkas salinan sudah ada, perintah default membaca berkas itu; pengambilan dari jaringan hanya terjadi dengan flag eksplisit `--refresh`. Kecamatan dan desa tidak diambil.
+**Decision**: `devotion seed:regions` mengambil **dua tingkat saja**, provinsi dan kabupaten/kota, dari wilayah.id, menyimpannya ke Postgres, dan **sekaligus menulis salinan** ke `docs/master-data/regions.json`. Bila berkas salinan sudah ada, perintah default membaca berkas itu; pengambilan dari jaringan hanya terjadi dengan flag eksplisit `--refresh`. Kecamatan dan desa tidak diambil.
 
 ```bash
 # Pengambilan pertama, sekali saja, saat menyiapkan project:
-devotion seed:wilayah --refresh   # ambil dari wilayah.id, tulis JSON, isi DB
+devotion seed:regions --refresh   # ambil dari wilayah.id, tulis JSON, isi DB
 
 # Semua pemakaian berikutnya, termasuk di VPS dan CI:
-devotion seed:wilayah             # baca docs/master-data/wilayah.json, isi DB
+devotion seed:regions             # baca docs/master-data/regions.json, isi DB
 ```
 
 Idempoten memakai kode wilayah sebagai identitas: sisipkan bila kode belum ada, perbarui nama bila sudah ada, **jangan pernah menghapus** karena Profil Usaha menunjuk ke baris itu.
