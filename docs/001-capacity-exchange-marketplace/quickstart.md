@@ -135,7 +135,7 @@ Setelah langkah B6, uji bahwa origin benar-benar tertutup dari luar Cloudflare:
 
 ```bash
 curl -sk --max-time 5 https://<IP_VPS>/api/health    # harus timeout atau tertolak
-curl -s https://<domain>/api/health                  # harus 200
+curl -s https://devotion.cloud/api/health                  # harus 200
 ```
 
 Bila perintah pertama berhasil, lapisan tepi bisa dilewati begitu saja beserta seluruh
@@ -191,7 +191,7 @@ berkas yang sudah diunggah.
 
 ```bash
 cd /opt/devotion
-curl -so .env.example https://raw.githubusercontent.com/<org>/devotion/main/.env.example
+curl -so .env.example https://raw.githubusercontent.com/fzrilsh/devotion/main/.env.example
 cp .env.example .env
 nano .env
 chmod 600 .env
@@ -202,7 +202,7 @@ ini:
 
 ```text
 APP_ENV=production
-APP_BASE_URL=https://<domain>
+APP_BASE_URL=https://devotion.cloud
 TLS_CERT_PATH=/opt/devotion/tls/origin.pem
 TLS_KEY_PATH=/opt/devotion/tls/origin.key
 CF_CLIENT_CA_PATH=/opt/devotion/tls/cf-client-ca.pem
@@ -214,7 +214,7 @@ DATABASE_URL=
 
 MAILJET_API_KEY=
 MAILJET_SECRET_KEY=
-MAIL_FROM=noreply@<domain>
+MAIL_FROM=noreply@devotion.cloud
 
 WHATSAPP_NOMOR=
 SENTRY_DSN=
@@ -285,7 +285,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   backend:
-    image: ghcr.io/<org>/devotion:latest
+    image: ghcr.io/fzrilsh/devotion:latest
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -355,7 +355,7 @@ docker compose exec backend /devotion seed:master-data
 
 # Admin pertama. Kata sandi diminta lewat prompt, tidak lewat argumen,
 # agar tidak tersimpan di riwayat shell.
-docker compose exec -it backend /devotion admin:create --email admin@<domain>
+docker compose exec -it backend /devotion admin:create --email admin@devotion.cloud
 ```
 
 Ketiganya idempoten: menjalankan dua kali tidak menduplikasi data.
@@ -385,7 +385,7 @@ senyap saat pencarian.
 
 ### B13. Menyambungkan WhatsApp
 
-Buka `https://<domain>/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
+Buka `https://devotion.cloud/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
 
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
@@ -403,7 +403,7 @@ docker compose exec backend /devotion user:verify --phone 62xxxxxxxxxx
 ### B14. Health check dan pemantau uptime
 
 ```bash
-curl -s https://<domain>/api/health | jq
+curl -s https://devotion.cloud/api/health | jq
 ```
 
 Yang diharapkan: `status: sehat`, basis data sehat, WhatsApp tersambung, penyimpanan
@@ -445,7 +445,7 @@ terakhir disimpan.
 itu sendiri yang bermasalah. Dari mesin lokal:
 
 ```bash
-rsync -avz devotion@<domain>:/opt/devotion/cadangan/ ./cadangan-devotion/
+rsync -avz devotion@devotion.cloud:/opt/devotion/cadangan/ ./cadangan-devotion/
 ```
 
 ### B16. Snapshot VPS
@@ -472,7 +472,7 @@ push ke main
        ├─ npm run build            → frontend/dist
        ├─ salin dist → backend/webdist
        ├─ docker build (multi-stage, embed.FS)
-       └─ push ghcr.io/<org>/devotion:<sha> dan :latest
+       └─ push ghcr.io/fzrilsh/devotion:<sha> dan :latest
   └─ SSH ke VPS
        └─ docker compose pull && docker compose up -d
 ```
@@ -494,7 +494,7 @@ Kunci SSH disimpan sebagai secret di GitHub, tidak pernah di dalam repository.
 ## D. Menjalankan Sistem dan Pengujian di Mesin Lokal
 
 ```bash
-git clone https://github.com/<org>/devotion.git && cd devotion
+git clone https://github.com/fzrilsh/devotion.git && cd devotion
 cp .env.example .env        # isi untuk lokal; APP_ENV=development
 
 docker compose up -d postgres

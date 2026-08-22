@@ -374,7 +374,7 @@ Pengiriman WhatsApp mengikuti pola notifikasi umum: baris ditulis ke tabel di da
 
 ## R-09. Email transaksional lewat Mailjet dan penyiapan DNS
 
-**Decision**: Mailjet melalui SMTP dengan `net/smtp` dari standard library, tanpa menambah dependency SDK. Pengirim `noreply@<domain>`. Tiga record DNS dipasang di Cloudflare **pada awal pengerjaan, bukan menjelang tenggat**: SPF, DKIM (nilainya diberikan Mailjet), dan DMARC dengan `p=none` pada tahap ini.
+**Decision**: Mailjet melalui SMTP dengan `net/smtp` dari standard library, tanpa menambah dependency SDK. Pengirim `noreply@devotion.cloud`. Tiga record DNS dipasang di Cloudflare **pada awal pengerjaan, bukan menjelang tenggat**: SPF, DKIM (nilainya diberikan Mailjet), dan DMARC dengan `p=none` pada tahap ini.
 
 Verifikasi email memakai **kode enam digit**, bukan tautan sekali klik, karena penguji dapat membuka email di perangkat yang berbeda dari perangkat pendaftarannya. Pengiriman berjalan di goroutine, respons HTTP tidak pernah menunggu SMTP selesai, dan tombol kirim ulang selalu tersedia dengan jeda yang membesar.
 
