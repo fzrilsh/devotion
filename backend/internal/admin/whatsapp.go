@@ -169,6 +169,15 @@ func (m *Manager) Status() Status {
 	}
 }
 
+// Connected reports whether the link is up, for the /health probe. It reads the
+// same live client state Status does but exposes only the bit, never the QR or
+// error text, and never the service number (FR-082).
+func (m *Manager) Connected() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.client != nil && m.client.IsConnected() && m.client.IsLoggedIn()
+}
+
 // SendText delivers one WhatsApp text to phone, satisfying
 // notification.WhatsAppSender. phone is the recipient's number in bare digits
 // (62...); it is turned into a JID on the default user server. An unpaired or

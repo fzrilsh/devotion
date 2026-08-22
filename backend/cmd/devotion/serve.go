@@ -21,8 +21,10 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/notification"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/config"
+	"github.com/fzrilsh/devotion/backend/internal/platform/health"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 	"github.com/fzrilsh/devotion/backend/internal/platform/migrate"
+	"github.com/fzrilsh/devotion/backend/internal/platform/observability"
 	"github.com/fzrilsh/devotion/backend/internal/platform/ratelimit"
 	"github.com/fzrilsh/devotion/backend/internal/platform/scheduler"
 	"github.com/fzrilsh/devotion/backend/internal/platform/session"
@@ -53,6 +55,15 @@ func runServe(ctx context.Context, args []string) error {
 	}
 
 	log := httpx.NewLogger()
+
+	// Sentry is the only external error sink; a nil DSN (development, or a
+	// production that opted out) makes Init a no-op. Its BeforeSend scrubs by
+	// allowlist so no request, user, or identity-document field can leak.
+	flush, err := observability.Init(cfg.SentryDSN, string(cfg.AppEnv))
+	if err != nil {
+		return err
+	}
+	defer flush()
 
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -105,6 +116,12 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	notif := notification.New(pool, clock, acc, email, wa)
 	notif.Register(router)
+
+	// GET /health probes the database, the WhatsApp link, and free space on the
+	// upload volume. The free-space floor is one file's worth: below it a new
+	// upload would fail, so the instance is reported unhealthy. It sits outside
+	// /api/ and is public (security:[] in the contract).
+	health.New(pool, wa, clock, cfg.UploadPath, cfg.UploadFileLimitMB).Register(router)
 
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
 		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))

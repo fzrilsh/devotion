@@ -67,3 +67,17 @@ whatsmeow juga menaikkan `golang.org/x/crypto` ke v0.54.0, `golang.org/x/term`
 ke v0.45.0, dan menarik `google.golang.org/protobuf` (v1.36.11) sebagai
 dependency langsung untuk membangun payload pesan (`waE2E.Message`). (T024a)
 
+### github.com/getsentry/sentry-go (v0.35.3)
+
+Pelapor galat. Satu-satunya penampung eksternal untuk panic dan galat tak
+terduga, dipakai lewat `internal/platform/observability` sebagai satu titik
+sentuh. `BeforeSend` diterapkan sebagai allowlist: event yang keluar dibangun
+ulang dari field aman saja (pesan, exception, level, tag `request_id`),
+sehingga `Request`, `User`, `Extra`, dan `Contexts` dibuang alih-alih disaring.
+Denylist gagal diam-diam saat SDK atau kode menambah field baru, dan mode
+kegagalannya adalah data dokumen identitas atau nomor layanan (FR-082) bocor ke
+pihak ketiga, jadi default amannya harus "buang", bukan "teruskan". Sudah
+tercantum di Primary Dependencies plan.md. Jalan dalam proses `serve`, bukan
+layanan kedua, jadi Gate I tetap dua. (T025)
+
+
