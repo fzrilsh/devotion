@@ -192,4 +192,22 @@ perubahannya.
   dinaikkan dari indirect ke dependency langsung, dicatat di
   `docs/dependencies.md`. Uji: dua kali jalan tidak menduplikasi admin, panggilan
   kedua mengganti kata sandi. (T020)
+- Penyajian SPA tersemat dan TLS produksi, plus `serve` yang sesungguhnya.
+  `embed.go` (`package web`) menyematkan `webdist/` lewat `//go:embed
+  all:webdist`; awalan `all:` wajib atau chunk Vite berawalan `_` tersaring
+  diam-diam. `webdist/index.html` placeholder di-commit supaya direktif embed
+  ter-compile; CI menimpanya dengan hasil build. `httpx.NewStatic` menegakkan
+  urutan R-06: `/api/*` ke handler API (termasuk 404 `Problem` untuk path API
+  tak dikenal, bukan `index.html`), berkas nyata di `webdist` dengan
+  `Cache-Control: public, max-age=31536000, immutable` untuk aset ber-hash,
+  sisanya jatuh ke `index.html` dengan `Cache-Control: no-cache`. `tlsconf.Load`
+  membangun `tls.Config` dengan `ClientAuth: RequireAndVerifyClientCert`,
+  `ClientCAs` dari CA klien Cloudflare, dan `MinVersion: TLS12`, sehingga
+  Authenticated Origin Pulls menolak koneksi yang melewati edge (R-01). `serve`
+  memuat config, menyambung pool, menjalankan migrasi, membangun router, mendaftar
+  `account` dan `masterdata`, menyalakan penjadwal sebagai goroutine, lalu listen
+  dengan `ReadHeaderTimeout: 10s` dan shutdown anggun pada SIGINT/SIGTERM: TLS di
+  `:443` saat produksi, HTTP polos di `:8080` di pengembangan. Cookie `Secure`
+  mati hanya bila `APP_BASE_URL` memakai `http://`, dan pengecualian itu nyaring
+  di log. (T022)
 
