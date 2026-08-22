@@ -1,0 +1,11 @@
+DROP TRIGGER IF EXISTS trg_reject_wrong_machine_item ON listing_machine;
+DROP TRIGGER IF EXISTS trg_reject_wrong_product_item ON listing_product;
+DROP FUNCTION IF EXISTS reject_wrong_item_type();
+DROP INDEX IF EXISTS idx_listing_machine_item;
+DROP INDEX IF EXISTS idx_listing_product_item;
+DROP TABLE IF EXISTS listing_machine;
+DROP TABLE IF EXISTS listing_product;
+DROP INDEX IF EXISTS idx_listing_horizon;
+DROP INDEX IF EXISTS idx_listing_calendar_stale;
+DROP INDEX IF EXISTS idx_listing_published;
+DROP TABLE IF EXISTS capacity_listing;

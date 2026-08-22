@@ -2,10 +2,10 @@
 
 # Build stage. Frontend is built in CI and copied into webdist/ before this
 # runs, so the go:embed directive in the serve command finds real files.
-FROM golang:1.23.4-alpine AS build
+FROM golang:1.24.1-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache ca-certificates
-COPY go.mod ./
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /devotion ./cmd/devotion

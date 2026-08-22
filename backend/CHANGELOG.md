@@ -43,3 +43,16 @@ perubahannya.
   adalah galat. Semua variabel hilang dikumpulkan dalam satu galat yang hanya
   memuat nama, tidak pernah nilai. `IsProduction()` untuk penjaga
   `seed:test-data`/`reset:test-data`. (T009)
+- 14 migrasi SQL (`000001_extensions` sampai `000014_rate_limit`, 28 berkas
+  up/down) yang memetakan data-model.md §12 satu banding satu, ditambah runner
+  `internal/platform/migrate`. Runner memakai `iofs` atas migrasi yang di-embed
+  (`db/embed.go`), jalan di bawah `pg_try_advisory_lock` dengan kunci konstanta
+  pada satu koneksi yang di-pin, dan mengembalikan nil tanpa galat bila lock
+  dipegang proses lain (skip saat rollover deploy). Tanpa `DEFAULT now()` di
+  mana pun; kolom waktu diisi aplikasi lewat `Clock`. Down migration kebalikan
+  tepat dalam urutan mundur (trigger sebelum fungsi, fungsi sebelum tabel).
+  Uji: versi 14 `dirty=false`, idempoten dua kali, down-up kembali ke versi 14,
+  tiga fungsi trigger terpasang lewat `pg_trigger`, empat constraint kunci lewat
+  `pg_constraint`, sapuan larangan `DEFAULT` waktu, dan kelengkapan 14 pasang
+  migrasi. Uji integrasi memakai skema terpisah pada Postgres yang sama dan
+  `t.Skip` bila `DATABASE_URL_TEST` tak terjangkau. (T010)
