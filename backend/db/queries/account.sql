@@ -11,6 +11,27 @@ INSERT INTO user_account (
 )
 RETURNING *;
 
+-- UpsertAdmin creates the admin account or, when the email already exists,
+-- resets its password. Idempotent so admin:create can run twice without a
+-- duplicate. role_admin is set true and the two business roles false, which the
+-- admin_has_no_business_role and has_at_least_one_role constraints both accept.
+-- name: UpsertAdmin :one
+INSERT INTO user_account (
+    id, email, phone, password_hash,
+    role_subcontractor, role_buyer, role_admin,
+    email_verified, phone_verified,
+    created_at, updated_at
+) VALUES (
+    gen_random_uuid(), $1, $2, $3,
+    false, false, true,
+    true, true,
+    $4, $4
+)
+ON CONFLICT (email) DO UPDATE
+SET password_hash = EXCLUDED.password_hash,
+    updated_at    = EXCLUDED.updated_at
+RETURNING *;
+
 -- GetAccountByEmail loads one account by its case-insensitive email. Used by
 -- login and recovery; both must run the rate limit before this lookup.
 -- name: GetAccountByEmail :one

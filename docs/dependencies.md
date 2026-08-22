@@ -31,3 +31,13 @@ memakai `golang.org/x/crypto/bcrypt` untuk hash kata sandi dengan cost 10.
 CLAUDE.md mematok bcrypt sebagai satu-satunya jalur hashing kata sandi, dan
 `go mod tidy` menaikkannya dari `// indirect` menjadi dependency langsung.
 Sudah tercantum di Primary Dependencies plan.md. (T014)
+
+### golang.org/x/term (v0.31.0)
+
+Membaca kata sandi admin dari terminal tanpa echo di subcommand `admin:create`
+(`term.ReadPassword`). Kata sandi tidak boleh lewat flag karena flag tersimpan
+di riwayat shell, dan stdlib tidak punya cara portabel mematikan echo terminal.
+Ikut transitif bersama `golang.org/x/crypto`, jadi tidak menambah pohon modul
+baru; `go mod tidy` menaikkannya dari `// indirect` menjadi dependency langsung.
+Di luar Primary Dependencies plan.md, dicatat di sini sesuai Prinsip IV. (T020)
+

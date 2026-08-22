@@ -307,3 +307,58 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 	_, err := q.db.Exec(ctx, updatePassword, arg.ID, arg.PasswordHash, arg.UpdatedAt)
 	return err
 }
+
+const upsertAdmin = `-- name: UpsertAdmin :one
+INSERT INTO user_account (
+    id, email, phone, password_hash,
+    role_subcontractor, role_buyer, role_admin,
+    email_verified, phone_verified,
+    created_at, updated_at
+) VALUES (
+    gen_random_uuid(), $1, $2, $3,
+    false, false, true,
+    true, true,
+    $4, $4
+)
+ON CONFLICT (email) DO UPDATE
+SET password_hash = EXCLUDED.password_hash,
+    updated_at    = EXCLUDED.updated_at
+RETURNING id, email, phone, password_hash, email_verified, phone_verified, role_subcontractor, role_buyer, role_admin, notif_nontx_email, notif_nontx_whatsapp, created_at, updated_at
+`
+
+type UpsertAdminParams struct {
+	Email        string
+	Phone        string
+	PasswordHash string
+	CreatedAt    pgtype.Timestamptz
+}
+
+// UpsertAdmin creates the admin account or, when the email already exists,
+// resets its password. Idempotent so admin:create can run twice without a
+// duplicate. role_admin is set true and the two business roles false, which the
+// admin_has_no_business_role and has_at_least_one_role constraints both accept.
+func (q *Queries) UpsertAdmin(ctx context.Context, arg UpsertAdminParams) (UserAccount, error) {
+	row := q.db.QueryRow(ctx, upsertAdmin,
+		arg.Email,
+		arg.Phone,
+		arg.PasswordHash,
+		arg.CreatedAt,
+	)
+	var i UserAccount
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.PasswordHash,
+		&i.EmailVerified,
+		&i.PhoneVerified,
+		&i.RoleSubcontractor,
+		&i.RoleBuyer,
+		&i.RoleAdmin,
+		&i.NotifNontxEmail,
+		&i.NotifNontxWhatsapp,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

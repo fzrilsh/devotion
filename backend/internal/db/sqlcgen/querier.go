@@ -138,6 +138,11 @@ type Querier interface {
 	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
 	// UpdatePassword replaces the bcrypt hash during recovery confirmation.
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	// UpsertAdmin creates the admin account or, when the email already exists,
+	// resets its password. Idempotent so admin:create can run twice without a
+	// duplicate. role_admin is set true and the two business roles false, which the
+	// admin_has_no_business_role and has_at_least_one_role constraints both accept.
+	UpsertAdmin(ctx context.Context, arg UpsertAdminParams) (UserAccount, error)
 	// UpsertCatalogItem inserts a baseline product or machine type, or reactivates
 	// and reorders an existing one. Idempotent on (type, name): the seed can run
 	// twice without duplicating. created_at is supplied by the caller from the Clock
