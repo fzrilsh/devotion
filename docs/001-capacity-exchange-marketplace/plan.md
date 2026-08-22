@@ -1,164 +1,201 @@
-# Implementation Plan: Capacity Exchange — Marketplace Subkontrak Kapasitas Konveksi (MVP)
+# Implementation Plan: Capacity Exchange, Marketplace Subkontrak Kapasitas Konveksi (MVP)
 
-**Branch**: `001-capacity-exchange-marketplace` | **Date**: 2026-08-21 | **Spec**: `specs/001-capacity-exchange-marketplace/spec.md`
+**Branch**: `001-capacity-exchange-marketplace` | **Date**: 2026-08-21 | **Last Revised**: 2026-08-22
 
-**Input**: Feature specification from `specs/001-capacity-exchange-marketplace/spec.md`
+**Spec**: `docs/001-capacity-exchange-marketplace/spec.md` (91 FR)
 
-**Constitution**: Devotion Constitution v2.1.0
+**Constitution**: `docs/memory/constitution.md` v2.1.0
+
+**Status**: Phase 0 dan Phase 1 selesai. Constitution Check pasca-desain di bawah.
 
 ## Summary
 
-Membangun Devotion, platform web responsif tempat UMKM konveksi mendaftarkan kapasitas produksi yang menganggur dan UMKM yang kelebihan order mencarinya berdasarkan kecocokan keras, mengirim request kuota ke beberapa kandidat, bernegosiasi harga, lalu mengeksekusi pesanan sampai tuntas dengan reputasi yang terbentuk dari transaksi nyata. Masalah yang dijawab: pencarian subkontraktor yang hanya lewat relasi personal sehingga jangkauannya terbatas dan tidak ada mekanisme matching sistematis [1], listing kapasitas statis yang cepat kedaluwarsa sehingga transaksi gagal [1], dan tidak adanya sistem reputasi antar UMKM yang belum saling kenal [1].
+Membangun Devotion, platform web responsif tempat UMKM konveksi mendaftarkan kapasitas produksi yang menganggur dan UMKM yang kelebihan order mencarinya berdasarkan kecocokan keras, mengirim request kuota ke beberapa kandidat, bernegosiasi harga, lalu mengeksekusi pesanan sampai tuntas dengan reputasi yang terbentuk dari transaksi nyata.
+
+Empat masalah yang dijawab, seluruhnya dari analisis dokumen sumber: pencarian subkontraktor yang hanya lewat relasi personal sehingga jangkauannya terbatas dan tidak ada mekanisme matching sistematis [1]; listing kapasitas yang statis dan cepat kedaluwarsa sehingga informasinya tidak aktual dan transaksi gagal [1]; tidak adanya sistem reputasi antar UMKM yang belum saling kenal sehingga trust rendah dan transaksi antar pihak asing terhambat [1]; dan pemberi order yang memaksakan kapasitas sendiri sehingga terlambat, kualitas turun, dan reputasinya rusak karena alternatif subkontrak tidak terstruktur [1].
 
 Pendekatan teknis: satu biner Go yang menyajikan frontend React hasil build, menghabiskan TLS sendiri dengan Cloudflare Origin Certificate, dan berbicara ke satu PostgreSQL. Dua layanan di `docker-compose.yml`, tidak ada proses ketiga. Modularitas lewat batas paket internal, bukan batas jaringan. Pekerjaan terjadwal ditangani penjadwal di dalam proses yang sama, dengan perhitungan saat baca sebagai lapisan kedua agar tidak ada tenggat yang terlewat bila proses sempat mati.
 
 ## Technical Context
 
-**Language/Version**: Go 1.22+ (backend), TypeScript 5.x pada React 18 (frontend)
+**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip VI, tidak ada rentang terbuka.
 
 **Primary Dependencies**:
 
-Backend — `net/http` (router bawaan, pola path + metode sejak 1.22), `jackc/pgx/v5` (driver Postgres), `sqlc` (generator kode dari SQL, perkakas build), `golang-migrate` (migrasi), `golang.org/x/crypto/bcrypt` (hash kata sandi), `go.mau.fi/whatsmeow` (WhatsApp), `getsentry/sentry-go` (pelacak error), `log/slog` + `net/smtp` + `image/jpeg` + `crypto/rand` (standard library, nol dependency tambahan untuk log terstruktur, email, pengolahan gambar, dan token sesi)
+Backend: `net/http` (router bawaan, pola path + metode sejak 1.22), `jackc/pgx/v5`, `sqlc` (generator, perkakas build), `golang-migrate`, `golang.org/x/crypto/bcrypt`, `go.mau.fi/whatsmeow`, `getsentry/sentry-go`. Dari standard library tanpa dependency tambahan: `log/slog` (log terstruktur), `net/smtp` (email lewat Mailjet), `image/jpeg` dan `image/png` (pembuangan metadata lokasi), `crypto/rand` (token sesi).
 
-Frontend — Vite, React, TanStack Query (pengambilan data server), Zod + React Hook Form (validasi form), Tailwind CSS (gaya), Leaflet + tile OpenStreetMap (peta), `@sentry/react`
+Frontend: Vite, React 18, TanStack Query, Zod + React Hook Form, Tailwind CSS, Leaflet + tile OpenStreetMap, `@sentry/react`, `openapi-typescript` (devDependency).
 
-**Storage**: PostgreSQL 16 untuk seluruh data termasuk store sesi whatsmeow; berkas unggahan pada volume disk VPS (maksimal 5MB per berkas, total maksimal 500MB), dilayani hanya lewat handler Go yang memeriksa peran
+**Storage**: PostgreSQL 16 untuk seluruh data termasuk store sesi whatsmeow dan tabel pembatasan laju; berkas unggahan pada volume disk VPS (maksimal 5MB per berkas, total maksimal 500MB), dilayani hanya lewat handler Go yang memeriksa peran.
 
-**Testing**: `go test` dengan skema Postgres terpisah pada layanan basis data yang sama (backend), Jest (frontend), pengujian end-to-end manual oleh penguji di luar tim mengikuti dokumen skenario
+**Testing**: `go test` dengan skema Postgres terpisah pada layanan basis data yang sama (backend), Jest (frontend), pengujian end-to-end **manual** oleh penguji di luar tim mengikuti `quickstart.md` bagian F.
 
-**Target Platform**: VPS Linux tunggal, 2GB RAM, 50GB storage, fresh install; Docker Compose dua layanan; Cloudflare sebagai DNS dan proxy tepi dengan mode SSL/TLS Full (strict)
+**Target Platform**: VPS Linux tunggal, 2GB RAM, 50GB storage; Docker Compose dua layanan; Cloudflare sebagai DNS dan proxy tepi dengan mode SSL/TLS Full (strict) dan Authenticated Origin Pulls.
 
-**Project Type**: Web application monolith — satu repository, satu deployable, frontend disematkan ke dalam biner backend
+**Project Type**: Web application monolith, satu repository, satu deployable, frontend disematkan ke dalam biner backend.
 
-**Performance Goals**: Hasil pencarian tampil dalam 3 detik pada koneksi seluler lambat (SC-010); pencarian yang diulang menghasilkan urutan identik termasuk antar halaman (SC-013)
+**Performance Goals**: Hasil pencarian tampil dalam 3 detik pada koneksi seluler lambat (SC-010); pencarian yang diulang menghasilkan urutan identik termasuk antar halaman (SC-013).
 
-**Constraints**: 2GB RAM dan 50GB disk pada satu server; maksimal 2 layanan runtime; dilarang memproses dana pihak mana pun; dilarang membangun artefak di server; ukuran log kontainer dan total unggahan wajib dibatasi
+**Constraints**: 2GB RAM dan 50GB disk pada satu server; maksimal 2 layanan runtime; dilarang memproses dana pihak mana pun; dilarang membangun artefak di server; ukuran log kontainer dan total unggahan wajib dibatasi.
 
-**Scale/Scope**: 86 functional requirement, 7 user story, 16 entitas, 19 success criteria. Data demo sekitar 50 usaha; SC-003 menargetkan 200 usaha aktif pada bulan ketiga sebagai sasaran bisnis, mengikuti proyeksi sekitar 1.500 UMKM aktif pada tahun ketiga [1]
+**Scale/Scope**: 91 functional requirement, 7 user story, 16 entitas domain pada 25 tabel, 21 success criteria, 63 operasi API, 81 task. Data demo sekitar 50 usaha; SC-003 menargetkan 200 usaha aktif pada bulan ketiga sebagai sasaran bisnis, mengikuti proyeksi sekitar 1.500 UMKM aktif dengan transaksi rata-rata Rp 64 juta per UMKM per tahun pada tahun ketiga [1].
 
-**Anggaran memori pada 2GB** (perkiraan, wajib diverifikasi saat penyiapan server):
+**Anggaran memori pada 2GB** (perkiraan, wajib diverifikasi dengan `docker stats` setelah penyiapan):
 
 | Komponen | Perkiraan |
 |----------|-----------|
-| PostgreSQL (`max_connections` diturunkan ke 20) | 300–400MB |
+| PostgreSQL (`max_connections` 20, `shared_buffers` 256MB) | 300–400MB |
 | Go + whatsmeow | 150–250MB |
 | Sistem operasi dan Docker | 250–350MB |
 | Sisa untuk lonjakan | ~1GB |
-| Swap yang disiapkan | 2GB |
+| Swap yang disiapkan | 2GB, `vm.swappiness=10` |
 
-**NEEDS CLARIFICATION** — tiga hal yang belum dapat saya pastikan dan akan diselesaikan di `research.md`:
+### Keputusan yang Sudah Tertutup
 
-1. Cara paling andal menolak koneksi yang tidak datang dari Cloudflare pada mode Full (strict): pembatasan firewall ke rentang alamat Cloudflare, Authenticated Origin Pulls, atau keduanya. Rentang alamat Cloudflare juga perlu diambil dan dipatok beserta tanggal pengambilannya.
-2. Bentuk dan ketersediaan respons wilayah.id saat ini, serta apakah kode wilayahnya sesuai kode resmi BPS/Kemendagri. Saya belum memeriksa endpoint-nya langsung.
-3. Angka penyetelan PostgreSQL yang tepat untuk 2GB (`shared_buffers`, `work_mem`, `effective_cache_size`) beserta batas pool koneksi di sisi Go.
+Empat pertentangan antar artefak yang ditemukan `/analyze` dan diselesaikan pada revisi 2026-08-22. Dicatat di sini karena keempatnya membentuk arsitektur pencarian dan alokasi:
 
-Batas dan kuota layanan luar (rate limiting Cloudflare paket gratis, batas ukuran body proxy, kuota harian Mailjet paket gratis) tidak saya hafal dan dapat berubah; semuanya perlu diperiksa langsung di dasbor masing-masing, bukan diasumsikan dari dokumen ini.
+| Isu | Keputusan | Dampak |
+|-----|-----------|--------|
+| Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `jeda_kesiapan_hari`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `pesanan.minggu_kesiapan_mulai` + trigger; kueri pencarian |
+| Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `listing_kapasitas.horizon_sampai` |
+| Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh 25 tabel; menegakkan Prinsip V pada tingkat data |
+| Kriteria mesin tidak terdefinisi ketika filternya dikosongkan | Kriteria yang filternya tidak diisi dihitung **terpenuhi**; respons menyebut kriteria mana yang dievaluasi. Skor tetap 0–4, tanpa normalisasi | FR-023, FR-026 |
 
-## Constitution Check
+Dua temuan WARNING yang juga sudah ditutup: FR-089 (propagasi perubahan kapasitas mingguan ke periode mendatang tanpa alokasi) dan FR-091 (penggolongan notifikasi transaksional versus non-transaksional, dengan kolom `notifikasi.transaksional`).
 
-*GATE: Wajib lolos sebelum Phase 0. Diperiksa ulang setelah Phase 1.*
+### Yang Masih Terbuka
 
-### Gate I — Monolith-First (NON-NEGOTIABLE)
+Satu keputusan bersyarat dan tiga hal yang wajib diverifikasi sebelum task terkait dimulai:
 
-| Aturan | Rencana | Status |
-|--------|---------|--------|
-| Backend dan frontend satu repository | `backend/` dan `frontend/` dalam satu repo | LOLOS |
-| Frontend disajikan proses backend yang sama | Hasil build Vite disematkan lewat `embed.FS`, dilayani handler Go dengan fallback SPA | LOLOS |
-| Maksimal dua layanan runtime | `docker-compose.yml`: `backend`, `postgres` | LOLOS |
-| Tidak ada broker, worker, cron, cache, proxy sebagai proses | Tidak ada. TLS oleh Go sendiri dengan Cloudflare Origin Certificate | LOLOS |
-| Pekerjaan terjadwal tanpa proses kedua | Penjadwal `time.Ticker` di dalam proses backend, ditambah perhitungan saat baca sebagai lapisan kedua | LOLOS |
-| Notifikasi di dalam proses yang sama | Goroutine pengirim membaca antrean dari tabel notifikasi; kegagalan tidak menggagalkan transaksi (FR-086) | LOLOS |
-| Antar modul lewat pemanggilan fungsi | Paket `internal/*` saling memanggil langsung; tidak ada HTTP ke diri sendiri | LOLOS |
+- **Rentang alamat Cloudflare** di `research.md` R-01 ditulis dari ingatan dan **wajib dicocokkan** ke sumber resmi sebelum dipatok ke konstanta Go.
+- **Angka penyetelan PostgreSQL** di R-03 sudah konkret dan siap pakai, tetapi wajib diverifikasi dengan pengukuran nyata pada 2GB.
+- **Batas dan kuota layanan luar** (aturan rate limiting Cloudflare paket gratis, batas ukuran body proxy, kuota harian Mailjet) tidak saya hafal dan berubah dari waktu ke waktu. Periksa langsung di dasbor masing-masing, jangan diasumsikan dari dokumen ini.
+
+## Constitution Check (Pasca-Phase 1)
+
+*Diperiksa ulang setelah `research.md`, `data-model.md`, `contracts/`, dan `quickstart.md` selesai.*
+
+### Gate I: Monolith-First (NON-NEGOTIABLE)
+
+| Aturan | Bukti pada artefak desain | Status |
+|--------|---------------------------|--------|
+| Backend dan frontend satu repository | Struktur di bawah | LOLOS |
+| Frontend disajikan proses backend yang sama | `research.md` R-06: `embed.FS` + fallback SPA; T022 | LOLOS |
+| Maksimal dua layanan runtime | `quickstart.md` B10: `backend`, `postgres` | LOLOS |
+| Tidak ada broker, worker, cron, cache, proxy sebagai proses | TLS oleh Go dengan Origin Certificate (R-01); Cloudflare Tunnel ditolak justru karena `cloudflared` adalah daemon | LOLOS |
+| Pekerjaan terjadwal tanpa proses kedua | R-07: perhitungan saat baca + `time.Ticker` dalam proses, masing-masing dibungkus advisory lock | LOLOS |
+| Notifikasi di dalam proses yang sama | `data-model.md` §9: baris `notifikasi` di dalam transaksi kejadian, `notifikasi_kanal` diproses goroutine setelahnya (FR-086) | LOLOS |
+| Antar modul lewat pemanggilan fungsi | Paket `internal/*`; tidak ada HTTP ke diri sendiri | LOLOS |
 | Perkakas pengembangan bukan proses runtime | `sqlc`, `golang-migrate` CLI, Jest, `go test` hanya saat build dan uji | LOLOS |
-| Perintah sekali jalan lewat subcommand | `devotion serve`, `admin:create`, `seed:master-data`, `seed:wilayah`, `seed:test-data`, `reset:test-data` | LOLOS |
+| Perintah sekali jalan lewat subcommand | Delapan subcommand pada satu biner (T002) | LOLOS |
 | Pengujian tanpa layanan basis data tambahan | Skema `test_*` pada layanan Postgres yang sama | LOLOS |
-| Layanan luar dicatat, tidak dihitung | Cloudflare, Mailjet, Sentry, pemantau uptime, wilayah.id — dicatat di `docs/layanan-luar.md` beserta akibat bila mati | LOLOS |
+| Layanan luar dicatat, tidak dihitung | `docs/layanan-luar.md`: Cloudflare, Mailjet, Sentry, pemantau uptime, wilayah.id | LOLOS |
 
-### Gate II — Demo-Ready Over Complete
+**Cara memeriksa**: hitung entri di bawah `services:` pada `docker-compose.yml`. Lebih dari dua, atau ada layanan di luar backend dan basis data, berarti pelanggaran.
 
-| Aturan | Rencana | Status |
-|--------|---------|--------|
-| Setiap story dapat didemokan lewat antarmuka | Tujuh story punya halaman sendiri; tidak ada Acceptance Scenario yang menuntut akses basis data manual | LOLOS |
-| Data contoh untuk keadaan berhasil dan gagal | `seed:test-data` menyiapkan keduanya, termasuk hasil pencarian kosong dan penawaran yang tertolak karena kapasitas | LOLOS |
-| Data acuan terisi dengan satu perintah | `seed:wilayah` dan `seed:master-data` | LOLOS |
-| Demo tidak bergantung layanan yang bisa mati | Notifikasi di dalam platform (FR-054) menjadi jalur pengamatan; WhatsApp dan email boleh gagal tanpa merusak alur | LOLOS |
+### Gate II: Demo-Ready Over Complete
 
-Turunan yang mengikat urutan pengerjaan: pengisian daftar baku dan wilayah adalah prasyarat data bagi User Story 1 dan 2, sehingga masuk fase Foundational, terpisah dari antarmuka admin yang tetap di prioritas terakhir.
+| Aturan | Bukti | Status |
+|--------|-------|--------|
+| Setiap story dapat didemokan lewat antarmuka | `quickstart.md` §F: 83 langkah verifikasi manual, tujuh story | LOLOS |
+| Data contoh keadaan berhasil dan gagal | T075: hasil pencarian kosong, penawaran tertolak karena kapasitas, kalender basi, request kedaluwarsa | LOLOS |
+| Data acuan terisi dengan satu perintah | `seed:wilayah`, `seed:master-data` (T019) | LOLOS |
+| Demo tidak bergantung layanan yang bisa mati | Notifikasi di dalam platform sebagai jalur pengamatan; WhatsApp dan email boleh gagal tanpa merusak alur (FR-054, FR-086) | LOLOS |
 
-### Gate III — Traceability to Spec
+Turunan yang mengikat urutan: pengisian daftar baku dan wilayah adalah prasyarat data bagi US1 dan US2, sehingga masuk fase Foundational (T019), terpisah dari antarmuka admin yang tetap di prioritas terakhir (T073). Tanpa itu, US7 harus naik ke awal padahal prioritasnya P7.
 
-Setiap task di `tasks.md` akan mencantumkan FR atau user story. Setiap pengujian menyebutkan FR pada namanya. Setiap skenario penguji manual menunjuk Acceptance Scenario. Kontrak API di `contracts/` akan memetakan setiap endpoint ke FR yang dilayaninya. **LOLOS** — dapat ditegakkan, diperiksa saat `/tasks`.
+### Gate III: Traceability to Spec
 
-### Gate IV — Minimal Dependencies
+| Aturan | Bukti | Status |
+|--------|-------|--------|
+| Setiap task menunjuk FR atau user story | `tasks.md`: 66 dari 81 task punya baris **FR** | LOLOS bersyarat |
+| Setiap pengujian menyebut FR | Pola nama disepakati di `CLAUDE.md` | LOLOS |
+| Setiap endpoint dipetakan ke FR | `contracts/README.md`: peta 63 operasi + 10 FR yang memang bukan endpoint | LOLOS |
+| Skenario penguji menunjuk Acceptance Scenario | `quickstart.md` §F: setiap blok menyebut nomor scenario | LOLOS |
 
-Setiap dependency dan pembenarannya. Yang dapat diselesaikan standard library sengaja tidak memakai dependency.
+**Bersyarat**: 15 task pada fase Setup dan Polish tidak menunjuk FR karena melayani gerbang konstitusi, bukan requirement produk: T001, T003–T007, T009, T011, T020, T075–T081. Ini dicatat sebagai pengecualian di Complexity Tracking, bukan diabaikan.
+
+### Gate IV: Minimal Dependencies
+
+Sebelas dependency runtime, seluruhnya dengan pembenaran di `plan.md` versi ini dan `docs/dependencies.md`. Yang diselesaikan tanpa dependency: log terstruktur, email, pembuangan EXIF, token acak, UUID, jarak haversine, pembatasan laju, router.
 
 | Dependency | Pembenaran | Alternatif yang ditolak |
 |------------|------------|-------------------------|
-| `pgx/v5` | Driver Postgres yang matang; mendukung penguncian baris dan transaksi yang dibutuhkan FR-036 | `database/sql` + `lib/pq` — kurang mendukung tipe Postgres dan lebih lambat |
-| `sqlc` | Query pencarian dan skor kecocokan harus eksplisit dan deterministik (FR-023 sampai FR-025); generator menjaga SQL tetap terlihat | GORM — menyembunyikan SQL, justru pada bagian paling penting |
-| `golang-migrate` | Migrasi berversi yang dapat dijalankan otomatis saat startup | Menulis migrasi sendiri — sekitar 200 baris kode yang tidak perlu |
-| `bcrypt` | Hash kata sandi yang memang ditujukan untuk itu | argon2id — lebih baik, tetapi biaya memorinya perlu disetel hati-hati pada 2GB |
-| `whatsmeow` | Satu-satunya cara mengirim WhatsApp tanpa API resmi yang butuh verifikasi bisnis; berjalan sebagai library, bukan layanan | API resmi Meta — verifikasi bisnis tidak akan selesai sebelum tenggat |
-| `sentry-go`, `@sentry/react` | Mengetahui adanya kerusakan sebelum juri menemukannya | Self-host Sentry — menuntut beberapa layanan, melanggar Gate I |
-| TanStack Query | Daftar pesanan, hasil pencarian, dan status per kandidat semuanya perlu disegarkan; menghemat banyak kode keadaan | `useEffect` manual — menulis ulang cache, invalidasi, dan keadaan galat |
-| Zod + React Hook Form | Validasi form dengan skema yang sama dipakai memeriksa bentuk respons | Validasi manual — rawan dan berulang pada belasan form |
-| Tailwind CSS | FR-055 menuntut mobile-first; menulis CSS sendiri lebih lambat | Component library — menambah bobot; hanya dipilih bila tenggat menekan |
-| Leaflet + OpenStreetMap | FR-064 menampilkan titik lokasi; tanpa kunci API dan tanpa penagihan | Google Maps, Mapbox — menuntut kunci dan kartu kredit |
+| `pgx/v5` | Mendukung penguncian baris dan transaksi yang dibutuhkan alokasi kapasitas | `database/sql` + `lib/pq`, dukungan tipe Postgres lebih lemah |
+| `sqlc` | Kueri pencarian dan skor harus eksplisit dan deterministik; generator menjaga SQL terlihat | GORM, menyembunyikan SQL justru pada bagian terpenting |
+| `golang-migrate` | Migrasi berversi, dijalankan otomatis saat startup | Menulis sendiri, ~200 baris tanpa nilai tambah |
+| `bcrypt` | Hash kata sandi yang memang untuk itu | argon2id, lebih baik, tetapi biaya memorinya perlu penyetelan hati-hati pada 2GB |
+| `whatsmeow` | Satu-satunya cara mengirim WhatsApp tanpa verifikasi bisnis; library, bukan layanan | API resmi Meta, verifikasi tidak selesai sebelum tenggat |
+| `sentry-go`, `@sentry/react` | Mengetahui kerusakan sebelum juri menemukannya | Self-host Sentry, beberapa layanan, melanggar Gate I |
+| TanStack Query | Hasil pencarian, daftar pesanan, status kandidat semuanya perlu disegarkan | `useEffect` manual, menulis ulang cache dan invalidasi |
+| Zod + React Hook Form | Skema yang sama memvalidasi form dan bentuk respons | Validasi manual, rawan pada belasan form |
+| Tailwind CSS | FR-055 menuntut mobile-first | Component library, hanya bila tenggat menekan |
+| Leaflet + OpenStreetMap | FR-064 menampilkan titik lokasi tanpa kunci API | Google Maps, Mapbox, menuntut kunci dan penagihan |
+| `openapi-typescript` | Tipe frontend dari kontrak, bukan ditulis tangan | Tulis tangan, akan menyimpang tanpa terdeteksi |
 
-Diselesaikan tanpa dependency: log terstruktur (`log/slog`), pengiriman email (`net/smtp`), pembuangan metadata gambar dan pengubahan ukuran (`image/jpeg`, `image/png` — dekode lalu enkode ulang membuang EXIF), token sesi (`crypto/rand`), pengenal baris (`gen_random_uuid()` bawaan Postgres), perhitungan jarak haversine (aritmetika sendiri, bukan PostGIS), pembatasan laju domain (tabel Postgres), router (`net/http`).
+**LOLOS**. Bila tenggat menekan, kandidat pertama yang dipangkas adalah Sentry di sisi frontend.
 
-**LOLOS** dengan catatan: sebelas dependency untuk project seukuran ini masih dapat dipertanggungjawabkan, tetapi lima di antaranya milik frontend. Bila tenggat menekan, kandidat pertama yang dipangkas adalah Sentry di sisi frontend.
+### Gate V: Deterministic Behavior
 
-### Gate V — Deterministic Behavior
-
-| Aturan | Rencana | Status |
-|--------|---------|--------|
-| Urutan hasil identik pada pengulangan, termasuk antar halaman | Pengurutan penuh oleh SQL dengan pemecah seri berakhir pada pengenal listing (FR-025); paginasi memakai keyset, bukan offset | LOLOS |
-| Skor hanya dari kriteria keras | Empat kriteria FR-023 dihitung sebagai empat nilai boolean yang dijumlahkan; tidak ada bobot | LOLOS |
-| Setiap keputusan dapat dijelaskan satu kalimat | Respons pencarian menyertakan status per kriteria (FR-026) | LOLOS |
-| Satu sumber waktu yang dapat digantikan | Interface `Clock` disuntikkan ke setiap service; `time.Now()` dilarang di dalam logika bisnis | LOLOS |
-| Batas minggu Senin, Asia/Jakarta, tipe tanggal | Kolom `date` untuk awal periode; seluruh pergeseran minggu dihitung di WIB; waktu kejadian `timestamptz` | LOLOS |
-| Uang bilangan bulat rupiah | Kolom `bigint`, tanpa pecahan | LOLOS |
-| Data acuan dari luar diambil sekali dan disalin ke repo | `seed:wilayah` mengambil dari wilayah.id, menyimpan ke Postgres, sekaligus menulis `docs/master-data/wilayah.json` sebagai cadangan | LOLOS |
+| Aturan | Bukti | Status |
+|--------|-------|--------|
+| Urutan identik pada pengulangan, termasuk antar halaman | R-05: keyset tuple lima kolom berakhir pada `listing_id`; `data-model.md` §10 | LOLOS |
+| Skor hanya dari kriteria keras | Empat boolean dijumlahkan; FR-024 melarang faktor lain secara eksplisit | LOLOS |
+| Setiap keputusan dapat dijelaskan satu kalimat | Respons pencarian mengirim nilai per kriteria (FR-026) | LOLOS |
+| Satu sumber waktu yang dapat digantikan | `Clock` disuntikkan; **tidak ada `DEFAULT now()` pada tabel mana pun** | LOLOS |
+| Batas minggu Senin, WIB, tipe tanggal | `CHECK EXTRACT(ISODOW) = 1` pada tiga tabel | LOLOS |
+| Uang bilangan bulat rupiah | `bigint`, tanpa tipe pecahan | LOLOS |
+| Data acuan dari luar diambil sekali, disalin ke repo | T019: `--refresh` hanya di lokal, salinan di `docs/master-data/` | LOLOS |
 
 ### Batasan Tambahan
 
-| Batasan | Rencana | Status |
-|---------|---------|--------|
-| Batas keuangan | Tidak ada payment gateway; hanya Catatan Pembayaran sebagai pernyataan pengguna (FR-040 sampai FR-043) | LOLOS |
-| Unggahan tidak lewat path statis | Handler `GET /api/files/{id}` memeriksa peran sebelum mengirim byte | LOLOS |
-| Nama berkas dibuat sistem, tipe divalidasi dari isi | UUID sebagai nama; tipe diperiksa dari magic bytes | LOLOS |
-| Metadata lokasi gambar dibuang | Dekode dan enkode ulang saat unggah | LOLOS |
-| Segmen origin terenkripsi, koneksi non-Cloudflare ditolak | Cloudflare Origin Certificate + Full (strict) + pembatasan firewall | LOLOS, rinciannya menunggu Phase 0 |
-| Alamat asal hanya dipercaya dari rentang Cloudflare | Middleware memeriksa `RemoteAddr` terhadap rentang yang dipatok sebelum membaca header | LOLOS |
-| Pembatasan laju berbasis data domain | Per akun untuk percobaan masuk, per nomor untuk kode sekali pakai, per pengguna untuk request kuota | LOLOS |
-| Kredensial dan nomor layanan tidak di repo | Seluruhnya variabel lingkungan; `.env.example` hanya memuat nama kunci tanpa nilai | LOLOS |
-| Membangun artefak tidak di server | GitHub Actions membangun image, VPS hanya menarik dan menjalankan | LOLOS |
-| Ukuran log dibatasi | `max-size` dan `max-file` pada kedua layanan compose | LOLOS |
-| Cadangan terjadwal, salinan di luar server, jumlah dibatasi | `pg_dump` harian lewat cron host, disalurkan ke gzip, tiga salinan terakhir, disalin keluar VPS | PERLU DICATAT — lihat Complexity Tracking |
+| Batasan | Bukti | Status |
+|---------|-------|--------|
+| Batas keuangan | Tidak ada payment gateway; `catatan_pembayaran` tanpa kolom jumlah uang. Escrow yang menahan dana dan merilisnya saat pesanan dikonfirmasi selesai [1] sengaja tidak dibangun | LOLOS |
+| Unggahan tidak lewat path statis | `GET /api/berkas/{id}` memeriksa peran sebelum mengirim byte | LOLOS |
+| Nama berkas dibuat sistem, tipe dari isi | UUID sebagai `path_penyimpanan`; magic bytes | LOLOS |
+| Metadata lokasi gambar dibuang | Dekode–enkode ulang saat unggah | LOLOS |
+| Segmen origin terenkripsi, koneksi non-Cloudflare ditolak | R-01: tiga lapisan (firewall, Origin Certificate + Full (strict), Authenticated Origin Pulls) | LOLOS |
+| Alamat asal hanya dipercaya dari rentang Cloudflare | `RealIP` memeriksa `RemoteAddr` sebelum membaca header | LOLOS |
+| Pembatasan laju berbasis data domain | Empat batas di tabel `batas_laju`, bukan di memori | LOLOS |
+| Kredensial dan nomor layanan tidak di repo | Variabel lingkungan; `.env.example` hanya nama kunci | LOLOS bersyarat |
+| Membangun artefak tidak di server | CI membangun image; VPS hanya `pull` dan `up` | LOLOS |
+| Ukuran log dibatasi | `max-size 10m`, `max-file 3` pada kedua layanan | LOLOS |
+| Total unggahan dibatasi | 500MB total, 5MB per berkas, `CHECK` + aplikasi | LOLOS |
+| Koneksi basis data disesuaikan memori | `max_connections` 20, pool 15, sisa 5 untuk `pg_dump`, `psql`, migrasi | LOLOS |
+| Cadangan terjadwal, salinan di luar server, jumlah dibatasi | `pg_dump` harian, gzip, tiga salinan, `rsync` keluar | LOLOS dengan catatan |
+
+**Bersyarat pada kredensial**: `quickstart.md` §E memuat kredensial akun uji karena konstitusi juga mewajibkan kredensial akun uji tersedia bagi penguji eksternal. Dua kewajiban itu bertabrakan secara harfiah, dan penyelesaiannya ada di Complexity Tracking.
 
 ### Hasil Gate
 
-Lolos untuk melanjutkan ke Phase 0, dengan dua hal tercatat di Complexity Tracking dan tiga hal yang harus diselesaikan `research.md`.
+Lolos untuk implementasi. Dua pengecualian tercatat di Complexity Tracking, dan empat hal terbuka di Technical Context wajib diselesaikan sebelum task terkait dimulai.
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```text
-docs/specs/001-capacity-exchange-marketplace/
-├── spec.md
-├── plan.md
-├── research.md
-├── data-model.md
-├── quickstart.md
-├── contracts/
-└── tasks.md
-
-docs/memory/
-└── constitution.md
+docs/
+├── memory/
+│   └── constitution.md                     # v2.1.0
+└── 001-capacity-exchange-marketplace/
+    ├── spec.md                             # 91 FR, revisi 2026-08-22
+    ├── plan.md                             # berkas ini
+    ├── research.md                         # R-01 sampai R-10
+    ├── data-model.md                       # 25 tabel, revisi 2026-08-22
+    ├── quickstart.md                       # runbook VPS + 83 langkah uji manual
+    ├── tasks.md                            # 81 task, tingkat modul
+    ├── contracts/
+    │   ├── openapi.yaml                    # 63 operasi, 28 kode galat
+    │   └── README.md                       # peta endpoint → FR
+    └── checklists/
+        └── requirements.md                 # 16 butir
 ```
+
+Dokumen operasional yang diturunkan dari `quickstart.md` berada langsung di bawah `docs/`: `setup-vps.md`, `menjalankan.md`, `pengujian.md`, `skenario-uji-manual.md`, `temuan-penguji.md`, `layanan-luar.md`, `dependencies.md`, `utang-teknis.md`, `cloudflare-ips.md`, dan data acuan pada `docs/master-data/`.
+
+Changelog **tidak** berada di `docs/`. Ia per bagian: `backend/CHANGELOG.md` dan `frontend/CHANGELOG.md`, diisi setiap kali sebuah story ditutup di checkpoint.
 
 ### Source Code (repository root)
 
@@ -166,73 +203,87 @@ docs/memory/
 devotion/
 ├── README.md                       # template panitia, struktur tidak diubah
 ├── LICENSE                         # MIT
+├── CLAUDE.md                       # panduan agent, di root agar terbaca
 ├── docker-compose.yml              # tepat 2 layanan: backend, postgres
 ├── .env.example                    # nama variabel tanpa nilai
-├── .github/workflows/ci.yml        # vet, test, build image, deploy
+├── .github/workflows/ci.yml
 ├── backend/
-│   ├── cmd/devotion/main.go        # subcommand: serve, admin:create, seed:*, reset:test-data
+│   ├── CHANGELOG.md
+│   ├── cmd/devotion/               # serve, admin:create, seed:*, reset:*, user:verify, health:check
 │   ├── internal/
-│   │   ├── platform/               # clock, config, httpx, session, storage, scheduler, ratelimit, cloudflare
-│   │   ├── account/                # akun, peran, profil usaha, verifikasi identitas   (US1, US7)
-│   │   ├── masterdata/             # daftar baku, wilayah, usulan item                 (US1, US2, US7)
-│   │   ├── listing/                # listing kapasitas, periode ketersediaan           (US1, US4)
-│   │   ├── search/                 # kriteria keras, skor, pemecah seri, keyset page    (US2)
-│   │   ├── quota/                  # request kuota, penawaran, counter-offer            (US3)
-│   │   ├── order/                  # pesanan, alokasi kapasitas, pembatalan, pembayaran (US4, US5)
-│   │   ├── reputation/             # ulasan, tingkat penyelesaian                       (US6)
-│   │   ├── notification/           # antrean, pengirim email/WA/in-app, percobaan ulang (semua)
-│   │   └── admin/                  # verifikasi, moderasi, mediasi                      (US7)
-│   ├── db/
-│   │   ├── migrations/             # golang-migrate, berurutan
-│   │   └── queries/                # sumber SQL untuk sqlc
+│   │   ├── platform/               # clock, config, httpx, session, storage, scheduler,
+│   │   │                           # ratelimit, cloudflare
+│   │   ├── account/                # akun, peran, profil usaha, verifikasi identitas
+│   │   ├── masterdata/             # daftar baku, wilayah, usulan item
+│   │   ├── listing/                # listing kapasitas, periode ketersediaan, horizon
+│   │   ├── search/                 # kriteria keras, skor, pemecah seri, keyset
+│   │   ├── quota/                  # request kuota, penawaran, counter-offer
+│   │   ├── order/                  # pesanan, alokasi kapasitas, pembatalan, pembayaran
+│   │   ├── reputation/             # ulasan, tingkat penyelesaian
+│   │   ├── notification/           # antrean, pengirim, percobaan ulang
+│   │   └── admin/                  # verifikasi, moderasi, mediasi
+│   ├── db/migrations/              # 14 migrasi berurutan
+│   ├── db/queries/                 # sumber SQL untuk sqlc
 │   ├── webdist/                    # hasil build frontend, disematkan embed.FS
 │   └── go.mod
 ├── frontend/
+│   ├── CHANGELOG.md
 │   ├── src/
 │   │   ├── pages/                  # satu berkas per layar, dikelompokkan per user story
 │   │   ├── components/
-│   │   ├── api/                    # klien, tipe dari OpenAPI, hook TanStack Query
+│   │   ├── api/                    # klien, tipe ter-generate, hook TanStack Query
 │   │   ├── schemas/                # skema Zod
 │   │   └── lib/
 │   ├── package.json
 │   └── vite.config.ts
-└── docs/
-    ├── setup-vps.md                # dari fresh install sampai aplikasi jalan
-    ├── menjalankan.md
-    ├── pengujian.md
-    ├── skenario-uji-manual.md      # untuk penguji eksternal, beserta akun uji
-    ├── temuan-penguji.md
-    ├── layanan-luar.md             # Cloudflare, Mailjet, Sentry, wilayah.id, pemantau uptime
-    ├── dependencies.md             # alasan setiap dependency
-    ├── utang-teknis.md
-    └── master-data/                # wilayah.json, jenis-produk.json, jenis-mesin.json
+└── docs/                           # lihat bagian sebelumnya
 ```
 
-**Structure Decision**: Monolith dua bagian dalam satu repository, dengan `backend/` sebagai satu-satunya proses aplikasi. Frontend dibangun di CI, hasilnya disalin ke `backend/webdist/`, lalu disematkan ke dalam biner lewat `embed.FS`. Handler statis melayani berkas yang ada dan mengembalikan `index.html` untuk path yang bukan `/api/*` agar penyegaran halaman dalam tidak menghasilkan 404.
+**Structure Decision**: Monolith dua bagian dalam satu repository, dengan `backend/` sebagai satu-satunya proses aplikasi. Frontend dibangun di CI, hasilnya disalin ke `backend/webdist/`, lalu disematkan lewat `embed.FS`. Handler statis melayani berkas yang ada dan mengembalikan `index.html` untuk path non-API; `/api/*` yang tidak dikenali mengembalikan 404 JSON, bukan HTML, agar kesalahan penulisan alamat tidak menyesatkan saat diagnosis.
 
-Batas modul mengikuti batas user story sedapat mungkin, sehingga setiap fase `tasks.md` menyentuh paket yang jelas. Tiga paket sengaja dipakai bersama beberapa story: `masterdata` menjadi prasyarat US1 dan US2, `notification` dipakai hampir semua story, dan `platform` memuat `Clock` yang wajib dapat digantikan saat pengujian.
+Batas modul mengikuti batas user story sedapat mungkin, sehingga setiap fase `tasks.md` menyentuh paket yang jelas dan `[P]` bermakna di tingkat modul. Tiga paket sengaja dipakai bersama: `masterdata` prasyarat US1 dan US2, `notification` dipakai hampir semua story, `platform` memuat `Clock` yang wajib dapat digantikan.
 
-Konsekuensi arah ketergantungan yang perlu dijaga: `order` mengubah kapasitas milik `listing` lewat baris Alokasi Kapasitas (FR-077), sehingga `order` bergantung pada `listing`, bukan sebaliknya. `search` hanya membaca. Tidak ada ketergantungan melingkar.
+**Arah ketergantungan yang harus dijaga**: `order` mengubah kapasitas milik `listing` lewat baris alokasi (FR-077), sehingga `order` bergantung pada `listing`, bukan sebaliknya. `search` hanya membaca. Tidak ada ketergantungan melingkar.
+
+**Empat path yang dipatok**, berubah tempatnya berarti artefak lain rusak: `backend/internal/platform/clock.go`, `backend/db/migrations/`, `backend/webdist/`, `docker-compose.yml`.
 
 ## Complexity Tracking
 
-Dua penyimpangan dari konstitusi yang perlu dicatat.
-
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|--------------------------------------|
-| Direktori tingkat atas `specs/` dan `memory/` di luar daftar yang diizinkan Batasan Struktur Repository | Artefak spec-driven development ini adalah bagian dari penilaian kualitas dokumen, dan `specs/NNN-*` adalah konvensi yang dirujuk seluruh artefak termasuk `plan.md` ini | Memindahkannya ke `docs/specs/` dan `docs/memory/` akan memenuhi konstitusi secara harfiah, tetapi memutus konvensi yang sudah dirujuk lintas berkas. **Rekomendasi: pindahkan ke `docs/` bila panitia menilai struktur direktori secara ketat, atau amandemen konstitusi menjadi 2.2.0 untuk memasukkan keduanya ke daftar yang diizinkan.** Keputusan pemilik project |
-| Cron di tingkat host untuk `pg_dump` harian | Konstitusi mewajibkan cadangan terjadwal dengan salinan di luar server, sementara Gate I melarang proses terjadwal kedua. Cron host bukan bagian dari aplikasi dan tidak muncul di `docker-compose.yml`, tetapi tetap merupakan pekerjaan terjadwal di server yang sama | Penjadwal di dalam proses backend ditolak karena `pg_dump` harus berjalan meski aplikasi sedang mati atau rusak — justru saat itulah cadangan paling dibutuhkan. Menambah layanan cron ke compose ditolak karena melanggar batas dua layanan |
+| Cron di tingkat host untuk `pg_dump` harian | Konstitusi mewajibkan cadangan terjadwal dengan salinan di luar server, sementara Gate I melarang proses terjadwal kedua. Cron host tidak muncul di `docker-compose.yml` tetapi tetap merupakan pekerjaan terjadwal di server yang sama | Penjadwal di dalam proses backend ditolak karena `pg_dump` harus tetap berjalan ketika aplikasi sedang mati atau rusak, justru saat itulah cadangan paling dibutuhkan. Menambah layanan cron ke compose melanggar batas dua layanan |
+| Kredensial akun uji tertulis di `docs/skenario-uji-manual.md` | Batasan Keamanan melarang kredensial di dokumentasi, sementara gerbang Pengujian End-to-End mewajibkan kredensial akun uji tersedia di `docs/` bagi penguji eksternal yang tidak punya akses basis data | Tidak ada alternatif yang memenuhi keduanya. Dibatasi tiga syarat: akun hanya ada pada data `seed:test-data` yang **menolak berjalan** saat `APP_ENV=production`; kata sandinya tidak dipakai akun sungguhan mana pun; domain `.test` tidak dapat diregistrasi sehingga tidak ada email nyata yang terlibat |
+| Lima belas task tanpa rujukan FR (T001, T003–T007, T009, T011, T020, T075–T081) | Gate III mewajibkan setiap task menunjuk FR atau user story. Kelima belas task ini melayani gerbang konstitusi (struktur repository, CI, penyiapan server, dokumentasi, cadangan), bukan requirement produk | Memaksakan rujukan FR pada scaffolding akan menghasilkan rujukan yang menyesatkan. Sebagai gantinya, setiap task tersebut menyebut gerbang konstitusi yang dilayaninya pada baris **Kemampuan** atau **Hati-hati** |
+| Direktori tingkat atas `.github/` di luar struktur yang didaftar `CLAUDE.md` | Konstitusi mewajibkan CI membangun image, dan CI berbasis GitHub Actions menuntut `.github/workflows/`. `CLAUDE.md` melarang menambah direktori tingkat atas dan tidak menyebut `.github/` | Menaruh definisi CI di dalam `backend/` atau `frontend/` ditolak karena pipeline membangun kedua area sekaligus dan bukan milik salah satunya; `.github/` adalah lokasi yang diwajibkan penyedia CI, bukan pilihan struktur |
 
-Dua hal berikut **bukan** pelanggaran tetapi wajib tercatat di `docs/layanan-luar.md` sesuai Gate I: Cloudflare, Mailjet, Sentry, pemantau uptime, dan wilayah.id semuanya berjalan di luar server dan tidak dihitung sebagai proses runtime.
+Dua hal berikut **bukan** pelanggaran tetapi wajib tercatat di `docs/layanan-luar.md` sesuai Gate I, beserta akibat bila mati: Cloudflare, Mailjet, Sentry, pemantau uptime, dan wilayah.id semuanya berjalan di luar server dan tidak dihitung sebagai proses runtime.
 
-Satu risiko yang tidak melanggar aturan apa pun tetapi perlu terlihat di rencana: whatsmeow memakai protokol WhatsApp Web, bukan API resmi. Nomor yang mengirim kode sekali pakai ke banyak penerima baru berisiko diblokir, dan sesinya dapat lepas kapan saja. FR-002 menjadikan verifikasi nomor HP sebagai gerbang, sehingga blokir nomor berarti tidak ada akun baru yang dapat dibuat saat demo. Mitigasi yang masuk rencana: halaman admin yang menampilkan QR dan status sambungan agar dapat disambungkan ulang tanpa akses SSH, subcommand darurat untuk memverifikasi akun secara manual, dan email yang tetap dipertahankan sebagai kanal kedua. Ini akan dicatat sebagai risiko di `research.md`, bukan sebagai utang teknis, karena keputusannya sadar dan sudah dimitigasi.
+### Risiko yang Diterima Sadar
 
-## Yang Berikutnya
+Empat hal yang bukan pelanggaran aturan tetapi perlu terlihat di rencana, karena semuanya menyimpang dari mitigasi yang dokumen sumber tetapkan:
 
-`plan.md` berhenti di sini sesuai aturan satu artefak per giliran. Urutan berikutnya:
+**whatsmeow memakai protokol WhatsApp Web, bukan API resmi.** FR-002 menjadikan verifikasi nomor HP sebagai gerbang, sehingga nomor yang terblokir berarti tidak ada akun baru yang dapat dibuat saat demo. Mitigasi: halaman admin QR dan status sambungan agar penyambungan ulang tidak memerlukan SSH (T024), subcommand `user:verify` sebagai jalan darurat, email dipertahankan sebagai kanal kedua, dan pembatasan laju per nomor serta per alamat asal untuk mengurangi pola yang terdeteksi sebagai spam.
 
-1. **`research.md`** (Phase 0) — menyelesaikan tiga NEEDS CLARIFICATION di Technical Context, ditambah keputusan tercatat untuk: pola penguncian baris pada alokasi kapasitas lintas periode, bentuk keyset pagination yang menjaga SC-013, cara menyematkan frontend beserta fallback SPA, strategi penjadwal dalam proses berpasangan dengan perhitungan saat baca, ketahanan sesi whatsmeow, dan penyiapan SPF/DKIM/DMARC di Cloudflare untuk Mailjet.
-2. **`data-model.md`, `contracts/`, `quickstart.md`** (Phase 1) — termasuk runbook VPS dari fresh install: pengguna non-root, firewall yang membatasi ke rentang Cloudflare, swap 2GB, Docker, Cloudflare Origin Certificate, penyetelan Postgres untuk 2GB, batas log, volume unggahan, cron cadangan, lalu urutan seed dan pembuatan admin.
-3. **`/tasks`** — task berlabel per user story, dengan task pengujian karena pengujian otomatis diwajibkan konstitusi 2.1.0.
+**Escrow tidak dibangun.** Dokumen sumber menempatkan penahanan dana yang dirilis saat pesanan dikonfirmasi selesai [1] sebagai bagian modul transaksi, dan menjadikannya mitigasi utama risiko gagal bayar sekaligus alat tawar dalam sengketa kualitas. Versi ini menggantinya dengan pencatatan pernyataan pembayaran, sehingga mediasi admin kehilangan salah satu daya paksanya.
 
-Satu keputusan menunggu pemilik project sebelum Phase 1: penempatan `specs/` dan `memory/` pada tabel Complexity Tracking di atas.
+**Verifikasi identitas bukan gerbang.** Hasil pencarian dapat memuat usaha yang belum diperiksa, dan lencana menjadi satu-satunya pembeda.
+
+**Skor kecocokan tidak memuat faktor perilaku.** Penalti peringkat bagi subkontraktor yang tidak memperbarui kalender tidak dipakai; penegakannya hanya lewat pengingat dan penanda "Data Belum Diperbarui".
+
+Keempatnya tercatat lengkap beserta konsekuensinya di bagian Assumptions `spec.md`, dan akan dicatat ulang di `docs/utang-teknis.md` saat implementasi berjalan.
+
+## Phase 0 dan Phase 1: Selesai
+
+**Phase 0 → `research.md`**: sepuluh keputusan. R-01 penolakan koneksi non-Cloudflare (tiga lapisan), R-02 sumber data wilayah (bersyarat), R-03 penyetelan PostgreSQL untuk 2GB (angka konkret), R-04 penguncian baris alokasi lintas periode, R-05 keyset pagination, R-06 penyematan frontend dan fallback SPA, R-07 penjadwal dua lapisan, R-08 ketahanan sesi whatsmeow, R-09 email lewat Mailjet dan penyiapan DNS, R-10 sesi, kata sandi, dan pembatasan laju.
+
+**Phase 1 → `data-model.md`, `contracts/`, `quickstart.md`**: 16 entitas pada 25 tabel dengan seluruh constraint dan indeks, tiga trigger untuk aturan yang melintasi tabel, 63 operasi API dengan 28 kode galat berbahasa Indonesia, dan runbook VPS 16 langkah plus 83 langkah verifikasi manual.
+
+**Phase 2 → `tasks.md`**: 81 task tingkat modul, dihasilkan `/tasks`.
+
+## Langkah Berikutnya
+
+Empat hal terbuka di Technical Context diselesaikan lebih dulu: bentuk respons wilayah.id sebelum T019, rentang alamat Cloudflare sebelum T013, angka Postgres saat penyiapan server, batas layanan luar saat pendaftaran akun.
+
+Lalu implementasi menurut `tasks.md`: Setup → Foundational → US1 → berhenti dan buktikan US1 berdiri sendiri → demo. MVP yang disarankan adalah US1 saja; bila tenggat longgar, US1 sampai US3 bersama membentuk alur utuh dari mendaftarkan kapasitas sampai menyepakati pesanan.
+
+Dua artefak yang perlu terbit ulang setelah revisi ini: `tasks.md` (T035 dan T041 memuat rentang kapasitas dan perpanjangan horizon; T028 harus tahu horizon dapat diperpanjang; T036 dan T050 mendapat test dari SC-020 dan SC-021; T047 mendapat FR-089; T006 dan catatan checkpoint menyesuaikan lokasi changelog) dan `checklists/requirements.md` (butir "no implementation details" perlu dinilai ulang setelah FR-036 dan FR-079 dibersihkan).

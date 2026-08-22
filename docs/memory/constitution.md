@@ -1,6 +1,6 @@
 # Devotion Constitution
 
-**Project**: Devotion — *devotion*, kesetiaan. Platform Capacity Exchange:
+**Project**: Devotion (*devotion*, kesetiaan). Platform Capacity Exchange:
 marketplace subkontrak B2B yang mempertemukan UMKM konveksi dengan kapasitas
 produksi menganggur dan UMKM yang order-nya melebihi kapasitas sendiri [1].
 
@@ -34,8 +34,8 @@ Aturan yang mengikat:
   Kegagalan pengiriman MUST TIDAK menggagalkan transaksi yang memicunya.
 - Komunikasi antar modul MUST berupa pemanggilan fungsi langsung di dalam satu
   proses, bukan pemanggilan jaringan ke diri sendiri.
-- Perkakas yang hanya berjalan saat pengembangan — test runner, linter,
-  generator kode, generator migrasi — bukan proses runtime dan tidak melanggar
+- Perkakas yang hanya berjalan saat pengembangan (test runner, linter,
+  generator kode, generator migrasi) bukan proses runtime dan tidak melanggar
   prinsip ini. Batasnya: perkakas itu MUST TIDAK menambah layanan pada
   `docker-compose.yml` dan MUST TIDAK diperlukan agar aplikasi berjalan.
 - Perintah sekali jalan (pembuatan admin, seed data) bukan proses runtime.
@@ -43,8 +43,8 @@ Aturan yang mengikat:
 - Pengujian MUST berjalan terhadap layanan basis data yang sama dengan nama
   basis data atau skema terpisah. Dilarang menambah layanan basis data khusus
   pengujian.
-- Layanan di luar repository yang tidak dijalankan di server sendiri — DNS dan
-  proxy tepi, penyedia email, pemantau uptime, pelacak error — bukan proses
+- Layanan di luar repository yang tidak dijalankan di server sendiri (DNS dan
+  proxy tepi, penyedia email, pemantau uptime, pelacak error) bukan proses
   runtime dan tidak dihitung dalam batas ini. Setiap layanan semacam itu MUST
   dicatat di `docs/` beserta akibatnya bila layanan itu mati.
 
@@ -77,7 +77,7 @@ Aturan yang mengikat:
 ### III. Traceability to Spec
 
 Setiap satuan pekerjaan MUST menunjuk ke nomor requirement atau user story di
-`specs/001-capacity-exchange-marketplace/spec.md`.
+`001-capacity-exchange-marketplace/spec.md`.
 
 Aturan yang mengikat:
 
@@ -128,8 +128,8 @@ Aturan yang mengikat:
 - Skor kecocokan MUST hanya dihitung dari kriteria keras yang ditetapkan spec.
   Dilarang memasukkan pembobotan, pembelajaran mesin, personalisasi, maupun
   pengacakan.
-- Setiap keputusan yang ditampilkan ke pengguna — urutan hasil, penolakan
-  penawaran, angka tingkat penyelesaian — MUST dapat dijelaskan kepada pengguna
+- Setiap keputusan yang ditampilkan ke pengguna (urutan hasil, penolakan
+  penawaran, angka tingkat penyelesaian) MUST dapat dijelaskan kepada pengguna
   dalam satu kalimat.
 - Hitungan yang bergantung waktu MUST memakai satu sumber waktu yang sama, dan
   sumber waktu itu MUST dapat digantikan saat pengujian. Tidak ada pemanggilan
@@ -189,9 +189,9 @@ spec lebih dulu.
   segmen itu berjalan tanpa enkripsi dilarang.
 - Alamat asal permintaan yang dikirim proxy tepi MUST hanya dipercaya bila
   koneksinya memang berasal dari rentang alamat proxy tersebut.
-- Pembatasan laju yang bergantung pada data domain — percobaan masuk per akun,
+- Pembatasan laju yang bergantung pada data domain (percobaan masuk per akun,
   pengiriman ulang kode sekali pakai per nomor, dan pengiriman request kuota per
-  pengguna — MUST ditegakkan di dalam aplikasi, tidak diserahkan ke proxy tepi.
+  pengguna) MUST ditegakkan di dalam aplikasi, tidak diserahkan ke proxy tepi.
 - Kredensial MUST berada di variabel lingkungan. Dilarang menuliskannya di
   dalam kode maupun meng-commit berkas `.env`. Nomor telepon layanan, kunci API,
   dan kredensial basis data MUST TIDAK muncul di repository, di dokumentasi,
@@ -348,7 +348,7 @@ penulis kode dan kebiasaan yang dianggap praktik terbaik di luar konteks ini.
 
 ## Riwayat Amandemen
 
-- **2.1.0 (2026-08-21)** — Frontend wajib disajikan oleh proses backend yang
+- **2.1.0 (2026-08-21)**: Frontend wajib disajikan oleh proses backend yang
   sama; batas layanan runtime turun dari tiga menjadi dua (backend dan basis
   data), karena proxy tepi tidak lagi berjalan di server sendiri. Penanda elemen
   antarmuka yang stabil turun dari wajib menjadi anjuran karena pengujian
@@ -362,7 +362,7 @@ penulis kode dan kebiasaan yang dianggap praktik terbaik di luar konteks ini.
   dari layanan luar; kewajiban pengujian atas kapasitas lintas periode dan
   balapan alokasi. Larangan mencantumkan nomor telepon layanan dan kredensial di
   repository maupun artefak perencanaan dinyatakan eksplisit.
-- **2.0.0 (2026-08-21)** — Pengujian otomatis berubah dari tidak diwajibkan
+- **2.0.0 (2026-08-21)**: Pengujian otomatis berubah dari tidak diwajibkan
   menjadi diwajibkan, dengan cakupan minimum yang dapat diperiksa. Ditambahkan
   gerbang mutu baru untuk pengujian end-to-end oleh penguji eksternal. Prinsip I
   diperjelas bahwa perkakas pengembangan bukan proses runtime dan pengujian
@@ -370,6 +370,6 @@ penulis kode dan kebiasaan yang dianggap praktik terbaik di luar konteks ini.
   pengujian menunjuk FR. Prinsip V memperketat sumber waktu menjadi wajib dapat
   digantikan saat pengujian. Prinsip IV mengatur dependency pengujian. Aturan
   penomoran versi diperluas agar mencakup gerbang mutu, bukan hanya prinsip.
-- **1.0.0 (2026-08-21)** — Versi pertama.
+- **1.0.0 (2026-08-21)**: Versi pertama.
 
 **Version**: 2.1.0 | **Ratified**: 2026-08-21 | **Last Amended**: 2026-08-21

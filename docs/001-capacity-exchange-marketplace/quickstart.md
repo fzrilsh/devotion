@@ -1,6 +1,6 @@
-# Quickstart: Devotion — Capacity Exchange
+# Quickstart: Devotion, Capacity Exchange
 
-**Feature**: `docs/specs/001-capacity-exchange-marketplace/`
+**Feature**: `docs/001-capacity-exchange-marketplace/`
 **Date**: 2026-08-21
 **Input**: `plan.md`, `research.md` (R-01, R-03, R-07), `data-model.md`, `contracts/openapi.yaml`
 **Constitution**: v2.1.0
@@ -50,7 +50,7 @@ usermod -aG sudo devotion
 rsync --archive --chown=devotion:devotion ~/.ssh /home/devotion
 ```
 
-Uji dari terminal **baru** sebelum menutup sesi root — kalau kunci belum benar dan sesi
+Uji dari terminal **baru** sebelum menutup sesi root. Kalau kunci belum benar dan sesi
 root sudah tertutup, kamu terkunci di luar:
 
 ```bash
@@ -74,7 +74,7 @@ timedatectl        # verifikasi: Time zone: Asia/Jakarta (WIB, +0700)
 ```
 
 Zona waktu server disetel ke WIB agar log dan `pg_dump` mudah dibaca. Perhitungan batas
-minggu tetap dilakukan eksplisit di kode, tidak diserahkan ke pengaturan ini — Prinsip V
+minggu tetap dilakukan eksplisit di kode, tidak diserahkan ke pengaturan ini. Prinsip V
 mewajibkannya karena pengaturan server dapat berubah tanpa sepengetahuan aplikasi.
 
 ### B3. Swap 2GB
@@ -93,7 +93,7 @@ free -h            # verifikasi: Swap total 2,0Gi
 ```
 
 Bukan untuk dipakai rutin. Ini agar lonjakan sesaat tidak berakhir dengan proses dibunuh
-kernel — dan yang biasanya dibunuh adalah Postgres, bukan penyebab lonjakannya.
+kernel, dan yang biasanya dibunuh adalah Postgres, bukan penyebab lonjakannya.
 
 ### B4. Firewall
 
@@ -127,7 +127,7 @@ Port 80 **tidak** dibuka. Cloudflare menghubungi origin di 443 pada mode Full (s
 dan pengalihan HTTP ke HTTPS ditangani di tepi.
 
 Salin daftar yang sudah diverifikasi ke `docs/cloudflare-ips.md` beserta tanggal
-pengambilannya, dan patok nilainya sebagai konstanta Go — jangan mengambilnya lewat
+pengambilannya, dan patok nilainya sebagai konstanta Go. Jangan mengambilnya lewat
 jaringan saat aplikasi naik, karena satu kegagalan HTTP akan membuat aplikasi gagal
 menyala.
 
@@ -161,7 +161,7 @@ Di dasbor, berurutan:
 | SSL/TLS → Origin Server | Buat **Origin Certificate**, simpan sertifikat dan kunci | Berlaku 15 tahun, tanpa perpanjangan |
 | SSL/TLS → Origin Server | Aktifkan **Authenticated Origin Pulls** | Lapisan kedua bila aturan firewall salah |
 | SSL/TLS → Edge Certificates | **Always Use HTTPS** aktif | Pengalihan di tepi, bukan di origin |
-| Caching → Cache Rules | Bypass cache untuk `/api/*` | Hasil pencarian yang ter-cache menampilkan kapasitas basi — persis masalah data tidak aktual yang platform ini dibangun untuk menyelesaikan |
+| Caching → Cache Rules | Bypass cache untuk `/api/*` | Hasil pencarian yang ter-cache menampilkan kapasitas basi, persis masalah data tidak aktual yang platform ini dibangun untuk menyelesaikan |
 
 Simpan sertifikat di server dengan izin ketat:
 
@@ -237,7 +237,7 @@ DMARC dengan `p=none` pada tahap ini.
 
 Verifikasi di dasbor Mailjet sampai domain berstatus terverifikasi, lalu kirim satu email
 uji ke Gmail dan periksa apakah masuk kotak masuk atau spam. Kegagalan email bersifat
-senyap — server penerima menjawab sukses lalu membuang pesannya — sehingga dasbor Mailjet
+senyap (server penerima menjawab sukses lalu membuang pesannya), sehingga dasbor Mailjet
 adalah satu-satunya cara mengetahui apa yang sebenarnya terjadi.
 
 Karena FR-002 menjadikan verifikasi email sebagai gerbang, kegagalan di sini berarti tidak
@@ -334,7 +334,7 @@ docker compose exec postgres psql -U ${POSTGRES_USER} -d devotion \
   -c "select version, dirty from schema_migrations;"
 ```
 
-`dirty = true` berarti migrasi gagal di tengah. Jangan lanjut — periksa log, perbaiki,
+`dirty = true` berarti migrasi gagal di tengah. Jangan lanjut. Periksa log, perbaiki,
 lalu jalankan ulang. Melanjutkan dengan skema setengah jadi akan menghasilkan galat yang
 tampak tidak berhubungan di langkah-langkah berikutnya.
 
@@ -347,7 +347,7 @@ dan antarmuka pencocokan tidak dapat didemokan tanpa ketiganya.
 
 ```bash
 # Wilayah: dua tingkat administratif saja (provinsi, kota/kabupaten).
-# Di server, baca dari salinan repository — jangan bergantung pada layanan luar.
+# Di server, baca dari salinan repository, jangan bergantung pada layanan luar.
 docker compose exec backend /devotion seed:wilayah
 
 # Daftar baku jenis produk dan jenis mesin.
@@ -379,7 +379,7 @@ docker compose exec postgres psql -U ${POSTGRES_USER} -d devotion -c "
 ```
 
 Kelimanya harus lebih dari nol. Bila `kota` nol sementara `provinsi` terisi, pemetaan kode
-gagal — constraint `kota_milik_provinsinya` menolak baris yang dua digit pertama kodenya
+gagal. Constraint `kota_milik_provinsinya` menolak baris yang dua digit pertama kodenya
 tidak cocok dengan kode provinsinya, dan itu memang gunanya: gagal keras saat seed, bukan
 senyap saat pencarian.
 
@@ -389,7 +389,7 @@ Buka `https://<domain>/admin/whatsapp`, masuk sebagai admin, pindai QR dengan po
 memegang nomor khusus lomba.
 
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
-justru agar penyambungan ulang tidak memerlukan akses SSH — dan itu penting karena FR-002
+justru agar penyambungan ulang tidak memerlukan akses SSH, dan itu penting karena FR-002
 menjadikan verifikasi nomor HP sebagai gerbang pendaftaran.
 
 Risiko yang diterima secara sadar: whatsmeow memakai protokol WhatsApp Web, bukan API
@@ -416,7 +416,7 @@ di `docs/layanan-luar.md` beserta akibat bila mati.
 ### B15. Cadangan basis data
 
 Cron di tingkat host, bukan di dalam kontainer, karena `pg_dump` harus tetap berjalan
-ketika aplikasi sedang mati atau rusak — justru saat itulah cadangan paling dibutuhkan.
+ketika aplikasi sedang mati atau rusak, justru saat itulah cadangan paling dibutuhkan.
 Penyimpangan ini tercatat di Complexity Tracking `plan.md`.
 
 ```bash
@@ -518,7 +518,7 @@ layanan basis data tambahan. Konstitusi melarang menambah layanan untuk keperlua
 pengujian.
 
 Pengujian yang menyangkut tenggat memakai sumber waktu yang digantikan, bukan menunggu
-waktu nyata — tanpa itu, konfirmasi otomatis tujuh hari hanya dapat diverifikasi dengan
+waktu nyata. Tanpa itu, konfirmasi otomatis tujuh hari hanya dapat diverifikasi dengan
 menunggu tujuh hari.
 
 Yang wajib lulus sebelum sebuah story dinyatakan selesai ada di Gate konstitusi; daftar
@@ -582,7 +582,7 @@ langkah pertama.
 ## F. Verifikasi Manual per User Story
 
 Untuk penguji di luar tim. Setiap langkah menyebutkan akun yang dipakai, tindakan, dan
-hasil yang diharapkan. Kolom terakhir untuk menuliskan **apa yang benar-benar terjadi** —
+hasil yang diharapkan. Kolom terakhir untuk menuliskan **apa yang benar-benar terjadi**,
 bukan hanya lulus atau gagal, karena uraian bebas dari penguji sering menemukan hal yang
 tidak ada di skenario ini.
 
@@ -590,26 +590,26 @@ tidak ada di skenario ini.
 
 **Notifikasi WhatsApp dan email tidak perlu Anda periksa.** Keduanya dikirim ke nomor dan
 alamat yang tidak Anda miliki. Jalur pengamatan notifikasi adalah **ikon lonceng di dalam
-aplikasi** — notifikasi selalu tampil di sana meskipun pengiriman ke WhatsApp dan email
+aplikasi**. Notifikasi selalu tampil di sana meskipun pengiriman ke WhatsApp dan email
 gagal seluruhnya. Bila WhatsApp atau email tidak sampai, itu bukan temuan.
 
 ---
 
-### US1 — Subkontraktor mempublikasikan kapasitas produksinya
+### US1: Subkontraktor mempublikasikan kapasitas produksinya
 
 Menjawab masalah pencarian subkontraktor yang selama ini hanya lewat relasi personal
 sehingga jangkauannya terbatas dan tidak ada mekanisme matching sistematis [1].
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
-| 1.1 | — | Daftar akun baru sebagai subkontraktor dengan email dan nomor HP Anda sendiri | Muncul permintaan memasukkan kode verifikasi untuk email dan nomor HP | |
+| 1.1 | publik | Daftar akun baru sebagai subkontraktor dengan email dan nomor HP Anda sendiri | Muncul permintaan memasukkan kode verifikasi untuk email dan nomor HP | |
 | 1.2 | akun baru | Coba buka halaman pembuatan listing sebelum verifikasi selesai | Ditolak dengan penjelasan bahwa email dan nomor HP harus diverifikasi lebih dulu | |
 | 1.3 | `budi@contoh.test` | Buka halaman listing kapasitas | Terlihat kapasitas mingguan, jeda kesiapan mulai, jenis produk, dan jenis mesin | |
 | 1.4 | `budi@contoh.test` | Perhatikan kolom jenis produk | Hanya dapat memilih dari daftar yang tersedia; tidak dapat menaip nama sendiri | |
 | 1.5 | `budi@contoh.test` | Perhatikan apakah ada kolom kapasitas terpisah untuk setiap jenis produk | Tidak ada. Hanya satu angka kapasitas mingguan untuk seluruh jenis produk | |
 | 1.6 | `budi@contoh.test` | Kosongkan kapasitas mingguan, lalu simpan | Listing tidak tersimpan; pesan menyebut kolom mana yang belum diisi | |
 | 1.7 | `budi@contoh.test` | Isi lengkap lalu simpan | Listing tersimpan dan langsung berstatus tayang, tanpa menunggu persetujuan siapa pun | |
-| 1.8 | — (tanpa masuk) | Buka halaman publik profil Bu... maksudnya Pak Budi | Seluruh atribut kapasitas tampil benar sesuai yang diisi | |
+| 1.8 | tanpa masuk | Buka halaman publik profil Pak Budi | Seluruh atribut kapasitas tampil benar sesuai yang diisi | |
 | 1.9 | `budi@contoh.test` | Usulkan satu jenis produk yang belum ada di daftar | Usulan terkirim, dan listing tetap dapat disimpan dengan pilihan yang tersedia | |
 | 1.10 | `budi@contoh.test` | Ubah kapasitas mingguan, lalu buka lagi halaman publiknya | Perubahan langsung terlihat | |
 
@@ -617,7 +617,7 @@ Mengacu Acceptance Scenario US1 nomor 1–6.
 
 ---
 
-### US2 — Pemberi order menemukan subkontraktor yang cocok
+### US2: Pemberi order menemukan subkontraktor yang cocok
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
@@ -638,7 +638,7 @@ Mengacu Acceptance Scenario US2 nomor 1–10.
 
 ---
 
-### US3 — Request kuota dan perbandingan penawaran
+### US3: Request kuota dan perbandingan penawaran
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
@@ -658,7 +658,7 @@ Mengacu Acceptance Scenario US3 nomor 1–7.
 
 ---
 
-### US4 — Kalender ketersediaan tetap aktual
+### US4: Kalender ketersediaan tetap aktual
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
@@ -678,7 +678,7 @@ Mengacu Acceptance Scenario US4 nomor 1–6.
 
 ---
 
-### US5 — Memantau pesanan sampai tuntas
+### US5: Memantau pesanan sampai tuntas
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
@@ -700,18 +700,18 @@ Mengacu Acceptance Scenario US5 nomor 1–9.
 
 ---
 
-### US6 — Reputasi dari transaksi nyata
+### US6: Reputasi dari transaksi nyata
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
 | 6.1 | `sari@contoh.test` | Beri rating dan ulasan pada pesanan yang sudah dikonfirmasi | Ulasan tersimpan | |
-| 6.2 | — (tanpa masuk) | Buka profil publik Pak Budi | Ulasan tampil beserta nama pemberi ulasan dan tanggal transaksi; tidak anonim | |
+| 6.2 | tanpa masuk | Buka profil publik Pak Budi | Ulasan tampil beserta nama pemberi ulasan dan tanggal transaksi; tidak anonim | |
 | 6.3 | `sari@contoh.test` | Coba beri ulasan kedua pada pesanan yang sama | Ditolak | |
 | 6.4 | `sari@contoh.test` | Coba beri rating pada usaha yang belum pernah bertransaksi dengan Anda | Tidak tersedia atau ditolak | |
 | 6.5 | `sari@contoh.test` | Coba beri ulasan pada pesanan yang belum dikonfirmasi | Ditolak dengan penjelasan bahwa pesanan harus dikonfirmasi diterima lebih dulu | |
-| 6.6 | — | Buka profil usaha yang baru punya 2 pesanan | Tingkat penyelesaian **tidak** ditampilkan sebagai persentase; ada keterangan bahwa data belum cukup | |
+| 6.6 | tanpa masuk | Buka profil usaha yang baru punya 2 pesanan | Tingkat penyelesaian **tidak** ditampilkan sebagai persentase; ada keterangan bahwa data belum cukup | |
 | 6.7 | `sari@contoh.test` | Catat tingkat penyelesaian Anda dan Pak Budi, lalu batalkan satu pesanan sebelum produksi | Pesanan berstatus Dibatalkan | |
-| 6.8 | — | Buka kedua profil | Tingkat penyelesaian **Bu Sari** turun; tingkat penyelesaian **Pak Budi** tidak berubah sama sekali | |
+| 6.8 | tanpa masuk | Buka kedua profil | Tingkat penyelesaian **Bu Sari** turun; tingkat penyelesaian **Pak Budi** tidak berubah sama sekali | |
 | 6.9 | `admin@contoh.test` | Sembunyikan satu ulasan dengan alasan | Ulasan hilang dari profil publik dan rata-rata rating berubah karenanya | |
 
 Mengacu Acceptance Scenario US6 nomor 1–5. Langkah 6.8 adalah yang paling penting: itu
@@ -719,7 +719,7 @@ yang membedakan aturan tingkat penyelesaian ini dari perhitungan biasa.
 
 ---
 
-### US7 — Admin: daftar baku, lencana, mediasi
+### US7: Admin: daftar baku, lencana, mediasi
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|

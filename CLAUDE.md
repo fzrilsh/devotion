@@ -21,13 +21,13 @@ Jangan menebak. Setiap keputusan sudah tertulis di salah satu berkas ini:
 | Butuh apa | Baca |
 |-----------|------|
 | Prinsip dan gerbang mutu | `docs/memory/constitution.md` |
-| Perilaku produk, 86 requirement | `docs/specs/001-capacity-exchange-marketplace/spec.md` |
-| Endpoint, skema, kode galat | `.../contracts/openapi.yaml` |
-| Tabel, constraint, indeks | `.../data-model.md` |
-| Alasan keputusan teknis | `.../research.md` |
-| Struktur folder, dependency | `.../plan.md` |
-| Cara menjalankan, skenario uji | `.../quickstart.md` |
-| Daftar pekerjaan | `.../tasks.md` |
+| Perilaku produk, 86 requirement | `docs/001-capacity-exchange-marketplace/spec.md` |
+| Endpoint, skema, kode galat | `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` |
+| Tabel, constraint, indeks | `docs/001-capacity-exchange-marketplace/data-model.md` |
+| Alasan keputusan teknis | `docs/001-capacity-exchange-marketplace/research.md` |
+| Struktur folder, dependency | `docs/001-capacity-exchange-marketplace/plan.md` |
+| Cara menjalankan, skenario uji | `docs/001-capacity-exchange-marketplace/quickstart.md` |
+| Daftar pekerjaan | `docs/001-capacity-exchange-marketplace/tasks.md` |
 
 Bila kode bertentangan dengan spec, **spec yang benar**. Ubah spec lebih dulu,
 baru kode. Jangan pernah sebaliknya.
@@ -252,7 +252,7 @@ Perubahan tanpa entri CHANGELOG dianggap belum selesai.
   ditulis di dalam transaksi kejadiannya; pengiriman ke email dan WhatsApp
   berjalan setelahnya, maksimal 3 percobaan.
 - **Galat** memakai `application/problem+json` dengan `code` mesin yang stabil
-  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar 30 kode ada di
+  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar 28 kode ada di
   `openapi.yaml`.
 - **Log** memakai `log/slog` format JSON dengan request ID di setiap baris.
 - **Berkas unggahan** tidak pernah dilayani lewat path statis. Selalu lewat

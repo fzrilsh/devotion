@@ -1,4 +1,4 @@
-# Feature Specification: Capacity Exchange — Marketplace Subkontrak Kapasitas Konveksi (MVP)
+# Feature Specification: Capacity Exchange, Marketplace Subkontrak Kapasitas Konveksi (MVP)
 
 **Feature Branch**: `001-capacity-exchange-marketplace`
 
@@ -6,7 +6,7 @@
 
 **Status**: Draft
 
-**Input**: User description: "Ide fitur ada di PDF terlampir (Dokume Lomba New.pdf) — marketplace subkontrak B2B yang mempertemukan UMKM konveksi berkapasitas menganggur dengan UMKM yang order-nya melebihi kapasitas. Scope MVP = daftar fitur Must-have; konteks tambahan (pengguna, project baru/existing, reuse, out-of-scope, tests) tidak diisi dan digantikan asumsi."
+**Input**: User description: "Ide fitur ada di PDF terlampir (Dokume Lomba New.pdf), marketplace subkontrak B2B yang mempertemukan UMKM konveksi berkapasitas menganggur dengan UMKM yang order-nya melebihi kapasitas. Scope MVP = daftar fitur Must-have; konteks tambahan (pengguna, project baru/existing, reuse, out-of-scope, tests) tidak diisi dan digantikan asumsi."
 
 ## Clarifications
 
@@ -14,17 +14,17 @@
 
 - Q: Apakah verifikasi identitas admin wajib dilewati sebelum listing bisa ditemukan pihak lain? → A: Tidak. Listing langsung tayang; verifikasi hanya menambah lencana pada profil dan hasil pencarian.
 - Q: Apakah versi pertama menahan dana pihak lain di platform (escrow)? → A: Tidak. Untuk keperluan lomba dan bukan production, platform hanya mencatat kesepakatan dan konfirmasi pembayaran yang terjadi langsung antar pihak.
-- Q: Faktor apa yang menentukan urutan hasil pencarian? → A: Kecocokan keras saja — kesesuaian jenis produk, spesifikasi mesin, lead time, dan ketersediaan kapasitas. Reputasi dan status verifikasi tidak mempengaruhi urutan.
+- Q: Faktor apa yang menentukan urutan hasil pencarian? → A: Kecocokan keras saja: kesesuaian jenis produk, spesifikasi mesin, lead time, dan ketersediaan kapasitas. Reputasi dan status verifikasi tidak mempengaruhi urutan.
 - Q: Apakah jenis produk dan spesifikasi mesin dipilih dari daftar baku yang dikelola admin, atau diisi bebas sebagai teks? → A: Daftar baku tertutup untuk keduanya; subkontraktor dan pemberi order hanya memilih dari daftar itu, dan admin yang menambah item baru.
 - Q: Siapa yang boleh membatalkan sebuah pesanan, dan sampai tahap mana pembatalan masih diizinkan? → A: Sebelum status "Produksi" kedua pihak boleh membatalkan sendiri dengan alasan dan kapasitas langsung kembali; setelah "Produksi" hanya lewat mediasi admin.
 - Q: Bagaimana "tingkat penyelesaian" dihitung, dan apakah pembatalan ikut menurunkannya? → A: Pesanan selesai dibagi seluruh pesanan yang disepakati, tetapi pembatalan hanya dihitung merugikan pihak yang membatalkan.
-- Q: Lokasi usaha dicatat sebagai apa — nama wilayah administratif saja, atau titik koordinat yang bisa dihitung jaraknya? → A: Wilayah administratif berjenjang, dan titik koordinat usaha juga dicatat sebagai informasi tampilan.
+- Q: Lokasi usaha dicatat sebagai apa, nama wilayah administratif saja, atau titik koordinat yang bisa dihitung jaraknya? → A: Wilayah administratif berjenjang, dan titik koordinat usaha juga dicatat sebagai informasi tampilan.
 - Q: Apa yang terjadi jika pemberi order tidak pernah mengonfirmasi penerimaan padahal barang sudah dikirim? → A: Otomatis dianggap diterima setelah 7 hari sejak status "Dikirim", disertai pemberitahuan sebelum tenggat itu jatuh.
 - Q: Bagaimana pesanan yang jumlahnya melampaui kapasitas satu minggu diperlakukan? → A: Kapasitas dijumlahkan dari minggu berjalan sampai minggu deadline pemberi order. Lolos bila totalnya cukup, tertolak bila deadline-nya terlalu dekat.
 - Q: Bagaimana kapasitas dialokasikan setelah kesepakatan terbentuk? → A: Mengisi periode mingguan paling awal lebih dulu sampai jumlah pesanan terpenuhi, dicatat per periode sebagai baris alokasi tersendiri.
 - Q: Kapasitas dinyatakan dalam satuan apa? → A: Satu satuan tunggal, potong per minggu, untuk seluruh listing. Jenis produk hanya menyatakan kemampuan mengerjakan, tanpa angka kapasitas sendiri.
 - Q: Lead time berarti apa? → A: Jeda kesiapan mulai, yaitu jumlah hari sejak kesepakatan sampai produksi dapat dimulai. Bukan durasi menyelesaikan pekerjaan.
-- Q: Berapa tingkat hierarki wilayah dan bagaimana perluasan pencarian bekerja? → A: Tiga tingkat — kota/kabupaten, provinsi, seluruh Indonesia — memakai pembagian administratif resmi tanpa pengelompokan buatan sendiri.
+- Q: Berapa tingkat hierarki wilayah dan bagaimana perluasan pencarian bekerja? → A: Tiga tingkat (kota/kabupaten, provinsi, seluruh Indonesia) memakai pembagian administratif resmi tanpa pengelompokan buatan sendiri.
 - Q: Bolehkah satu akun mengirim request kuota ke listing miliknya sendiri? → A: Tidak boleh.
 - Q: Berapa batas waktu balasan sebuah request kuota, dan siapa yang menentukan? → A: Sistem menetapkan 72 jam, bukan pemberi order.
 - Q: Berapa kali pengiriman notifikasi diulang sebelum dianggap gagal? → A: Tiga kali, lalu dicatat gagal permanen sementara notifikasi di dalam platform tetap tampil.
@@ -178,12 +178,12 @@ Tim Ops mengelola daftar jenis produk dan jenis mesin yang menjadi tulang punggu
 ### Edge Cases
 
 - Pesanan yang jumlahnya melampaui total kapasitas sampai deadline, tetapi hanya selisih kecil.
-- Deadline pemberi order jatuh di tengah minggu — apakah minggu itu dihitung penuh atau tidak dihitung sama sekali?
+- Deadline pemberi order jatuh di tengah minggu. Apakah minggu itu dihitung penuh atau tidak dihitung sama sekali?
 - Jeda kesiapan mulai subkontraktor membuat produksi baru bisa dimulai setelah beberapa minggu pertama terlewat, sehingga kapasitas yang benar-benar terpakai bukan minggu paling awal.
 - Subkontraktor menurunkan kapasitas mingguannya setelah punya alokasi berjalan, sehingga kapasitas terpakai melebihi kapasitas total yang baru.
 - Subkontraktor menandai minggu penuh padahal minggu itu sudah punya alokasi dari pesanan berjalan.
 - Dua pemberi order menerima penawaran yang memakai periode kapasitas yang sama secara bersamaan.
-- Alokasi sebuah pesanan gagal di tengah jalan setelah beberapa periode terisi — apakah seluruhnya dibatalkan atau sebagian tersimpan?
+- Alokasi sebuah pesanan gagal di tengah jalan setelah beberapa periode terisi. Apakah seluruhnya dibatalkan atau sebagian tersimpan?
 - Semua kandidat pada satu request menolak, atau menolak setelah lewat 72 jam.
 - Pemberi order membatalkan berkali-kali sebelum produksi sehingga alokasi kapasitas subkontraktor bolak-balik terpakai dan bebas.
 - Pembatalan diajukan tepat ketika pihak lain sedang mengubah status menjadi "Produksi".
@@ -210,7 +210,7 @@ Tim Ops mengelola daftar jenis produk dan jenis mesin yang menjadi tulang punggu
 
 ## Requirements *(mandatory)*
 
-Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser.
+Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser. Revisi 2026-08-22 menambahkan FR-087 sampai FR-091 dari empat pertentangan antar artefak yang ditemukan `/analyze`, seluruhnya menyangkut rentang kapasitas, horizon kalender, propagasi perubahan kapasitas, kesiapan mulai pada penawaran, dan penggolongan notifikasi.
 
 ### Istilah yang Mengikat
 
@@ -219,6 +219,8 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **Jeda kesiapan mulai** (sebelumnya disebut "lead time"): jumlah hari sejak kesepakatan terbentuk sampai produksi dapat dimulai. Bukan durasi menyelesaikan pekerjaan.
 - **Durasi penyelesaian**: dihitung sistem dari jumlah pesanan dibagi kapasitas mingguan, bukan diisi pengguna.
 - **Periode mingguan**: satu minggu yang dimulai hari Senin menurut zona waktu Asia/Jakarta.
+- **Minggu kesiapan mulai**: periode mingguan yang memuat tanggal acuan ditambah jeda kesiapan mulai. Tanggal acuannya adalah tanggal kesepakatan pada sebuah pesanan, dan tanggal pencarian pada perhitungan kandidat. Ini periode paling awal yang boleh dihitung maupun dialokasikan; minggu sebelum itu tidak ikut, karena subkontraktor sendiri menyatakan produksi belum dapat dimulai.
+- **Rentang kapasitas**: rentang periode mingguan dari minggu kesiapan mulai sampai periode yang memuat deadline pemberi order, inklusif. Seluruh penjumlahan dan alokasi kapasitas memakai rentang ini, bukan dihitung dari minggu berjalan. Bila minggu kesiapan mulai jatuh setelah minggu deadline, rentangnya kosong dan kapasitas yang terhitung nol.
 
 ### Functional Requirements
 
@@ -243,8 +245,8 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-059**: Admin MUST dapat menambah item baru, mengubah nama item, dan menonaktifkan item pada daftar baku.
 - **FR-060**: Menonaktifkan sebuah item MUST TIDAK mengubah atau menghapus data listing yang sudah memakainya, dan listing tersebut MUST tetap dapat ditemukan melalui pencarian.
 - **FR-061**: Pengguna MUST dapat mengusulkan item baru ketika tidak menemukan yang sesuai, MUST tetap dapat menyimpan listingnya dengan item yang tersedia, dan MUST diberi tahu ketika usulannya diputuskan.
-- **FR-062**: Sistem MUST menyimpan data wilayah dua tingkat administratif — provinsi dan kota/kabupaten — dan setiap kota/kabupaten MUST termasuk dalam tepat satu provinsi. Pengelompokan wilayah di luar pembagian administratif resmi MUST TIDAK dipakai.
-- **FR-075**: Sistem MUST mengisi data wilayah dan daftar baku melalui satu perintah sekali jalan yang dapat diulang tanpa menduplikasi data, MUST menyimpan hasilnya di basis data sendiri, dan MUST TIDAK memanggil sumber data luar saat melayani permintaan pengguna.
+- **FR-062**: Sistem MUST menyimpan data wilayah dua tingkat administratif (provinsi dan kota/kabupaten), dan setiap kota/kabupaten MUST termasuk dalam tepat satu provinsi. Pengelompokan wilayah di luar pembagian administratif resmi MUST TIDAK dipakai.
+- **FR-075**: Sistem MUST dapat mengisi data wilayah dan daftar baku dalam satu tindakan yang dapat diulang tanpa menduplikasi data, MUST menyimpan salinannya sendiri, dan MUST TIDAK bergantung pada sumber data luar saat melayani permintaan pengguna.
 
 **Listing Kapasitas**
 
@@ -264,7 +266,10 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-021**: Sistem MUST menandai listing yang kalendernya tidak diperbarui lebih dari 7 hari dan MUST mengirim pengingat kepada pemiliknya; penanda ini bersifat informatif dan MUST TIDAK mengubah urutan hasil pencarian.
 - **FR-077**: Sistem MUST mencatat alokasi kapasitas sebagai baris tersendiri per pasangan pesanan dan periode mingguan, memuat jumlah yang dialokasikan pada periode itu, sehingga alokasi satu pesanan dapat tersebar ke beberapa periode dan dapat dibalik secara utuh.
 - **FR-078**: Sistem MUST melewati periode yang ditandai penuh atau kapasitasnya sudah habis ketika mengisi alokasi, dan MUST melanjutkan ke periode berikutnya yang masih tersedia.
-- **FR-079**: Sistem MUST menolak keadaan di mana kapasitas terpakai sebuah periode melampaui kapasitas totalnya, dan penolakan itu MUST ditegakkan pada tingkat penyimpanan data sehingga tetap berlaku meskipun logika aplikasi keliru.
+- **FR-079**: Sistem MUST menjaga agar kapasitas terpakai sebuah periode tidak pernah melampaui kapasitas totalnya, dan jaminan ini MUST tetap berlaku bahkan ketika logika aplikasi keliru.
+- **FR-087**: Sistem MUST menghitung penjumlahan dan alokasi kapasitas hanya di dalam rentang kapasitas, yaitu mulai dari minggu kesiapan mulai, bukan dari minggu berjalan. Sebuah pesanan MUST menyimpan minggu kesiapan mulainya sendiri saat kesepakatan terbentuk, dan alokasi MUST TIDAK menyentuh periode mingguan sebelum minggu itu.
+- **FR-088**: Sistem MUST memperlakukan periode mingguan yang belum dibuat tetapi jatuh sebelum deadline yang diminta sebagai berkapasitas penuh saat menilai kandidat, dan MUST membuat periode yang kurang itu ketika sebuah kesepakatan benar-benar terbentuk, tanpa bergantung pada penjadwal bergulir.
+- **FR-089**: Ketika kapasitas mingguan sebuah listing diubah, sistem MUST memperbarui kapasitas total seluruh periode mendatang yang belum memiliki alokasi aktif, dan MUST membiarkan periode yang sudah memiliki alokasi tetap seperti semula.
 
 **Pencarian dan Matching**
 
@@ -289,11 +294,12 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-033**: Kedua pihak MUST dapat mengajukan counter-offer harga sampai tercapai kesepakatan atau salah satu pihak menghentikan negosiasi, dan seluruh riwayat penawaran MUST tersimpan.
 - **FR-034**: Sistem MUST membentuk pesanan dengan harga, jumlah, dan deadline yang disepakati saat sebuah penawaran diterima, dan MUST menutup kandidat lain pada request yang sama dengan notifikasi.
 - **FR-035**: Sistem MUST menolak penawaran yang jumlahnya melampaui total kapasitas tersisa subkontraktor dari periode mingguan berjalan sampai periode yang memuat deadline yang diminta, dan MUST menyebutkan total kapasitas yang sebenarnya tersisa sampai deadline tersebut.
-- **FR-036**: Sistem MUST memastikan kapasitas satu periode hanya dialokasikan kepada satu kesepakatan ketika dua kesepakatan atas periode yang sama terjadi berbarengan, dengan mengunci baris periode yang terlibat di dalam transaksi yang sama dengan pembentukan pesanan, dan MUST memberi tahu pihak yang gagal beserta alasannya.
+- **FR-036**: Sistem MUST memastikan kapasitas satu periode hanya dialokasikan kepada satu kesepakatan ketika dua kesepakatan atas periode yang sama terjadi berbarengan, sehingga hanya satu yang berhasil dan pihak yang gagal MUST diberi tahu beserta alasannya.
 - **FR-037**: Sistem MUST menandai request yang tidak dibalas melewati batas waktu balasan sebagai kedaluwarsa dan memberi tahu pemberi order.
 - **FR-082**: Sistem MUST menetapkan batas waktu balasan setiap request kuota sebesar 72 jam sejak request dikirim, MUST TIDAK meminta pemberi order menentukannya, dan MUST menampilkan batas itu kepada kedua pihak.
 - **FR-083**: Sistem MUST menolak pengiriman request kuota kepada listing yang dimiliki akun pengirim sendiri, termasuk ketika permintaan dikirim tanpa melalui hasil pencarian.
 - **FR-084**: Sistem MUST membentuk pesanan dan seluruh baris alokasi kapasitasnya dalam satu tindakan yang utuh: bila salah satu periode gagal dialokasikan, seluruh pembentukan pesanan MUST dibatalkan dan tidak ada kapasitas yang tersisa terpakai.
+- **FR-090**: Sistem MUST menolak penawaran yang minggu kesiapan mulainya jatuh setelah periode yang memuat deadline yang diminta, karena produksi tidak akan dapat dimulai sebelum deadline terlampaui, dan MUST menjelaskan alasan itu kepada subkontraktor.
 
 **Pesanan, Pembatalan, dan Pencatatan Pembayaran**
 
@@ -332,6 +338,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-074**: Sistem MUST mengirim notifikasi juga pada kejadian berikut: pesanan dibatalkan oleh pihak lain beserta alasannya, tenggat konfirmasi otomatis mendekat, pesanan tertutup secara otomatis, dan keputusan admin atas usulan item daftar baku.
 - **FR-085**: Sistem MUST mencoba mengirim ulang notifikasi yang gagal ke kanal eksternal paling banyak 3 kali, lalu MUST menandainya gagal permanen beserta alasannya.
 - **FR-086**: Kegagalan pengiriman notifikasi MUST TIDAK menggagalkan maupun membatalkan kejadian yang memicunya, dan catatan notifikasi di dalam platform MUST tetap tersimpan bersama kejadian tersebut.
+- **FR-091**: Sistem MUST menggolongkan setiap notifikasi sebagai transaksional atau non-transaksional. Notifikasi non-transaksional (pengingat kalender basi, deadline mendekat, dan permintaan rating) MUST tunduk pada preferensi kanal pengguna, sementara notifikasi transaksional MUST TIDAK dapat dimatikan karena menyangkut jalannya pesanan.
 
 **Antarmuka dan Bahasa**
 
@@ -341,17 +348,17 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 ### Key Entities
 
 - **Akun Pengguna**: Identitas login satu orang di platform; memuat kredensial, status verifikasi email dan nomor HP, serta satu atau dua peran usaha, atau peran admin. Satu akun memiliki satu Profil Usaha.
-- **Profil Usaha**: Identitas usaha yang tampil publik — nama usaha, kota/kabupaten (merujuk Wilayah), titik koordinat lokasi usaha, deskripsi, status lencana verifikasi, ringkasan reputasi. Menjadi pemilik Listing Kapasitas dan menjadi pihak dalam Request Kuota dan Pesanan.
-- **Wilayah**: Satuan lokasi administratif dua tingkat — provinsi dan kota/kabupaten — beserta kode resminya. Setiap kota/kabupaten termasuk dalam tepat satu provinsi. Menjadi dasar penyaringan dan perluasan pencarian, dengan tingkat ketiga berupa seluruh Indonesia yang tidak memerlukan data tersendiri.
+- **Profil Usaha**: Identitas usaha yang tampil publik: nama usaha, kota/kabupaten (merujuk Wilayah), titik koordinat lokasi usaha, deskripsi, status lencana verifikasi, ringkasan reputasi. Menjadi pemilik Listing Kapasitas dan menjadi pihak dalam Request Kuota dan Pesanan.
+- **Wilayah**: Satuan lokasi administratif dua tingkat (provinsi dan kota/kabupaten) beserta kode resminya. Setiap kota/kabupaten termasuk dalam tepat satu provinsi. Menjadi dasar penyaringan dan perluasan pencarian, dengan tingkat ketiga berupa seluruh Indonesia yang tidak memerlukan data tersendiri.
 - **Item Daftar Baku**: Satu item pada daftar jenis produk atau daftar jenis mesin, beserta penanda aktif atau nonaktif. Dikelola admin, dirujuk oleh Listing Kapasitas dan oleh filter pencarian, dan tidak dapat diisi bebas oleh pengguna.
 - **Usulan Item**: Permintaan pengguna untuk menambah item baru ke daftar baku, beserta keputusan admin dan waktunya.
 - **Pengajuan Verifikasi Identitas**: Berkas identitas usaha atau pemilik dan foto lokasi yang diajukan sebuah Profil Usaha, beserta keputusan admin, alasan, dan waktu keputusan. Bersifat rahasia, tidak pernah tampil publik, dan tidak menentukan ketayangan listing.
-- **Listing Kapasitas**: Penawaran kapasitas satu Profil Usaha subkontraktor — rujukan ke Item Daftar Baku untuk jenis mesin dan jenis produk, jumlah mesin, satu angka kapasitas mingguan dalam potong, jeda kesiapan mulai dalam hari, waktu pembaruan terakhir, dan status tayang. Memiliki banyak Periode Ketersediaan.
+- **Listing Kapasitas**: Penawaran kapasitas satu Profil Usaha subkontraktor: rujukan ke Item Daftar Baku untuk jenis mesin dan jenis produk, jumlah mesin, satu angka kapasitas mingguan dalam potong, jeda kesiapan mulai dalam hari, waktu pembaruan terakhir, dan status tayang. Memiliki banyak Periode Ketersediaan.
 - **Periode Ketersediaan**: Satu periode mingguan pada sebuah Listing Kapasitas, ditandai dengan tanggal Senin awal minggu, beserta kapasitas total periode itu, kapasitas terpakai, dan penanda penuh. Kapasitas terpakai tidak boleh melampaui kapasitas total.
 - **Alokasi Kapasitas**: Pemakaian kapasitas sejumlah tertentu oleh satu Pesanan pada satu Periode Ketersediaan. Satu pesanan dapat memiliki beberapa baris alokasi pada periode yang berurutan, dan seluruh barisnya dibalik bersama ketika pesanan dibatalkan.
-- **Request Kuota**: Permintaan pekerjaan dari Profil Usaha pemberi order — jenis produk, jumlah, bahan, deadline, catatan, dan batas waktu balasan 72 jam yang ditetapkan sistem. Dikirim ke beberapa kandidat dan memiliki satu status per kandidat.
-- **Penawaran**: Balasan seorang subkontraktor atas sebuah Request Kuota — harga dalam rupiah bulat, jeda kesiapan mulai yang dijanjikan, catatan. Dapat memiliki rangkaian counter-offer, dan satu di antaranya dapat diterima menjadi Pesanan.
-- **Pesanan**: Kesepakatan yang mengikat dua Profil Usaha — harga, jumlah, spesifikasi, deadline, status berjalan, riwayat perubahan status, serta bila dibatalkan: pihak yang membatalkan, alasan, dan waktunya. Memiliki satu atau beberapa Alokasi Kapasitas dan menjadi dasar satu Ulasan dari setiap pihak.
+- **Request Kuota**: Permintaan pekerjaan dari Profil Usaha pemberi order: jenis produk, jumlah, bahan, deadline, catatan, dan batas waktu balasan 72 jam yang ditetapkan sistem. Dikirim ke beberapa kandidat dan memiliki satu status per kandidat.
+- **Penawaran**: Balasan seorang subkontraktor atas sebuah Request Kuota: harga dalam rupiah bulat, jeda kesiapan mulai yang dijanjikan, catatan. Dapat memiliki rangkaian counter-offer, dan satu di antaranya dapat diterima menjadi Pesanan.
+- **Pesanan**: Kesepakatan yang mengikat dua Profil Usaha: harga, jumlah, spesifikasi, deadline, status berjalan, riwayat perubahan status, serta bila dibatalkan: pihak yang membatalkan, alasan, dan waktunya. Memiliki satu atau beberapa Alokasi Kapasitas dan menjadi dasar satu Ulasan dari setiap pihak.
 - **Catatan Pembayaran**: Pernyataan salah satu pihak atas sebuah Pesanan bahwa pembayaran telah dikirim atau diterima, beserta tanggal dan catatan. Tidak mewakili aliran dana di dalam platform.
 - **Ulasan**: Rating 1–5 dan teks dari satu pihak atas satu Pesanan yang sudah dikonfirmasi diterima, dengan penanda disembunyikan oleh admin atau tidak.
 - **Sengketa**: Laporan salah satu pihak atas sebuah Pesanan, beserta status mediasi, catatan admin, keputusan pengembalian alokasi kapasitas, pihak yang menanggung pembatalan, dan waktu penyelesaian.
@@ -380,6 +387,8 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **SC-017**: Setiap usulan item daftar baku mendapat keputusan admin dalam 2 hari kerja.
 - **SC-018**: Kapasitas terpakai sebuah periode tidak pernah melampaui kapasitas totalnya, dibuktikan melalui pengujian dua kesepakatan yang terjadi berbarengan atas periode yang sama.
 - **SC-019**: Pesanan yang jumlahnya melampaui kapasitas satu minggu tetap dapat disepakati selama total kapasitas sampai deadline mencukupi, dibuktikan dengan skenario 3.000 potong pada kapasitas 500 potong per minggu dengan deadline delapan minggu.
+- **SC-020**: Kapasitas kandidat yang jeda kesiapan mulainya menggeser produksi ke minggu-minggu berikutnya hanya dijumlahkan mulai dari minggu kesiapan mulai, dibuktikan dengan kandidat berjeda 14 hari yang dua minggu pertamanya tidak ikut dihitung sehingga total kapasitasnya lebih kecil dari kandidat berjeda 0 hari pada deadline yang sama.
+- **SC-021**: Pencarian dengan deadline yang melampaui horizon kalender yang sudah dibuat tetap menilai kandidat berdasarkan kapasitas penuh sampai deadline, dan periode yang kurang benar-benar terbentuk hanya ketika sebuah kesepakatan atas kandidat itu terbentuk, dibuktikan dengan pencarian berdeadline lima bulan pada listing yang horizon awalnya baru 3 bulan.
 
 ## Assumptions
 
@@ -396,7 +405,7 @@ Seluruh butir di bawah ini menggantikan konteks tambahan yang belum diisi pemili
 - **Jeda kesiapan mulai dan durasi penyelesaian dipisahkan.** Konsekuensi yang diterima: istilah "lead time" pada dokumen sumber ditafsirkan sebagai jeda kesiapan mulai, karena durasi penyelesaian sudah dapat dihitung dari kapasitas dan jumlah pesanan sehingga tidak dapat menjadi atribut tetap listing.
 - **Alokasi mengisi periode paling awal lebih dulu.** Konsekuensi yang diterima: pilihan ini lebih mudah dijelaskan kepada pengguna dan sesuai kebiasaan mengerjakan pesanan sesegera mungkin, tetapi tidak menyisakan ruang bagi subkontraktor untuk menahan minggu terdekat bagi pesanan mendesak yang mungkin datang kemudian.
 - **Data wilayah memakai pembagian administratif resmi** yang diambil sekali dari sumber data publik, disimpan di basis data sendiri, dan disalin ke dalam repository sebagai cadangan. Kecamatan dan desa tidak diambil karena tidak ada requirement yang memakainya.
-- **Perluasan wilayah tiga tingkat tanpa pengelompokan buatan.** Konsekuensi yang diterima: pencarian di sebuah kota yang secara praktik satu klaster dengan kota di provinsi lain — misalnya Jakarta dengan Bekasi dan Tangerang — baru menjangkau tetangganya pada perluasan tingkat terakhir. Pengelompokan wilayah manual ditolak karena menuntut data yang harus dirawat sendiri dan memperlambat penyiapan.
+- **Perluasan wilayah tiga tingkat tanpa pengelompokan buatan.** Konsekuensi yang diterima: pencarian di sebuah kota yang secara praktik satu klaster dengan kota di provinsi lain (misalnya Jakarta dengan Bekasi dan Tangerang) baru menjangkau tetangganya pada perluasan tingkat terakhir. Pengelompokan wilayah manual ditolak karena menuntut data yang harus dirawat sendiri dan memperlambat penyiapan.
 - **Nilai uang berupa bilangan bulat rupiah.** Tidak ada pecahan, karena harga subkontrak konveksi dalam praktik tidak memakai satuan di bawah rupiah.
 - **Cakupan wilayah awal**: lima kota besar yang disebut dokumen sumber sebagai basis segmen pasar aktif [1]; platform tidak dibatasi teknis pada kota-kota itu.
 - **Komisi platform 5–10% per transaksi** adalah model pendapatan yang diasumsikan di dokumen sumber; karena platform tidak menyentuh dana, penagihan dan pembukuan komisi tidak tercakup dalam versi ini.

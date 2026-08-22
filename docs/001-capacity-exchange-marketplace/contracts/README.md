@@ -1,4 +1,4 @@
-# docs/specs/001-capacity-exchange-marketplace/contracts/README.md
+# docs/001-capacity-exchange-marketplace/contracts/README.md
 
 # Peta Kontrak → Requirement
 
@@ -7,8 +7,8 @@ requirement, memenuhi Gate III konstitusi.
 
 ## Cakupan
 
-47 operasi pada 33 path. Seluruh 86 FR spec tercakup, kecuali sepuluh yang memang bukan
-kontrak API — dan itu disebut eksplisit di bawah agar `/analyze` tidak melaporkannya
+63 operasi pada 56 path. Seluruh 91 FR spec tercakup, kecuali tiga belas yang memang bukan
+kontrak API, dan itu disebut eksplisit di bawah agar `/analyze` tidak melaporkannya
 sebagai celah.
 
 ## FR yang tidak diwujudkan sebagai endpoint
@@ -18,12 +18,13 @@ sebagai celah.
 | FR-010 | Perilaku, bukan endpoint: listing tayang tanpa menunggu verifikasi |
 | FR-019, FR-078 | Algoritma alokasi di dalam `internal/order` |
 | FR-024 | Larangan: skor tidak menerima faktor selain empat kriteria keras |
+| FR-037 | Perilaku penjadwal: request tak dibalas melewati batas ditandai kedaluwarsa |
 | FR-040 | Larangan: tidak ada endpoint pembayaran, dan itu memang tujuannya |
 | FR-055, FR-056 | Antarmuka frontend |
 | FR-075 | Subcommand `seed:wilayah` dan `seed:master-data` |
 | FR-076 | Bentuk `ListingRequest`: tidak ada kolom kapasitas per jenis produk |
 | FR-079 | Constraint basis data |
-| FR-086 | Perilaku pengirim notifikasi |
+| FR-085, FR-086 | Perilaku pengirim notifikasi |
 
 ## Peta per User Story
 
@@ -39,9 +40,9 @@ sebagai celah.
 
 ## Kewajiban pengujian per endpoint
 
-Konstitusi mewajibkan setiap endpoint punya minimal dua pengujian — satu jalur berhasil,
-satu penolakan peran — dan satu penolakan masukan tidak sah bagi endpoint yang menerima
-masukan. Dengan 47 operasi, itu sekitar 110 pengujian endpoint, di luar pengujian aturan
+Konstitusi mewajibkan setiap endpoint punya minimal dua pengujian, satu jalur berhasil dan
+satu penolakan peran, dan satu penolakan masukan tidak sah bagi endpoint yang menerima
+masukan. Dengan 63 operasi, itu sekitar 150 pengujian endpoint, di luar pengujian aturan
 yang disebut khusus konstitusi.
 
 ## Endpoint yang wajib diuji secara khusus
@@ -65,5 +66,5 @@ yang disebut khusus konstitusi.
 - `GET /health` dan seluruh operasi ber-`security: []` adalah satu-satunya yang tidak
   memerlukan sesi.
 - Respons galat selalu `application/problem+json`, termasuk untuk `/api/*` yang tidak
-  dikenali — bukan `index.html`, agar kesalahan penulisan alamat tidak menghasilkan HTML
+  dikenali, bukan `index.html`, agar kesalahan penulisan alamat tidak menghasilkan HTML
   yang menyesatkan saat diagnosis.

@@ -1,8 +1,8 @@
-# docs/specs/001-capacity-exchange-marketplace/contracts/openapi.yaml
+# docs/001-capacity-exchange-marketplace/contracts/openapi.yaml
 openapi: 3.1.0
 
 info:
-  title: Devotion — Capacity Exchange API
+  title: Devotion, Capacity Exchange API
   version: 0.1.0
   description: |
     Kontrak API untuk Devotion, marketplace subkontrak kapasitas konveksi.
@@ -629,8 +629,10 @@ paths:
       description: |
         `minggu_mulai` wajib hari Senin. Kapasitas total tidak dapat diturunkan di bawah
         kapasitas yang sudah terpakai, dan periode yang sudah punya alokasi tidak dapat
-        ditandai penuh.
-      x-fr: [FR-017, FR-021]
+        ditandai penuh. Perubahan kapasitas mingguan diteruskan ke seluruh periode mendatang
+        yang belum memiliki alokasi aktif; periode yang sudah teralokasi tetap seperti semula
+        (FR-089).
+      x-fr: [FR-017, FR-021, FR-089]
       requestBody:
         required: true
         content:
@@ -673,10 +675,12 @@ paths:
         Skor kecocokan adalah jumlah empat kriteria keras, masing-masing bernilai
         terpenuhi atau tidak: kesesuaian jenis produk, kepemilikan jenis mesin, jeda
         kesiapan mulai tidak melebihi yang diminta, dan total kapasitas tersisa dari
-        minggu berjalan sampai minggu deadline tidak kurang dari jumlah yang dibutuhkan.
+        minggu kesiapan mulai sampai minggu deadline tidak kurang dari jumlah yang dibutuhkan.
 
         Kapasitas dijumlahkan lintas periode, sehingga kandidat berkapasitas 500 potong
         per minggu tetap memenuhi kriteria untuk 3.000 potong bila deadline delapan minggu.
+        Periode yang belum dibuat tetapi jatuh sebelum deadline dianggap berkapasitas penuh
+        saat penilaian, dan baru benar-benar dibuat ketika sebuah kesepakatan terbentuk (FR-088).
 
         Skor tidak dipengaruhi rating, tingkat penyelesaian, status verifikasi, kebaruan
         kalender, jarak koordinat, maupun tanggal pendaftaran (FR-024).
@@ -688,7 +692,7 @@ paths:
         `tingkat_wilayah` menentukan cakupan. Perluasan menaikkan tepat satu tingkat:
         `kota` → `provinsi` → `nasional`. Listing milik akun yang mencari selalu
         dikecualikan (FR-081).
-      x-fr: [FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-028, FR-063, FR-080, FR-081]
+      x-fr: [FR-022, FR-023, FR-024, FR-025, FR-026, FR-027, FR-028, FR-063, FR-080, FR-081, FR-088]
       parameters:
         - name: item_produk_id
           in: query
@@ -821,9 +825,11 @@ paths:
       tags: [request]
       summary: Kirim estimasi harga sebagai subkontraktor
       description: |
-        Ditolak bila jumlah request melampaui total kapasitas tersisa dari minggu berjalan
-        sampai minggu deadline, dengan menyebutkan total yang sebenarnya tersisa (FR-035).
-      x-fr: [FR-031, FR-035]
+        Ditolak bila jumlah request melampaui total kapasitas tersisa dari minggu kesiapan
+        mulai sampai minggu deadline, dengan menyebutkan total yang sebenarnya tersisa (FR-035).
+        Ditolak pula bila minggu kesiapan mulai jatuh setelah minggu deadline, karena produksi
+        tidak akan dapat dimulai sebelum deadline terlampaui (FR-090).
+      x-fr: [FR-031, FR-035, FR-090]
       parameters:
         - { name: kandidatId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -921,12 +927,15 @@ paths:
         ada kapasitas yang tersisa terpakai (FR-084).
 
         Alokasi mengisi periode mingguan paling awal yang tersedia lebih dulu, melewati
-        periode yang penuh atau habis (FR-018, FR-078).
+        periode yang penuh atau habis (FR-018, FR-078). Pesanan menyimpan minggu kesiapan
+        mulainya sendiri, dan alokasi tidak menyentuh periode sebelum minggu itu (FR-087).
+        Periode yang belum dibuat tetapi jatuh sebelum deadline dibentuk saat kesepakatan
+        ini terjadi (FR-088).
 
         Kandidat lain pada request yang sama otomatis berstatus "Tidak Dilanjutkan" dan
         mendapat notifikasi (FR-034). Bila dua kesepakatan atas periode yang sama terjadi
         berbarengan, hanya satu yang berhasil (FR-036).
-      x-fr: [FR-034, FR-036, FR-018, FR-077, FR-078, FR-084]
+      x-fr: [FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087, FR-088]
       parameters:
         - { name: penawaranId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1030,8 +1039,8 @@ paths:
                 status: 409
                 code: TRANSISI_STATUS_TIDAK_SAH
                 detail: >-
-                  Pesanan berstatus "Menunggu" tidak dapat langsung menjadi "Dikirim".
-                  Urutan yang diizinkan: Menunggu, Produksi, Selesai, Dikirim.
+                  Pesanan berstatus "Diterima" tidak dapat langsung menjadi "Dikirim".
+                  Urutan yang diizinkan: Diterima, Produksi, Selesai, Dikirim.
                 meta:
                   status_sekarang: diterima
                   transisi_diizinkan: [produksi, dibatalkan, dalam_mediasi]
@@ -1243,7 +1252,7 @@ paths:
     get:
       tags: [notifikasi]
       summary: Preferensi kanal notifikasi
-      x-fr: [FR-053]
+      x-fr: [FR-053, FR-091]
       responses:
         '200':
           content:
@@ -1252,8 +1261,8 @@ paths:
     put:
       tags: [notifikasi]
       summary: Ubah preferensi kanal untuk notifikasi non-transaksional
-      description: Notifikasi transaksional tidak dapat dimatikan (FR-053).
-      x-fr: [FR-053]
+      description: Notifikasi transaksional tidak dapat dimatikan (FR-053, FR-091).
+      x-fr: [FR-053, FR-091]
       requestBody:
         required: true
         content:
@@ -2164,7 +2173,10 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        request_id: { type: string, format: uuid }
+        request_id:
+          type: string
+          format: uuid
+          description: Diturunkan lewat kandidat pesanan; bukan kolom langsung di tabel pesanan
         pemberi_order:
           type: object
           properties:
@@ -2179,6 +2191,10 @@ components:
         jumlah: { type: integer }
         harga_total: { type: integer, format: int64 }
         deadline: { type: string, format: date }
+        minggu_kesiapan_mulai:
+          type: string
+          format: date
+          description: Senin minggu paling awal yang boleh dialokasikan; dihitung sekali saat kesepakatan (FR-087)
         status: { $ref: '#/components/schemas/StatusPesanan' }
         transisi_diizinkan:
           type: array
