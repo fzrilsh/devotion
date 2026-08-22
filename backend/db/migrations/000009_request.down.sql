@@ -1,0 +1,13 @@
+DROP INDEX IF EXISTS idx_offer_candidate;
+DROP TABLE IF EXISTS offer;
+DROP TYPE IF EXISTS offer_party;
+DROP TRIGGER IF EXISTS trg_reject_self_request ON request_candidate;
+DROP FUNCTION IF EXISTS reject_self_request();
+DROP INDEX IF EXISTS idx_one_agreement_per_request;
+DROP INDEX IF EXISTS idx_candidate_request;
+DROP INDEX IF EXISTS idx_candidate_subcon;
+DROP TABLE IF EXISTS request_candidate;
+DROP TYPE IF EXISTS candidate_status;
+DROP INDEX IF EXISTS idx_request_due;
+DROP INDEX IF EXISTS idx_request_buyer;
+DROP TABLE IF EXISTS quota_request;
