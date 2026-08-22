@@ -135,3 +135,18 @@ perubahannya.
   (kontrak menuntut 401), `GET /me` dan `PATCH /me/roles` lewat `RequireAuth`
   plus adapter `fromPrincipal`. Uji: matriks penolakan tiap kombinasi peran tak
   berwenang, auth mendahului cek peran, dan rute akun nol tak tercakup. (T015)
+- Penyimpanan berkas unggahan di `internal/platform/storage`, satu-satunya
+  tempat byte klien menyentuh disk. `Save` menjalankan urutan yang mengikat:
+  `io.LimitReader` ke batas per-berkas lebih dulu agar decode bomb tak menguras
+  memori, lalu `http.DetectContentType` atas magic bytes (nama dan
+  `Content-Type` dari klien tak pernah dipercaya), lalu decode dan re-encode
+  gambar lewat `image/jpeg`/`image/png` untuk membuang EXIF (foto lokasi dari
+  ponsel membawa koordinat GPS), PDF divalidasi magic bytes lalu disimpan apa
+  adanya, lalu cek total 500MB, baru tulis dengan nama acak `crypto/rand`
+  berekstensi dari tipe terverifikasi. `Open` menyelesaikan berkas lewat id dan
+  menegakkan pemilik-atau-admin (FR-009); tak ada path statis sama sekali. Query
+  `db/queries/uploaded_file.sql` (Create/Get/SumBytes), hasil `sqlc generate`
+  di-commit. Uji menunjuk FR-006/FR-009: orang asing ditolak `ErrForbidden`,
+  berkas berekstensi menipu ditolak `ErrUnsupportedType`, kuota penuh
+  `ErrQuotaFull`, kelebihan ukuran `ErrTooLarge`, dan penanda EXIF hilang setelah
+  re-encode. (T017)

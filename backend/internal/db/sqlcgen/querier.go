@@ -34,6 +34,12 @@ type Querier interface {
 	// opaque token. The raw token lives only in the cookie; the database never
 	// sees it, so a database read cannot reconstruct a usable session token.
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	// CreateUploadedFile records one stored file. The storage_path is a
+	// system-generated UUID name, never the client's filename; original_name is
+	// kept as display metadata only. size_bytes and mime_type are the values the
+	// application verified (magic bytes, re-encoded length), not what the client
+	// claimed, so the DB CHECK constraints see the trusted values.
+	CreateUploadedFile(ctx context.Context, arg CreateUploadedFileParams) (UploadedFile, error)
 	// CreateVerificationCode stores one six-digit code as its SHA-256 hash for a
 	// given account and purpose. The plaintext code is delivered out of band (email
 	// or WhatsApp) and never persisted, so a database read cannot reveal it.
@@ -69,6 +75,11 @@ type Querier interface {
 	// GetSessionByTokenHash loads a live session by token hash. The expiry check is
 	// in SQL so an expired row is treated as absent without a second round trip.
 	GetSessionByTokenHash(ctx context.Context, arg GetSessionByTokenHashParams) (Session, error)
+	// GetUploadedFile returns one file row by id. The handler resolves the caller's
+	// profile and admin flag and compares against owner_profile_id before streaming
+	// the bytes, so this query carries no access check of its own (FR-009 is
+	// enforced in Go, not SQL).
+	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
 	// InvalidateVerificationCodes consumes all outstanding codes for an account and
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
@@ -94,6 +105,10 @@ type Querier interface {
 	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error
 	// SetPhoneVerified marks the phone verified after a valid code is consumed.
 	SetPhoneVerified(ctx context.Context, arg SetPhoneVerifiedParams) error
+	// SumUploadedBytesByOwner totals the bytes a profile already holds, so a new
+	// upload can be rejected before it pushes the owner past the 500MB quota.
+	// COALESCE keeps the result 0 rather than NULL for an owner with no files yet.
+	SumUploadedBytesByOwner(ctx context.Context, ownerProfileID pgtype.UUID) (int64, error)
 	// TouchRateLimit increments the counter for one (target, key) in the current
 	// window bucket, creating the row on first use, and returns the new count. The
 	// ON CONFLICT DO UPDATE is atomic and takes a row lock, so two concurrent
