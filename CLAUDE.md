@@ -21,7 +21,7 @@ Jangan menebak. Setiap keputusan sudah tertulis di salah satu berkas ini:
 | Butuh apa | Baca |
 |-----------|------|
 | Prinsip dan gerbang mutu | `docs/memory/constitution.md` |
-| Perilaku produk, 86 requirement | `docs/001-capacity-exchange-marketplace/spec.md` |
+| Perilaku produk, 91 requirement | `docs/001-capacity-exchange-marketplace/spec.md` |
 | Endpoint, skema, kode galat | `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` |
 | Tabel, constraint, indeks | `docs/001-capacity-exchange-marketplace/data-model.md` |
 | Alasan keputusan teknis | `docs/001-capacity-exchange-marketplace/research.md` |
