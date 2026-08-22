@@ -6,13 +6,73 @@ package sqlcgen
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	// ConsumeVerificationCode marks a code used so it cannot be replayed. The
+	// consumed_at IS NULL guard makes double-consume a no-op, and the returned row
+	// count lets the caller detect a code already spent.
+	ConsumeVerificationCode(ctx context.Context, arg ConsumeVerificationCodeParams) (int64, error)
+	// CountActiveOrdersAsBuyer counts a profile's orders that are not terminal, on
+	// the buyer side. Revoking the buyer role while any of these exist is refused,
+	// because it would strip a party from an order still in flight.
+	CountActiveOrdersAsBuyer(ctx context.Context, buyerID pgtype.UUID) (int64, error)
+	// CountActiveOrdersAsSubcontractor counts a profile's non-terminal orders on the
+	// subcontractor side, guarding subcontractor-role revocation the same way.
+	CountActiveOrdersAsSubcontractor(ctx context.Context, subcontractorID pgtype.UUID) (int64, error)
 	// CountDistinctMembers counts the distinct members recorded under an address in
 	// the current window. Each (address, member) pair is one row, so the row count
 	// is the distinct-member count. The pattern is address + separator + '%'.
 	CountDistinctMembers(ctx context.Context, arg CountDistinctMembersParams) (int64, error)
+	// CreateAccount inserts a new account. business role columns default false at
+	// the table level; the caller passes only the roles chosen at registration.
+	// password_hash is a bcrypt digest, never the plaintext password.
+	CreateAccount(ctx context.Context, arg CreateAccountParams) (UserAccount, error)
+	// CreateSession stores a new session row keyed by the SHA-256 hash of the
+	// opaque token. The raw token lives only in the cookie; the database never
+	// sees it, so a database read cannot reconstruct a usable session token.
+	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	// CreateVerificationCode stores one six-digit code as its SHA-256 hash for a
+	// given account and purpose. The plaintext code is delivered out of band (email
+	// or WhatsApp) and never persisted, so a database read cannot reveal it.
+	CreateVerificationCode(ctx context.Context, arg CreateVerificationCodeParams) (VerificationCode, error)
+	// DeleteAllSessions removes every session for an account, used when no session
+	// is retained (recovery confirmed without an active caller session).
+	DeleteAllSessions(ctx context.Context, accountID pgtype.UUID) error
+	// DeleteOtherSessions removes every session for an account except the one whose
+	// hash is kept. Recovery confirmation uses this to end all other sessions after
+	// a password reset, without logging the current caller out mid-request.
+	DeleteOtherSessions(ctx context.Context, arg DeleteOtherSessionsParams) error
+	// DeleteSession removes one session by token hash, backing logout.
+	DeleteSession(ctx context.Context, tokenHash []byte) error
+	// EmailExists reports whether an email is already registered, so registration
+	// can answer 409 without leaking through a full row read.
+	EmailExists(ctx context.Context, email string) (bool, error)
+	// GetAccountByEmail loads one account by its case-insensitive email. Used by
+	// login and recovery; both must run the rate limit before this lookup.
+	GetAccountByEmail(ctx context.Context, email string) (UserAccount, error)
+	// GetAccountByID loads one account by id, backing GET /me and session refresh.
+	GetAccountByID(ctx context.Context, id pgtype.UUID) (UserAccount, error)
+	// GetAccountByPhone loads one account by phone, backing WhatsApp verification
+	// and the emergency user:verify --phone subcommand.
+	GetAccountByPhone(ctx context.Context, phone string) (UserAccount, error)
+	// GetLatestVerificationCode returns the most recent unconsumed code for an
+	// account and purpose. Verification compares the submitted code's hash against
+	// this row and checks expiry in Go against the injected Clock.
+	GetLatestVerificationCode(ctx context.Context, arg GetLatestVerificationCodeParams) (VerificationCode, error)
+	// GetProfileIDByAccount returns the business profile id for an account, or no
+	// rows when none exists yet. MyAccount carries profile_id as nullable, so the
+	// caller treats pgx.ErrNoRows as a null profile_id rather than an error.
+	GetProfileIDByAccount(ctx context.Context, accountID pgtype.UUID) (pgtype.UUID, error)
+	// GetSessionByTokenHash loads a live session by token hash. The expiry check is
+	// in SQL so an expired row is treated as absent without a second round trip.
+	GetSessionByTokenHash(ctx context.Context, arg GetSessionByTokenHashParams) (Session, error)
+	// InvalidateVerificationCodes consumes all outstanding codes for an account and
+	// purpose, so issuing a fresh code retires the previous ones in the same
+	// transaction and only the newest can be redeemed.
+	InvalidateVerificationCodes(ctx context.Context, arg InvalidateVerificationCodesParams) error
 	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
@@ -21,16 +81,32 @@ type Querier interface {
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
 	MemberRecorded(ctx context.Context, arg MemberRecordedParams) (bool, error)
+	// PhoneExists reports whether a phone is already registered.
+	PhoneExists(ctx context.Context, phone string) (bool, error)
 	Ping(ctx context.Context) (int32, error)
 	// RecordMember records that member was used under key in the current window.
 	// DO NOTHING keeps it idempotent within the window.
 	RecordMember(ctx context.Context, arg RecordMemberParams) error
+	// RenewSession slides the expiry forward and records access time, implementing
+	// rolling 7-day renewal on each authenticated request.
+	RenewSession(ctx context.Context, arg RenewSessionParams) error
+	// SetEmailVerified marks the email verified after a valid code is consumed.
+	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error
+	// SetPhoneVerified marks the phone verified after a valid code is consumed.
+	SetPhoneVerified(ctx context.Context, arg SetPhoneVerifiedParams) error
 	// TouchRateLimit increments the counter for one (target, key) in the current
 	// window bucket, creating the row on first use, and returns the new count. The
 	// ON CONFLICT DO UPDATE is atomic and takes a row lock, so two concurrent
 	// callers cannot both read the same count and both slip through: the second
 	// serializes behind the first and sees the incremented value.
 	TouchRateLimit(ctx context.Context, arg TouchRateLimitParams) (int32, error)
+	// UpdateBusinessRoles sets the two business role flags. admin is never touched
+	// here; the admin_has_no_business_role constraint rejects granting a business
+	// role to an admin account, so the update fails loudly instead of silently
+	// corrupting the role model.
+	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
+	// UpdatePassword replaces the bcrypt hash during recovery confirmation.
+	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
 }
 
 var _ Querier = (*Queries)(nil)

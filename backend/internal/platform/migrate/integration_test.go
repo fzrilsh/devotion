@@ -76,7 +76,7 @@ func quietLogger() *slog.Logger {
 }
 
 // TestRun_ReachesVersion14Clean verifies the full stack applies and lands at
-// version 14 with dirty=false, and that a second run is a no-op.
+// version 15 with dirty=false, and that a second run is a no-op.
 func TestRun_ReachesVersion14Clean(t *testing.T) {
 	base := testDSN(t)
 	const schema = "test_migrate_v14"
@@ -95,8 +95,8 @@ func TestRun_ReachesVersion14Clean(t *testing.T) {
 		Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 14 || dirty {
-		t.Fatalf("harap versi 14 dirty=false, dapat versi %d dirty=%v", version, dirty)
+	if version != 15 || dirty {
+		t.Fatalf("harap versi 15 dirty=false, dapat versi %d dirty=%v", version, dirty)
 	}
 
 	// Idempotent: a second run changes nothing and does not error.
@@ -106,7 +106,7 @@ func TestRun_ReachesVersion14Clean(t *testing.T) {
 }
 
 // TestRun_DownUpReturnsSameVersion verifies migrating fully down then back up
-// lands on version 14 again, exercising the exact-reverse down migrations.
+// lands on version 15 again, exercising the exact-reverse down migrations.
 func TestRun_DownUpReturnsSameVersion(t *testing.T) {
 	base := testDSN(t)
 	const schema = "test_migrate_downup"
@@ -135,8 +135,8 @@ func TestRun_DownUpReturnsSameVersion(t *testing.T) {
 		Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 14 || dirty {
-		t.Fatalf("setelah down-up harap versi 14 dirty=false, dapat %d dirty=%v", version, dirty)
+	if version != 15 || dirty {
+		t.Fatalf("setelah down-up harap versi 15 dirty=false, dapat %d dirty=%v", version, dirty)
 	}
 }
 

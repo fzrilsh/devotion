@@ -496,6 +496,49 @@ func (ns NullRateLimitTarget) Value() (driver.Value, error) {
 	return string(ns.RateLimitTarget), nil
 }
 
+type VerificationPurpose string
+
+const (
+	VerificationPurposeEmail    VerificationPurpose = "email"
+	VerificationPurposePhone    VerificationPurpose = "phone"
+	VerificationPurposeRecovery VerificationPurpose = "recovery"
+)
+
+func (e *VerificationPurpose) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = VerificationPurpose(s)
+	case string:
+		*e = VerificationPurpose(s)
+	default:
+		return fmt.Errorf("unsupported scan type for VerificationPurpose: %T", src)
+	}
+	return nil
+}
+
+type NullVerificationPurpose struct {
+	VerificationPurpose VerificationPurpose
+	Valid               bool // Valid is true if VerificationPurpose is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullVerificationPurpose) Scan(value interface{}) error {
+	if value == nil {
+		ns.VerificationPurpose, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.VerificationPurpose.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullVerificationPurpose) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.VerificationPurpose), nil
+}
+
 type VerificationStatus string
 
 const (
@@ -812,6 +855,16 @@ type UserAccount struct {
 	NotifNontxWhatsapp bool
 	CreatedAt          pgtype.Timestamptz
 	UpdatedAt          pgtype.Timestamptz
+}
+
+type VerificationCode struct {
+	ID         pgtype.UUID
+	AccountID  pgtype.UUID
+	Purpose    VerificationPurpose
+	CodeHash   []byte
+	ExpiresAt  pgtype.Timestamptz
+	ConsumedAt pgtype.Timestamptz
+	CreatedAt  pgtype.Timestamptz
 }
 
 type VerificationRequest struct {

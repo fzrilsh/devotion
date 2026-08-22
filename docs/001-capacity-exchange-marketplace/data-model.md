@@ -53,6 +53,7 @@ Nilai turunan sengaja tidak dimaterialisasi. Kolom yang harus diperbarui setiap 
 | Tabel | Dituntut oleh | Alasan tidak jadi entitas |
 |-------|---------------|---------------------------|
 | `session` | FR-003 | Mekanisme autentikasi, bukan konsep bisnis |
+| `verification_code` | FR-002, R-09 | Kode enam digit email/telepon/pemulihan, disimpan sebagai hash |
 | `uploaded_file` | FR-006, FR-009 | Metadata penyimpanan; entitas pemiliknya Pengajuan Verifikasi |
 | `listing_product`, `listing_machine` | FR-012, FR-076 | Relasi banyak-ke-banyak; `listing_machine` menyimpan jumlah mesin per jenis |
 | `request_candidate` | FR-030 | Satu status per kandidat pada satu request; tidak dapat jadi kolom |
@@ -120,6 +121,24 @@ CREATE INDEX idx_session_expires ON session (expires_at);
 ```
 
 Yang disimpan adalah hash token, bukan token mentah (R-10).
+
+```sql
+CREATE TYPE verification_purpose AS ENUM ('email', 'phone', 'recovery');
+
+CREATE TABLE verification_code (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id  uuid NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    purpose     verification_purpose NOT NULL,
+    code_hash   bytea NOT NULL,
+    expires_at  timestamptz NOT NULL,
+    consumed_at timestamptz,
+    created_at  timestamptz NOT NULL
+);
+
+CREATE INDEX idx_verification_code_lookup ON verification_code (account_id, purpose);
+```
+
+Kode enam digit untuk verifikasi email dan telepon (R-09) serta pemulihan kata sandi. Yang disimpan adalah hash SHA-256 kodenya, bukan kode mentah, dengan alasan yang sama dengan token sesi: kebocoran basis data tidak boleh memberi kode yang masih berlaku. `consumed_at` menandai kode yang sudah dipakai agar satu kode hanya sah sekali; `expires_at` diisi aplikasi lewat `Clock`, bukan `DEFAULT`. `purpose` memisah tiga alur (verifikasi email, verifikasi telepon, pemulihan) sehingga kode satu alur tidak dapat dipakai di alur lain.
 
 ```sql
 CREATE TABLE business_profile (
@@ -1043,6 +1062,7 @@ Mengikuti arah ketergantungan kunci asing:
 012_reputation            review, dispute
 013_notification          notification (+ transactional), notification_channel
 014_rate_limit            rate_limit
+015_verification_code     verification_code
 ```
 
 `item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.
