@@ -20,9 +20,11 @@ import (
 	devotiondb "github.com/fzrilsh/devotion/backend/db"
 )
 
-// advisoryLockKey is a fixed application-chosen key. Every process uses the
-// same literal so they contend on one lock; the value itself is arbitrary.
-const advisoryLockKey int64 = 5470130124100001
+// advisoryLockClass is a fixed application-chosen namespace for the two-int
+// advisory lock. The object id is hashtext(current_schema()) so two processes
+// migrating the same schema contend (and the loser skips on a deploy rollover),
+// while unrelated schemas (one per test) never block each other.
+const advisoryLockClass int32 = 54701301
 
 // migrationsSubdir is the directory inside the embedded FS holding the files.
 const migrationsSubdir = "migrations"
@@ -47,7 +49,7 @@ func Run(ctx context.Context, databaseURL string, log *slog.Logger) error {
 
 	var acquired bool
 	if err := conn.QueryRowContext(ctx,
-		"SELECT pg_try_advisory_lock($1)", advisoryLockKey).Scan(&acquired); err != nil {
+		"SELECT pg_try_advisory_lock($1, hashtext(current_schema()))", advisoryLockClass).Scan(&acquired); err != nil {
 		return fmt.Errorf("migrate: pg_try_advisory_lock: %w", err)
 	}
 	if !acquired {
@@ -56,7 +58,7 @@ func Run(ctx context.Context, databaseURL string, log *slog.Logger) error {
 	}
 	defer func() {
 		if _, err := conn.ExecContext(context.Background(),
-			"SELECT pg_advisory_unlock($1)", advisoryLockKey); err != nil {
+			"SELECT pg_advisory_unlock($1, hashtext(current_schema()))", advisoryLockClass); err != nil {
 			log.Error("melepas advisory lock migrasi gagal", "error", err)
 		}
 	}()
