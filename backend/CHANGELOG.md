@@ -25,3 +25,9 @@ perubahannya.
   (ekstrak quickstart.md A-B), `skenario-uji-manual.md` (penunjuk ke §F),
   `utang-teknis.md` (tiga item Complexity Tracking). `cloudflare-ips.md`
   menyusul di T013. (T006)
+- `backend/Dockerfile` multi-stage (build `golang:1.23.4-alpine`, runtime
+  `alpine:3.20` non-root) dan `.github/workflows/ci.yml`. Urutan pipeline:
+  `go vet` -> `go test` (Postgres sebagai layanan CI, bukan runtime, jadi Gate I
+  tetap dua) -> build frontend -> salin `frontend/dist/.` ke `backend/webdist/`
+  sebelum docker build -> push GHCR tag `<sha>` dan `latest` -> deploy SSH di
+  `main`. (T007)
