@@ -103,3 +103,19 @@ perubahannya.
   timestamp dari `Clock` sehingga uji kedaluwarsa jendela menggeser waktu, bukan
   tidur; 429 membawa `Retry-After` sampai jendela bergulir. Kueri di
   `db/queries/ratelimit.sql`, hasil `sqlc generate` di-commit. (T016)
+- `internal/platform/session` dan `internal/account`: sesi dan seluruh
+  permukaan auth. Token 32 byte `crypto/rand` di-encode base64url pada cookie
+  `devotion_session` (`httpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, TTL 7
+  hari dengan perpanjangan bergulir); yang tersimpan `token_hash` SHA-256, bukan
+  token mentah, dan logout menghapus baris. Sepuluh endpoint sesuai
+  `openapi.yaml`: `register`, `verify-email`, `verify-phone`, `resend-code`,
+  `login`, `logout`, `recover/request`, `recover/confirm`, `GET /me`,
+  `PATCH /me/roles`. `GET /me` mengembalikan bentuk `MyAccount`. bcrypt cost 10;
+  login menjalankan rate limit T016 **sebelum** perbandingan bcrypt. Kode enam
+  digit R-09 untuk email dan telepon, tersimpan sebagai hash SHA-256, sekali
+  pakai lewat `consumed_at`, kedaluwarsa 15 menit dari `Clock`. `POST
+  /auth/recover/request` selalu 202 dengan waktu respons dikonstankan lewat
+  `platform.ConstantTimeFloor` (wall-clock, bukan `Clock`, karena kebocorannya
+  sinyal waktu nyata) agar tak membocorkan keberadaan akun; `recover/confirm`
+  mengakhiri semua sesi lain. `golang.org/x/crypto` naik dari indirect menjadi
+  dependency langsung, dicatat di `docs/dependencies.md`. (T014)

@@ -32,8 +32,8 @@ func TestPool_MigratedSchemaAndPing(t *testing.T) {
 		"SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 14 || dirty {
-		t.Fatalf("harap versi 14 dirty=false, dapat %d dirty=%v", version, dirty)
+	if version != 15 || dirty {
+		t.Fatalf("harap versi 15 dirty=false, dapat %d dirty=%v", version, dirty)
 	}
 }
 

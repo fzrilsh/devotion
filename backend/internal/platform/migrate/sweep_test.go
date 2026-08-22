@@ -59,7 +59,7 @@ func TestNoTimeDefaultInMigrations(t *testing.T) {
 }
 
 // TestMigrationPairsComplete verifies every up has a matching down and the set
-// runs 1..14 without a gap.
+// runs 1..15 without a gap.
 func TestMigrationPairsComplete(t *testing.T) {
 	dir := migrationsDir(t)
 	entries, err := os.ReadDir(dir)
@@ -80,10 +80,10 @@ func TestMigrationPairsComplete(t *testing.T) {
 			downs[m[1]] = true
 		}
 	}
-	if len(ups) != 14 {
-		t.Fatalf("harap 14 migrasi up, ada %d", len(ups))
+	if len(ups) != 15 {
+		t.Fatalf("harap 15 migrasi up, ada %d", len(ups))
 	}
-	for i := 1; i <= 14; i++ {
+	for i := 1; i <= 15; i++ {
 		key := fmtNum(i)
 		if !ups[key] {
 			t.Errorf("migrasi up %s hilang", key)

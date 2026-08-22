@@ -77,3 +77,17 @@ func WeekStart(t time.Time) time.Time {
 	monday := time.Date(y, m, d-offset, 0, 0, 0, 0, jakarta)
 	return monday
 }
+
+// ConstantTimeFloor starts a real wall-clock stopwatch and returns a function
+// that, when called, sleeps until at least d has elapsed. It measures real time
+// (not the injected Clock) on purpose: it backs the constant response time that
+// hides whether a recovery account existed, and that leak is a real-time signal.
+// It lives here because the time.Now() it needs is banned outside platform.
+func ConstantTimeFloor(d time.Duration) func() {
+	start := time.Now()
+	return func() {
+		if elapsed := time.Since(start); elapsed < d {
+			time.Sleep(d - elapsed)
+		}
+	}
+}
