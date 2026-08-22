@@ -22,10 +22,15 @@ type Querier interface {
 	// CountActiveOrdersAsSubcontractor counts a profile's non-terminal orders on the
 	// subcontractor side, guarding subcontractor-role revocation the same way.
 	CountActiveOrdersAsSubcontractor(ctx context.Context, subcontractorID pgtype.UUID) (int64, error)
+	CountCatalogByType(ctx context.Context, type_ ItemType) (int64, error)
+	CountCities(ctx context.Context) (int64, error)
 	// CountDistinctMembers counts the distinct members recorded under an address in
 	// the current window. Each (address, member) pair is one row, so the row count
 	// is the distinct-member count. The pattern is address + separator + '%'.
 	CountDistinctMembers(ctx context.Context, arg CountDistinctMembersParams) (int64, error)
+	// CountProvinces, CountCities, CountCatalogByType back the seed verification and
+	// the "count is greater than zero" done-check.
+	CountProvinces(ctx context.Context) (int64, error)
 	// CreateAccount inserts a new account. business role columns default false at
 	// the table level; the caller passes only the roles chosen at registration.
 	// password_hash is a bcrypt digest, never the plaintext password.
@@ -84,6 +89,17 @@ type Querier interface {
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
 	InvalidateVerificationCodes(ctx context.Context, arg InvalidateVerificationCodesParams) error
+	// ListActiveCatalogItems returns the active items of one type ordered for
+	// display, for GET /master/products and /master/machines.
+	ListActiveCatalogItems(ctx context.Context, type_ ItemType) ([]ListActiveCatalogItemsRow, error)
+	// ListCities returns every city ordered by code, for GET /regions/cities with no
+	// province filter.
+	ListCities(ctx context.Context) ([]City, error)
+	// ListCitiesByProvince returns the cities of one province, for
+	// GET /regions/cities?province=.
+	ListCitiesByProvince(ctx context.Context, provinceCode string) ([]City, error)
+	// ListProvinces returns every province ordered by code, for GET /regions/provinces.
+	ListProvinces(ctx context.Context) ([]Province, error)
 	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
@@ -122,6 +138,22 @@ type Querier interface {
 	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
 	// UpdatePassword replaces the bcrypt hash during recovery confirmation.
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	// UpsertCatalogItem inserts a baseline product or machine type, or reactivates
+	// and reorders an existing one. Idempotent on (type, name): the seed can run
+	// twice without duplicating. created_at is supplied by the caller from the Clock
+	// since the column has no DB default.
+	UpsertCatalogItem(ctx context.Context, arg UpsertCatalogItemParams) error
+	// UpsertCity inserts a city or updates its name. The code is already normalized
+	// (dots stripped, four digits) by the seeder before it reaches here, so the
+	// city_code_format and city_belongs_to_province constraints hold.
+	UpsertCity(ctx context.Context, arg UpsertCityParams) error
+	// Master data queries: reference regions (province, city) and the baseline
+	// catalog of product and machine types. The seeders upsert by code/name so
+	// running them twice never duplicates and never deletes; business_profile
+	// references these rows, so a delete would orphan real data.
+	// UpsertProvince inserts a province or updates its name when the code already
+	// exists. Idempotent on code: the seed can run repeatedly without duplicating.
+	UpsertProvince(ctx context.Context, arg UpsertProvinceParams) error
 }
 
 var _ Querier = (*Queries)(nil)
