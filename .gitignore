@@ -3,6 +3,7 @@
 
 # Build output
 backend/webdist/
+backend/devotion
 frontend/dist/
 frontend/node_modules/
 
