@@ -246,4 +246,18 @@ perubahannya.
   terblokir sesaat tak menghalangi pembuatan akun. Dependency `go.mau.fi/whatsmeow`
   dicatat di `docs/dependencies.md`. Uji menunjuk FR-082: gate admin (401/403/200),
   null saat kosong, dan QR/galat sampai ke body. (T024a)
+- `internal/platform/health` menyajikan `GET /health` publik (`security:[]`)
+  yang memeriksa tiga ketergantungan: ping basis data, tautan WhatsApp lewat
+  `Manager.Connected()`, dan ruang sisa volume unggahan lewat `Statfs`. Balasan
+  503 bila salah satu gagal, dengan status per ketergantungan (`ok`/`down`) di
+  body; enum status itu tak punya ruang untuk nomor layanan (FR-082).
+  `internal/platform/observability` menyalakan Sentry dengan `BeforeSend`
+  berbentuk allowlist: event keluar dibangun ulang dari field aman saja, jadi
+  request, cookie, user, Extra, dan Contexts dibuang alih-alih disaring, dan
+  field sensitif baru aman secara default. Subcommand `health:check` menyelidik
+  `GET /health` lewat HTTP untuk healthcheck kontainer tanpa `curl` di image.
+  Dependency `github.com/getsentry/sentry-go` dicatat di `docs/dependencies.md`.
+  Uji menunjuk FR-082: 503 saat tiap ketergantungan mati, dan scrub membuang
+  kata sandi, token, nomor telepon, serta rujukan dokumen identitas. (T025)
+
 

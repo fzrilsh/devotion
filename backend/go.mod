@@ -3,6 +3,7 @@ module github.com/fzrilsh/devotion/backend
 go 1.25.0
 
 require (
+	github.com/getsentry/sentry-go v0.35.3
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.5
 	go.mau.fi/whatsmeow v0.0.0-20260720135917-a2381054887e
