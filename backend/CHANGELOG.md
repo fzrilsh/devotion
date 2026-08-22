@@ -13,3 +13,8 @@ perubahannya.
   `serve`, `admin:create`, `seed:regions`, `seed:master-data`,
   `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`. Semua
   masih stub kecuali dispatcher; diisi di branch berikutnya. (T002)
+- `docker-compose.yml` dengan tepat dua layanan runtime (`postgres`,
+  `backend`), penyetelan Postgres untuk 2GB dari research.md R-03, batas log
+  `max-size 10m`/`max-file 3` di keduanya, volume `pgdata`, bind mount
+  `${UPLOAD_PATH}`, dan `TZ: Asia/Jakarta`. Gate I: hitung entri di bawah
+  `services:`, harus dua. (T005)
