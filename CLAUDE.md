@@ -1,4 +1,4 @@
-# CLAUDE.md — Devotion
+# CLAUDE.md, Devotion
 
 Panduan wajib untuk agent yang menulis kode di repository ini. Baca ini sebelum
 menyentuh berkas apa pun.
@@ -37,14 +37,14 @@ spec menang pada hal perilaku produk.
 
 ---
 
-## Tujuh Aturan yang Tidak Boleh Dilanggar
+## Delapan Aturan yang Tidak Boleh Dilanggar
 
 Melanggar salah satu berarti pekerjaan belum selesai, apa pun alasannya.
 
 ### 1. Maksimal dua layanan runtime
 
 `docker-compose.yml` hanya boleh memuat `backend` dan `postgres`. Tidak ada
-yang lain — tidak ada nginx, Caddy, Redis, worker, cron container, message
+yang lain. Tidak ada nginx, Caddy, Redis, worker, cron container, message
 broker, maupun layanan frontend.
 
 Frontend disajikan oleh biner Go yang sama lewat `embed.FS`. TLS dihabiskan Go
@@ -71,7 +71,7 @@ dalam praktik B2B ini.
 ### 4. Minggu dimulai Senin, Asia/Jakarta
 
 Periode kapasitas disimpan sebagai kolom `date` berisi tanggal Senin awal
-minggu — bukan `timestamptz`. Semua pergeseran batas minggu dihitung di WIB.
+minggu, bukan `timestamptz`. Semua pergeseran batas minggu dihitung di WIB.
 
 Waktu kejadian (perubahan status, pencatatan pembayaran) tetap `timestamptz`,
 dikonversi ke WIB hanya saat ditampilkan.
@@ -103,11 +103,27 @@ Satu kemampuan, satu dependency. Tidak ada dua library untuk urusan sama.
 
 ### 7. Seluruh antarmuka bahasa Indonesia
 
-Label, pesan galat, judul halaman, notifikasi — semuanya. Mobile-first, dan
+Label, pesan galat, judul halaman, notifikasi, semuanya. Mobile-first, dan
 alur inti harus bisa diselesaikan dengan keyboard serta terbaca pembaca layar.
 
 Dokumen sumber menempatkan dukungan multi-bahasa sebagai non-goal karena fokus
 pasar domestik [1], jadi jangan buat lapisan i18n.
+
+### 8. Tanpa AI slop
+
+Tulisan di kode, komentar, dokumen, pesan commit, dan seluruh keluaran harus
+terbaca seperti ditulis manusia.
+
+- **Dilarang em-dash (`—`).** Pakai koma, titik, atau tanda kurung. Ini penanda
+  AI slop yang paling kentara dan paling sering lolos tanpa sengaja.
+- Hindari frasa klise pembuka dan penutup: "it's worth noting", "in today's
+  fast-paced world", "delve into", "in conclusion", "furthermore", "moreover",
+  dan sejenisnya, termasuk padanan bahasa Indonesianya.
+- Jangan menebalkan kata secara berlebihan, jangan bikin daftar berpoin kalau
+  kalimat biasa sudah cukup, jangan menutup dengan ringkasan yang tidak diminta.
+- Langsung ke inti. Tulis sepadat yang tersisa maknanya.
+
+Kalau ragu sebuah kalimat terdengar seperti mesin, tulis ulang.
 
 ---
 
@@ -196,6 +212,19 @@ Arah gabung selalu naik: branch kerja -> `develop/<area>` -> `staging` ->
 `main`. Jangan pernah melompati tingkat, dan jangan menggabungkan mundur tanpa
 alasan yang dicatat.
 
+### CHANGELOG per area
+
+Setiap perubahan, entah fitur baru, perbaikan, penghapusan, atau perubahan
+perilaku, dicatat di `CHANGELOG.md` milik area yang dikerjakan, bukan di satu
+berkas gabungan.
+
+- Kerja di backend dicatat di `backend/CHANGELOG.md`.
+- Kerja di frontend dicatat di `frontend/CHANGELOG.md`.
+
+Catat entri di CHANGELOG pada branch kerja yang sama dengan perubahannya, dalam
+commit yang sama bila memungkinkan, supaya riwayat dan catatan tidak terpisah.
+Perubahan tanpa entri CHANGELOG dianggap belum selesai.
+
 ---
 
 ## Backend (Go)
@@ -252,7 +281,7 @@ Tailwind CSS, Leaflet + OpenStreetMap, Jest.
 - **Generate tipe dari `openapi.yaml`**, jangan tulis tangan. Tipe yang ditulis
   tangan akan menyimpang dari kontrak tanpa ada yang tahu.
 - **`credentials: 'include'`** pada semua permintaan. Token **tidak pernah**
-  disimpan di `localStorage` maupun `sessionStorage` — satu celah XSS akan
+  disimpan di `localStorage` maupun `sessionStorage`. Satu celah XSS akan
   langsung berarti pengambilalihan akun, dan aplikasi ini memuat dokumen
   identitas.
 - **Jangan duplikasi mesin keadaan pesanan.** `PesananDetail` sudah mengirim
@@ -260,7 +289,7 @@ Tailwind CSS, Leaflet + OpenStreetMap, Jest.
   itu. Kalau logikanya ditulis ulang di React, dua tempat akan berbeda pada
   suatu titik.
 - **Kursor paginasi bersifat opaque.** Teruskan `kursor_berikutnya` apa adanya.
-  Jangan diurai, jangan diubah jadi `?page=2` — itu langsung melanggar jaminan
+  Jangan diurai, jangan diubah jadi `?page=2`. Itu langsung melanggar jaminan
   urutan stabil antar halaman.
 - **Tampilkan penjelasan kriteria** pada hasil pencarian. Respons mengirim
   `kriteria` per kandidat; pengguna harus bisa melihat kriteria mana yang tidak
@@ -274,7 +303,7 @@ Tailwind CSS, Leaflet + OpenStreetMap, Jest.
 ### Yang mudah salah
 
 - State selain data server cukup Context bawaan React. **Jangan tambah Redux
-  atau Zustand** — tidak ada state global yang rumit di aplikasi ini.
+  atau Zustand**. Tidak ada state global yang rumit di aplikasi ini.
 - Satu component library saja, atau Tailwind saja. Jangan dua-duanya.
 - Kalau memilih component library, pilih yang komponennya sudah benar secara
   aksesibilitas.
@@ -304,7 +333,7 @@ Jangan menambah layanan basis data untuk pengujian.
 
 Pengujian bertenggat memakai `Clock` yang digantikan, bukan menunggu waktu nyata.
 
-Aturan yang wajib diuji secara khusus — daftar lengkapnya di
+Aturan yang wajib diuji secara khusus, daftar lengkapnya di
 `contracts/README.md`, tetapi ini yang paling mudah rusak diam-diam:
 
 - Urutan hasil pencarian dapat diulang, termasuk antar halaman
@@ -374,7 +403,7 @@ VPS 2GB RAM, 50GB disk.
 - Ukuran log kontainer dibatasi. Log yang tumbuh tanpa batas akan mengisi disk,
   lalu Postgres berhenti menulis dan aplikasi mati total.
 - Total unggahan dibatasi 500MB, 5MB per berkas.
-- `max_connections` Postgres 20, pool di Go 15 — lima disisakan untuk `pg_dump`,
+- `max_connections` Postgres 20, pool di Go 15. Lima disisakan untuk `pg_dump`,
   `psql`, dan migrasi.
 
 ---
