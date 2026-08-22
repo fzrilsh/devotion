@@ -31,3 +31,7 @@ perubahannya.
   tetap dua) -> build frontend -> salin `frontend/dist/.` ke `backend/webdist/`
   sebelum docker build -> push GHCR tag `<sha>` dan `latest` -> deploy SSH di
   `main`. (T007)
+- `internal/platform/clock.go`: `Clock` interface, `SystemClock` (waktu
+  ter-lokalisasi Asia/Jakarta), `TestClock` dengan `Set`/`Advance` ber-mutex,
+  dan `WeekStart` (Senin awal minggu WIB) yang dipakai kedua lapisan penjadwal.
+  Uji menyisir tree: `time.Now()` dilarang di luar `platform` dan `cmd`. (T008)
