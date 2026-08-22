@@ -20,6 +20,7 @@ var (
 	errCodeInvalid    = errors.New("account: kode salah")
 	errCodeExpired    = errors.New("account: kode kedaluwarsa")
 	errRolesActive    = errors.New("account: peran masih dipakai order aktif")
+	errAccountUnknown = errors.New("account: akun tidak ditemukan")
 )
 
 // registerInput is the validated RegisterRequest. business_name is accepted per
@@ -307,6 +308,40 @@ func (s *Service) setRoles(ctx context.Context, acc sqlcgen.UserAccount, wantSub
 		return sqlcgen.UserAccount{}, err
 	}
 	return updated, nil
+}
+
+// VerifyByEmail marks the account with this email verified without a code, for
+// the user:verify subcommand. It exists so an admin can rescue an account whose
+// number is blocked by the WhatsApp channel shortly before judging, restoring
+// the ability to register. A missing account is errAccountUnknown.
+func (s *Service) VerifyByEmail(ctx context.Context, email string) error {
+	acc, err := s.queries().GetAccountByEmail(ctx, email)
+	if err != nil {
+		if isNoRows(err) {
+			return errAccountUnknown
+		}
+		return err
+	}
+	return s.queries().SetEmailVerified(ctx, sqlcgen.SetEmailVerifiedParams{
+		ID:        acc.ID,
+		UpdatedAt: tstz(s.clock.Now()),
+	})
+}
+
+// VerifyByPhone marks the account with this phone verified without a code, the
+// phone counterpart of VerifyByEmail. A missing account is errAccountUnknown.
+func (s *Service) VerifyByPhone(ctx context.Context, phone string) error {
+	acc, err := s.queries().GetAccountByPhone(ctx, phone)
+	if err != nil {
+		if isNoRows(err) {
+			return errAccountUnknown
+		}
+		return err
+	}
+	return s.queries().SetPhoneVerified(ctx, sqlcgen.SetPhoneVerifiedParams{
+		ID:        acc.ID,
+		UpdatedAt: tstz(s.clock.Now()),
+	})
 }
 
 // rateLimitError carries the retry hint so the handler can set Retry-After.

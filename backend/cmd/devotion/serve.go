@@ -15,6 +15,7 @@ import (
 
 	web "github.com/fzrilsh/devotion/backend"
 	"github.com/fzrilsh/devotion/backend/internal/account"
+	"github.com/fzrilsh/devotion/backend/internal/admin"
 	"github.com/fzrilsh/devotion/backend/internal/db"
 	"github.com/fzrilsh/devotion/backend/internal/masterdata"
 	"github.com/fzrilsh/devotion/backend/internal/notification"
@@ -82,15 +83,27 @@ func runServe(ctx context.Context, args []string) error {
 	acc.Register(router)
 	masterdata.New(pool, clock).Register(router)
 
+	// The WhatsApp manager runs the whatsmeow client as a goroutine inside this
+	// same process (research R-08), with its session store on the same Postgres
+	// database, so Gate I stays at two services. It is the concrete WhatsAppSender
+	// wired into notification below; its admin route exposes only the link state,
+	// never the service number (FR-082). A store failure at boot is fatal: without
+	// it the WhatsApp channel could never deliver.
+	wa, err := admin.New(ctx, cfg.DatabaseURL, log)
+	if err != nil {
+		return err
+	}
+	go wa.Start(ctx)
+	wa.Register(router, acc)
+
 	// The email sender exists only when Mailjet credentials are configured
 	// (always in production, optional in development). A nil sender fails the
-	// email channel's attempt rather than dropping it silently. WhatsApp has no
-	// transport until T024a, so it is nil here and its channel fails likewise.
+	// email channel's attempt rather than dropping it silently.
 	var email notification.EmailSender
 	if cfg.MailjetAPIKey != "" && cfg.MailjetSecret != "" && cfg.MailFrom != "" {
 		email = notification.NewMailjetSender(cfg.MailFrom, cfg.MailjetAPIKey, cfg.MailjetSecret)
 	}
-	notif := notification.New(pool, clock, acc, email, nil)
+	notif := notification.New(pool, clock, acc, email, wa)
 	notif.Register(router)
 
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {

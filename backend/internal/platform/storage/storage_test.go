@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -21,6 +22,15 @@ import (
 // baseTime is a fixed instant so any clock-derived created_at is deterministic.
 var baseTime = time.Date(2026, 8, 22, 10, 0, 0, 0, time.UTC)
 
+// phoneSeq hands each seeded account a distinct, constraint-valid phone number
+// (^62[0-9]{8,13}$), since the account rows carry a unique phone.
+var phoneSeq int
+
+func nextPhone() string {
+	phoneSeq++
+	return fmt.Sprintf("62812%07d", phoneSeq)
+}
+
 // seedProfile inserts the province, city, account, and business_profile a file
 // row must reference, and returns the new profile id. It writes SQL directly
 // because storage has no need for account or profile queries of its own.
@@ -37,9 +47,9 @@ func seedProfile(t *testing.T, pool *pgxpool.Pool, email string) pgtype.UUID {
 	}
 	var accountID pgtype.UUID
 	if err := pool.QueryRow(ctx,
-		`INSERT INTO user_account (email, phone, password_hash, created_at, updated_at)
-		 VALUES ($1, $2, 'x', $3, $3) RETURNING id`,
-		email, "+62812"+email[:4], baseTime).Scan(&accountID); err != nil {
+		`INSERT INTO user_account (email, phone, password_hash, role_subcontractor, created_at, updated_at)
+		 VALUES ($1, $2, 'x', true, $3, $3) RETURNING id`,
+		email, nextPhone(), baseTime).Scan(&accountID); err != nil {
 		t.Fatalf("seed account: %v", err)
 	}
 	var profileID pgtype.UUID
