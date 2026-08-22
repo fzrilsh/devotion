@@ -180,3 +180,16 @@ perubahannya.
   (`item_id`/`kind`). Uji: `NormalizeCityCode` langsung, seed dua kali idempoten,
   nol baris kota dengan `left(code,2) <> province_code`, dan keempat endpoint
   baca. (T019)
+- Subcommand `admin:create` di `cmd/devotion`: membuat admin pertama atau
+  mereset kata sandinya bila email sudah ada (idempoten lewat
+  `INSERT ... ON CONFLICT (email) DO UPDATE`, query `UpsertAdmin`). Kata sandi
+  dibaca dari prompt tanpa echo (`golang.org/x/term`, dikonfirmasi dua kali),
+  tidak pernah lewat flag karena flag masuk riwayat shell; `--email` dan
+  `--phone` dari flag. `account.CreateAdmin` memakai satu jalur bcrypt yang sama
+  (`hashPassword`, cost 10) sehingga hashing kata sandi cuma satu tempat; baris
+  admin punya `role_admin` true dan kedua peran usaha false, diterima
+  `has_at_least_one_role` dan `admin_has_no_business_role`. `golang.org/x/term`
+  dinaikkan dari indirect ke dependency langsung, dicatat di
+  `docs/dependencies.md`. Uji: dua kali jalan tidak menduplikasi admin, panggilan
+  kedua mengganti kata sandi. (T020)
+

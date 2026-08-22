@@ -243,7 +243,25 @@ func (s *Service) recoverConfirm(ctx context.Context, email, code, newPassword s
 	return acc, nil
 }
 
-// setRoles updates the two business role flags. Revoking a role while the
+// CreateAdmin creates the admin account or resets its password when the email
+// already exists, so the admin:create subcommand is idempotent. It reuses the
+// one bcrypt path (hashPassword), keeping password hashing in a single place.
+// role_admin is set and both business roles stay false; the phone is only
+// consulted on first insert, since the upsert touches only the password on
+// conflict.
+func (s *Service) CreateAdmin(ctx context.Context, email, phone, password string) (sqlcgen.UserAccount, error) {
+	hash, err := hashPassword(password)
+	if err != nil {
+		return sqlcgen.UserAccount{}, err
+	}
+	return s.queries().UpsertAdmin(ctx, sqlcgen.UpsertAdminParams{
+		Email:        email,
+		Phone:        phone,
+		PasswordHash: hash,
+		CreatedAt:    tstz(s.clock.Now()),
+	})
+}
+
 // account's profile still has active orders on that side is refused, because it
 // would strip a party from an order still in flight. The order counts key on the
 // business_profile id, so a profile is resolved first; no profile means no
