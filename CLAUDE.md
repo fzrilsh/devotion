@@ -109,6 +109,17 @@ alur inti harus bisa diselesaikan dengan keyboard serta terbaca pembaca layar.
 Dokumen sumber menempatkan dukungan multi-bahasa sebagai non-goal karena fokus
 pasar domestik [1], jadi jangan buat lapisan i18n.
 
+Batasnya jelas: yang bahasa Indonesia adalah teks yang dilihat pengguna. Nama
+kode tetap bahasa Inggris. Variabel, fungsi, tipe, paket, nama tabel dan kolom
+pada kode baru, semuanya diberi nama Inggris. Komentar di kode, bila ada,
+ditulis Inggris. Ini berlaku terutama untuk swagger/OpenAPI: `operationId`, nama
+skema, dan nama field ditulis Inggris, sedangkan `summary`, `description`, dan
+contoh pesan galat yang dikutip pengguna tetap Indonesia.
+
+DDL Indonesia yang sudah ada di `data-model.md` dibiarkan konsisten dengan
+dirinya sendiri. Aturan Inggris ini untuk kode dan kontrak yang ditulis sejak
+sekarang, bukan alasan menerjemahkan yang lama.
+
 ### 8. Tanpa AI slop
 
 Tulisan di kode, komentar, dokumen, pesan commit, dan seluruh keluaran harus

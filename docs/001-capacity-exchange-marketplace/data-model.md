@@ -336,7 +336,36 @@ CREATE INDEX idx_listing_mesin_item  ON listing_mesin (item_id);
 
 Indeks pada `item_id` adalah arah yang dipakai pencarian: dari jenis produk yang dicari menuju listing yang menyatakannya (FR-023 kriteria a dan b).
 
-Yang tidak dapat ditegakkan kunci asing: bahwa `item_id` pada `listing_produk` berjenis `produk` dan bukan `mesin`. Ditegakkan trigger, karena `CHECK` tidak boleh merujuk tabel lain.
+Yang tidak dapat ditegakkan kunci asing: bahwa `item_id` pada `listing_produk` berjenis `produk`, dan `item_id` pada `listing_mesin` berjenis `mesin`. Ditegakkan trigger, karena `CHECK` tidak boleh merujuk tabel lain. Satu fungsi dipakai bersama, jenis yang benar diteruskan sebagai argumen trigger sehingga tidak ada dua fungsi yang bisa menyimpang satu sama lain:
+
+```sql
+CREATE FUNCTION cegah_item_jenis_salah() RETURNS trigger AS $$
+DECLARE
+    v_jenis          text;
+    v_jenis_diharuskan text := TG_ARGV[0];
+BEGIN
+    SELECT i.jenis INTO v_jenis
+      FROM item_daftar_baku i WHERE i.id = NEW.item_id;
+
+    IF v_jenis IS DISTINCT FROM v_jenis_diharuskan THEN
+        RAISE EXCEPTION
+            'item % berjenis %, tabel ini hanya menerima jenis %',
+            NEW.item_id, v_jenis, v_jenis_diharuskan;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_cegah_item_produk_salah
+    BEFORE INSERT OR UPDATE ON listing_produk
+    FOR EACH ROW EXECUTE FUNCTION cegah_item_jenis_salah('produk');
+
+CREATE TRIGGER trg_cegah_item_mesin_salah
+    BEFORE INSERT OR UPDATE ON listing_mesin
+    FOR EACH ROW EXECUTE FUNCTION cegah_item_jenis_salah('mesin');
+```
+
+Aplikasi tetap wajib menolak jenis yang salah lebih dulu dengan pesan yang jelas, trigger ini gerbang terakhir agar data tidak pernah rusak meski logika aplikasi keliru, bukan pengganti validasi masukan.
 
 ---
 
