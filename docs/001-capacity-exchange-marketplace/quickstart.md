@@ -285,7 +285,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   backend:
-    image: ghcr.io/<org>/devotion:latest
+    image: ghcr.io/fzrilsh/devotion:latest
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -472,7 +472,7 @@ push ke main
        ├─ npm run build            → frontend/dist
        ├─ salin dist → backend/webdist
        ├─ docker build (multi-stage, embed.FS)
-       └─ push ghcr.io/<org>/devotion:<sha> dan :latest
+       └─ push ghcr.io/fzrilsh/devotion:<sha> dan :latest
   └─ SSH ke VPS
        └─ docker compose pull && docker compose up -d
 ```
@@ -494,7 +494,7 @@ Kunci SSH disimpan sebagai secret di GitHub, tidak pernah di dalam repository.
 ## D. Menjalankan Sistem dan Pengujian di Mesin Lokal
 
 ```bash
-git clone https://github.com/<org>/devotion.git && cd devotion
+git clone https://github.com/fzrilsh/devotion.git && cd devotion
 cp .env.example .env        # isi untuk lokal; APP_ENV=development
 
 docker compose up -d postgres
