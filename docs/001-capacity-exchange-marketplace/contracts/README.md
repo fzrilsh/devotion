@@ -62,7 +62,7 @@ yang disebut khusus konstitusi.
 ## Catatan penerapan
 
 - Kursor paginasi bersifat opaque bagi klien: teruskan apa adanya, jangan diurai.
-- `POST /auth/pulihkan/permintaan` selalu 202 agar tidak membocorkan keberadaan akun.
+- `POST /auth/recover/request` selalu 202 agar tidak membocorkan keberadaan akun.
 - `GET /health` dan seluruh operasi ber-`security: []` adalah satu-satunya yang tidak
   memerlukan sesi.
 - Respons galat selalu `application/problem+json`, termasuk untuk `/api/*` yang tidak
