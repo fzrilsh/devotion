@@ -156,6 +156,48 @@ ketergantungan melingkar.
 
 ---
 
+## Strategi Branch, Commit, dan Push
+
+Repository ini monolith tapi dikerjakan per domain. Alur branch dipisah antara
+frontend dan backend supaya keduanya bisa maju paralel tanpa saling menabrak.
+
+### Aturan
+
+- **Setiap unit kerja punya branch sendiri.** Satu `feat`, `fix`, `chore`, dan
+  sejenisnya tidak pernah dikerjakan langsung di branch integrasi. Buat branch
+  kerja lebih dulu, selesaikan di sana, baru gabungkan.
+- **Penamaan branch kerja**: `<area>/<tipe>/<short-desc>`.
+  - Frontend: `frontend/feat/login-form`, `frontend/fix/cursor-paginasi`.
+  - Backend: `backend/feat/alokasi-kapasitas`, `backend/chore/sqlc-regen`.
+  - `<tipe>` mengikuti Conventional Commits: `feat`, `fix`, `chore`, `docs`,
+    `refactor`, `test`, dan seterusnya. `<short-desc>` singkat dan `kebab-case`.
+- **Branch integrasi per area**: branch kerja digabung ke `develop/<area>`.
+  - Frontend: `frontend/feat/*` -> `develop/frontend`.
+  - Backend: `backend/feat/*` -> `develop/backend`.
+- **Branch staging menggabungkan semuanya.** `develop/frontend` dan
+  `develop/backend` digabung ke `staging` untuk pengujian terintegrasi. Semua
+  uji end-to-end lintas domain terjadi di sini.
+- **`main` adalah rilis.** Hanya menerima gabungan yang sudah lolos di
+  `staging`. Jangan push kerja harian langsung ke `main`.
+
+### Alur ringkas
+
+```text
+frontend/feat/short-desc ─┐
+                          ├─► develop/frontend ─┐
+frontend/fix/short-desc ──┘                     │
+                                                ├─► staging ─► main
+backend/feat/short-desc ──┐                     │
+                          ├─► develop/backend ──┘
+backend/chore/short-desc ─┘
+```
+
+Arah gabung selalu naik: branch kerja -> `develop/<area>` -> `staging` ->
+`main`. Jangan pernah melompati tingkat, dan jangan menggabungkan mundur tanpa
+alasan yang dicatat.
+
+---
+
 ## Backend (Go)
 
 **Stack**: Go 1.22+, `net/http` (router bawaan), `pgx/v5` + `sqlc`,
