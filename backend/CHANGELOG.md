@@ -166,3 +166,17 @@ perubahannya.
   literal dalam satu blok; pendaftaran job kosong (diisi T023). Uji menunjuk
   R-07: dua penjadwal pada database sama menaikkan counter tepat sekali, lock
   terlepas diperiksa lewat `pg_locks`. (T018)
+- Modul `internal/masterdata` plus subcommand `seed:regions` dan
+  `seed:master-data`, dan empat endpoint baca publik (`security: []`):
+  `GET /api/master/products`, `/api/master/machines`, `/api/regions/provinces`,
+  `/api/regions/cities` (filter opsional `?province=`). `NormalizeCityCode`
+  membuang titik pada kode kota wilayah.id (`32.73` jadi `3273`) sebelum
+  disimpan, karena `city_code_format` dan `city_belongs_to_province` menolak
+  bentuk lain. `seed:regions` default membaca salinan `docs/master-data/regions.json`;
+  `--refresh` mengambil dari wilayah.id, menormalkan, menulis ulang salinan,
+  lalu mengisi database. Seeder idempoten pada kode/nama: sisip bila absen,
+  perbarui nama bila ada, tak pernah menghapus karena `business_profile`
+  merujuknya. Handler memetakan kolom DB (`id`/`type`) ke nama kontrak
+  (`item_id`/`kind`). Uji: `NormalizeCityCode` langsung, seed dua kali idempoten,
+  nol baris kota dengan `left(code,2) <> province_code`, dan keempat endpoint
+  baca. (T019)

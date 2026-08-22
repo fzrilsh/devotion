@@ -2,8 +2,8 @@
 // home for the time arithmetic behind the two scheduler layers (research.md
 // R-07): the compute-on-read predicates in the read queries and the in-process
 // ticker both call these functions, so the same order can never look confirmed
-// on one page and pending on another. CLAUDE.md rule 5 forbids time.Now() in
-// business logic, so every function here takes the current instant as a
+// on one page and pending on another. CLAUDE.md rule 5 forbids reading the wall
+// clock in business logic, so every function here takes the current instant as a
 // parameter; the caller obtains it from an injected platform.Clock.
 package order
 
