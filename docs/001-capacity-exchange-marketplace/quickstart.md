@@ -191,7 +191,7 @@ berkas yang sudah diunggah.
 
 ```bash
 cd /opt/devotion
-curl -so .env.example https://raw.githubusercontent.com/<org>/devotion/main/.env.example
+curl -so .env.example https://raw.githubusercontent.com/fzrilsh/devotion/main/.env.example
 cp .env.example .env
 nano .env
 chmod 600 .env
