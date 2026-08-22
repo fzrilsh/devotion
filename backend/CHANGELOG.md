@@ -150,3 +150,19 @@ perubahannya.
   berkas berekstensi menipu ditolak `ErrUnsupportedType`, kuota penuh
   `ErrQuotaFull`, kelebihan ukuran `ErrTooLarge`, dan penanda EXIF hilang setelah
   re-encode. (T017)
+- Aritmetika tenggat di `internal/order/deadline.go`, satu-satunya tempat waktu
+  dihitung untuk kedua lapisan penjadwal (research.md R-07), sehingga sebuah
+  pesanan tak pernah tampak beda status di halaman berbeda. Setiap fungsi
+  menerima instan sekarang sebagai parameter, tak ada `time.Now()`:
+  `ReadinessDeadline`, `AutoConfirmAt`, `IsAutoConfirmDue`,
+  `IsAutoConfirmApproaching` (FR-068/FR-069), `IsCalendarStale` (FR-021),
+  `IsRequestExpired` (FR-037/FR-082). Batas inklusif diuji per nanodetik.
+- Penjadwal lapisan 2 di `internal/platform/scheduler`: satu `time.Ticker` lima
+  menit dalam goroutine yang dinyalakan `serve`, bukan proses/cron/container
+  kedua, jadi Gate I tetap dua layanan. Tiap job dibungkus
+  `pg_try_advisory_lock(class, key)` pada koneksi pool yang di-pin, dilepas lewat
+  `defer` pada koneksi sama dengan `context.Background()`, sehingga saat rollover
+  deploy container lama melewatkan job alih-alih mengantre. `LockKey` konstanta
+  literal dalam satu blok; pendaftaran job kosong (diisi T023). Uji menunjuk
+  R-07: dua penjadwal pada database sama menaikkan counter tepat sekali, lock
+  terlepas diperiksa lewat `pg_locks`. (T018)
