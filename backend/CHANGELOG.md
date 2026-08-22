@@ -119,3 +119,19 @@ perubahannya.
   sinyal waktu nyata) agar tak membocorkan keberadaan akun; `recover/confirm`
   mengakhiri semua sesi lain. `golang.org/x/crypto` naik dari indirect menjadi
   dependency langsung, dicatat di `docs/dependencies.md`. (T014)
+- Middleware peran di `internal/platform/httpx/auth.go`: peran sebagai bitmask
+  `Role` (`RoleSubcontractor`, `RoleBuyer`, `RoleAdmin`; bit admin terpisah,
+  tak pernah tersirat oleh peran usaha, satu akun boleh memegang dua peran
+  usaha). `RequireAuth` mengizinkan tiap pemanggil terautentikasi dan menaruh
+  `Principal` di konteks; `RequireRole` mengizinkan yang memegang salah satu
+  peran yang diminta. Kegagalan auth 401, peran salah 403, galat resolusi 500,
+  sehingga hiccup basis data tak disalahartikan sebagai sesi absen. httpx tak
+  mengimpor `account`: interface `Authenticator` disuntikkan, dan `account`
+  mengimplementasinya (`Authenticate` memvalidasi cookie, memuat akun segar,
+  melipat tiga flag boolean jadi bitmask). Router mencatat tiap pola sebagai
+  publik eksplisit atau ter-gate; `UncoveredAPIRoutes` melaporkan pola `/api/*`
+  non-publik yang tak ter-gate, dan uji menuntutnya kosong, sehingga endpoint
+  tak bisa terbit tanpa keputusan peran. `logout` dipindah dari Public ke Gated
+  (kontrak menuntut 401), `GET /me` dan `PATCH /me/roles` lewat `RequireAuth`
+  plus adapter `fromPrincipal`. Uji: matriks penolakan tiap kombinasi peran tak
+  berwenang, auth mendahului cek peran, dan rute akun nol tak tercakup. (T015)

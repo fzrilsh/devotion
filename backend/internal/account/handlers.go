@@ -15,58 +15,40 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/session"
 )
 
-// Register wires every auth, /me, and /me/roles route onto the router. The
-// authenticated routes are wrapped so the account is loaded once from the
-// session cookie and handed to the handler; unauthenticated auth routes carry
-// security:[] in the contract and are registered plain.
+// Register wires every auth, /me, and /me/roles route onto the router.
+//
+// The seven routes marked security:[] in the contract are registered with
+// Public: they are covered without a role check. register, login, recover, and
+// the three verify/resend routes must be reachable before the caller holds a
+// usable session (a freshly registered, still-unverified account has a session
+// but nothing to lose by verifying).
+//
+// logout, GET /me, and PATCH /me/roles admit any authenticated caller regardless
+// of business role, so they sit behind RequireAuth: the contract documents a 401
+// on logout, so it is gated, not public. The gate stores the Principal;
+// fromPrincipal pulls the account back out for the /me handlers. logout ignores
+// the Principal and revokes by the raw cookie token. Registering them through
+// Gated is what keeps them out of the router's uncovered set, so the coverage
+// test passes and a future /api route cannot ship without a role decision.
 func (s *Service) Register(r *httpx.Router) {
-	r.HandleFunc("POST /api/auth/register", s.handleRegister)
-	r.HandleFunc("POST /api/auth/verify-email", s.handleVerifyEmail)
-	r.HandleFunc("POST /api/auth/verify-phone", s.handleVerifyPhone)
-	r.HandleFunc("POST /api/auth/resend-code", s.handleResendCode)
-	r.HandleFunc("POST /api/auth/login", s.handleLogin)
-	r.HandleFunc("POST /api/auth/logout", s.handleLogout)
-	r.HandleFunc("POST /api/auth/recover/request", s.handleRecoverRequest)
-	r.HandleFunc("POST /api/auth/recover/confirm", s.handleRecoverConfirm)
-	r.HandleFunc("GET /api/me", s.withAccount(s.handleGetMe))
-	r.HandleFunc("PATCH /api/me/roles", s.withAccount(s.handlePatchRoles))
+	r.Public("POST /api/auth/register", s.handleRegister)
+	r.Public("POST /api/auth/verify-email", s.handleVerifyEmail)
+	r.Public("POST /api/auth/verify-phone", s.handleVerifyPhone)
+	r.Public("POST /api/auth/resend-code", s.handleResendCode)
+	r.Public("POST /api/auth/login", s.handleLogin)
+	r.Public("POST /api/auth/recover/request", s.handleRecoverRequest)
+	r.Public("POST /api/auth/recover/confirm", s.handleRecoverConfirm)
+
+	auth := httpx.RequireAuth(s)
+	r.Gated("POST /api/auth/logout", auth, s.handleLogout)
+	r.Gated("GET /api/me", auth, s.fromPrincipal(s.handleGetMe))
+	r.Gated("PATCH /api/me/roles", auth, s.fromPrincipal(s.handlePatchRoles))
 }
 
 // authedHandler is a handler that has already resolved the caller's account
-// from the session cookie.
+// from the session cookie. The httpx auth gate resolves it; fromPrincipal in
+// authenticator.go adapts it to this shape.
 type authedHandler func(w http.ResponseWriter, r *http.Request, acc sqlcgen.UserAccount)
-
-// withAccount validates the session cookie, loads the account, and passes it to
-// h. An absent or invalid session is 401; the account row is always fresh, so a
-// role change or verification takes effect on the next request.
-func (s *Service) withAccount(h authedHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		raw, ok := session.TokenFromRequest(r)
-		if !ok {
-			httpx.WriteProblem(w, httpx.CodeNotAuthenticated, "Belum masuk.")
-			return
-		}
-		sess, err := s.sessions.Validate(r.Context(), raw)
-		if err != nil {
-			if errors.Is(err, session.ErrNotFound) {
-				httpx.WriteProblem(w, httpx.CodeNotAuthenticated, "Sesi tidak berlaku. Silakan masuk lagi.")
-				return
-			}
-			httpx.WriteInternal(w)
-			return
-		}
-		acc, err := s.queries().GetAccountByID(r.Context(), sess.AccountID)
-		if err != nil {
-			if isNoRows(err) {
-				httpx.WriteProblem(w, httpx.CodeNotAuthenticated, "Akun tidak ditemukan.")
-				return
-			}
-			httpx.WriteInternal(w)
-			return
-		}
-		h(w, r, acc)
-	}
-}
 
 func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 	var body struct {
