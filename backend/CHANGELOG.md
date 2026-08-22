@@ -210,4 +210,23 @@ perubahannya.
   `:443` saat produksi, HTTP polos di `:8080` di pengembangan. Cookie `Secure`
   mati hanya bila `APP_BASE_URL` memakai `http://`, dan pengecualian itu nyaring
   di log. (T022)
+- Modul notifikasi `internal/notification`: antrean transaksional plus
+  pengiriman kanal. `Enqueue` menerima `pgx.Tx`, bukan pool, sehingga baris
+  notifikasi selalu ditulis di dalam transaksi kejadiannya (FR-086);
+  notifikasi dalam platform selalu tersimpan meski semua kanal dimatikan
+  preferensi, karena feed adalah satu-satunya jalur observasi penguji manual
+  (FR-054). `IsTransactional` adalah fungsi atas enum `event_type`, bukan
+  kolom yang bisa disalah-set pemanggil: hanya `calendar_stale`,
+  `deadline_approaching`, dan `rating_request` yang non-transaksional, sisanya
+  transaksional dan tidak bisa dibungkam preferensi (FR-091). Event
+  transaksional mengantre email dan WhatsApp tanpa syarat; event
+  non-transaksional hanya mengantre kanal yang masih diaktifkan akun. Kanal
+  dikirim oleh job penjadwal `Deliver` (didaftarkan lewat `DeliverJob`),
+  maksimal tiga percobaan lalu `failed_permanent`, hitungannya di
+  `notification_channel` (FR-085); kegagalan kirim tidak pernah menyentuh baris
+  notifikasi dalam platform. Email lewat `net/smtp` ke Mailjet tanpa SDK. Empat
+  endpoint terjaga peran: daftar feed dengan kursor keyset opaque dan
+  `unread_count`, tandai dibaca (idempoten, 404 bila bukan milik pemanggil atau
+  id tak sah), GET dan PUT preferensi non-transaksional. Uji menunjuk FR-051,
+  FR-054, FR-055, FR-085, FR-086, FR-091. (T023)
 

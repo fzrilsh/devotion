@@ -40,6 +40,10 @@ const (
 	// lockKeyBase is not a job; it anchors the int32 const type for LockKey so
 	// job keys are declared as, e.g., LockKeyAutoConfirm = lockKeyBase + 1.
 	lockKeyBase int32 = 0
+	// LockKeyNotificationDeliver guards the notification delivery job (T023): one
+	// tick claims pending channel rows and fans them out to email and WhatsApp, so
+	// two overlapping instances during a deploy rollover must not both send.
+	LockKeyNotificationDeliver int32 = lockKeyBase + 1
 )
 
 // Job is one unit of scheduled work. Run receives the pinned connection that
