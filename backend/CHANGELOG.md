@@ -56,3 +56,17 @@ perubahannya.
   `pg_constraint`, sapuan larangan `DEFAULT` waktu, dan kelengkapan 14 pasang
   migrasi. Uji integrasi memakai skema terpisah pada Postgres yang sama dan
   `t.Skip` bila `DATABASE_URL_TEST` tak terjangkau. (T010)
+- Lapisan akses data: `sqlc.yaml` (engine postgresql, `schema: db/migrations`
+  supaya tipe tak menyimpang dari database yang dimigrasi, `queries: db/queries`,
+  `sql_package: pgx/v5`, `emit_json_tags: false`), `db/queries/health.sql`, dan
+  hasil `sqlc generate` di `internal/db/sqlcgen` (di-commit). `internal/db/pool.go`
+  menyetel pool ke angka R-03: `MaxConns 15`, `MinConns 2`, lifetime 30m, idle 5m,
+  health check 1m, dengan `Ping` saat buka. `tx.go` `WithTx` rollback pada galat
+  maupun panic lalu re-panic. Harness `internal/db/testdb`: `New(t, name)` membuat
+  skema `test_<name>`, memigrasinya, mengembalikan pool
+  `search_path=test_<name>,public`, TRUNCATE (bukan DROP) saat cleanup.
+  Kunci advisory migrasi dipindah ke bentuk dua-int
+  `pg_try_advisory_lock(class, hashtext(current_schema()))` sehingga skema uji
+  yang berbeda tak saling memblokir; ekstensi `citext`/`pgcrypto` dipasang
+  `WITH SCHEMA public` dan down 000001 dikosongkan karena ekstensi milik seluruh
+  database, bukan per skema. (T011)
