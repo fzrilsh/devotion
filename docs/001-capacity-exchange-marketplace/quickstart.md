@@ -135,7 +135,7 @@ Setelah langkah B6, uji bahwa origin benar-benar tertutup dari luar Cloudflare:
 
 ```bash
 curl -sk --max-time 5 https://<IP_VPS>/api/health    # harus timeout atau tertolak
-curl -s https://<domain>/api/health                  # harus 200
+curl -s https://devotion.cloud/api/health                  # harus 200
 ```
 
 Bila perintah pertama berhasil, lapisan tepi bisa dilewati begitu saja beserta seluruh
@@ -202,7 +202,7 @@ ini:
 
 ```text
 APP_ENV=production
-APP_BASE_URL=https://<domain>
+APP_BASE_URL=https://devotion.cloud
 TLS_CERT_PATH=/opt/devotion/tls/origin.pem
 TLS_KEY_PATH=/opt/devotion/tls/origin.key
 CF_CLIENT_CA_PATH=/opt/devotion/tls/cf-client-ca.pem
@@ -214,7 +214,7 @@ DATABASE_URL=
 
 MAILJET_API_KEY=
 MAILJET_SECRET_KEY=
-MAIL_FROM=noreply@<domain>
+MAIL_FROM=noreply@devotion.cloud
 
 WHATSAPP_NOMOR=
 SENTRY_DSN=
@@ -355,7 +355,7 @@ docker compose exec backend /devotion seed:master-data
 
 # Admin pertama. Kata sandi diminta lewat prompt, tidak lewat argumen,
 # agar tidak tersimpan di riwayat shell.
-docker compose exec -it backend /devotion admin:create --email admin@<domain>
+docker compose exec -it backend /devotion admin:create --email admin@devotion.cloud
 ```
 
 Ketiganya idempoten: menjalankan dua kali tidak menduplikasi data.
@@ -385,7 +385,7 @@ senyap saat pencarian.
 
 ### B13. Menyambungkan WhatsApp
 
-Buka `https://<domain>/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
+Buka `https://devotion.cloud/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
 
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
@@ -403,7 +403,7 @@ docker compose exec backend /devotion user:verify --phone 62xxxxxxxxxx
 ### B14. Health check dan pemantau uptime
 
 ```bash
-curl -s https://<domain>/api/health | jq
+curl -s https://devotion.cloud/api/health | jq
 ```
 
 Yang diharapkan: `status: sehat`, basis data sehat, WhatsApp tersambung, penyimpanan
@@ -445,7 +445,7 @@ terakhir disimpan.
 itu sendiri yang bermasalah. Dari mesin lokal:
 
 ```bash
-rsync -avz devotion@<domain>:/opt/devotion/cadangan/ ./cadangan-devotion/
+rsync -avz devotion@devotion.cloud:/opt/devotion/cadangan/ ./cadangan-devotion/
 ```
 
 ### B16. Snapshot VPS
