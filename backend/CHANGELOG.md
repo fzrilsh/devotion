@@ -18,3 +18,10 @@ perubahannya.
   `max-size 10m`/`max-file 3` di keduanya, volume `pgdata`, bind mount
   `${UPLOAD_PATH}`, dan `TZ: Asia/Jakarta`. Gate I: hitung entri di bawah
   `services:`, harus dua. (T005)
+- Kerangka sembilan berkas `docs/*.md` (`menjalankan`, `pengujian`,
+  `dependencies`, `utang-teknis`, `layanan-luar`, `temuan-penguji`,
+  `cloudflare-ips`, `setup-vps`, `skenario-uji-manual`) plus
+  `frontend/CHANGELOG.md`. Diisi sekarang: `layanan-luar.md`, `setup-vps.md`
+  (ekstrak quickstart.md A-B), `skenario-uji-manual.md` (penunjuk ke §F),
+  `utang-teknis.md` (tiga item Complexity Tracking). `cloudflare-ips.md`
+  menyusul di T013. (T006)
