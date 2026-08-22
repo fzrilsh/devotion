@@ -11,6 +11,13 @@ import (
 )
 
 type Querier interface {
+	// ClaimPendingChannels returns channels still awaiting delivery, oldest first
+	// (attempted_at NULLS FIRST puts never-tried rows ahead of retried ones), with
+	// the recipient address and message text joined in so the delivery job needs no
+	// second query. The attempts < 3 guard skips rows already exhausted; the
+	// delivery job runs under an advisory lock, so no row lock is needed to keep two
+	// instances off the same channel.
+	ClaimPendingChannels(ctx context.Context, limit int32) ([]ClaimPendingChannelsRow, error)
 	// ConsumeVerificationCode marks a code used so it cannot be replayed. The
 	// consumed_at IS NULL guard makes double-consume a no-op, and the returned row
 	// count lets the caller detect a code already spent.
@@ -31,6 +38,9 @@ type Querier interface {
 	// CountProvinces, CountCities, CountCatalogByType back the seed verification and
 	// the "count is greater than zero" done-check.
 	CountProvinces(ctx context.Context) (int64, error)
+	// CountUnreadNotifications backs the unread_count field of NotificationList. It
+	// rides the partial idx_notification_unread index.
+	CountUnreadNotifications(ctx context.Context, accountID pgtype.UUID) (int64, error)
 	// CreateAccount inserts a new account. business role columns default false at
 	// the table level; the caller passes only the roles chosen at registration.
 	// password_hash is a bcrypt digest, never the plaintext password.
@@ -73,6 +83,9 @@ type Querier interface {
 	// account and purpose. Verification compares the submitted code's hash against
 	// this row and checks expiry in Go against the injected Clock.
 	GetLatestVerificationCode(ctx context.Context, arg GetLatestVerificationCodeParams) (VerificationCode, error)
+	// GetNotifPreferences reads the two non-transactional channel toggles for one
+	// account, backing GET /notifications/preferences (FR-054).
+	GetNotifPreferences(ctx context.Context, id pgtype.UUID) (GetNotifPreferencesRow, error)
 	// GetProfileIDByAccount returns the business profile id for an account, or no
 	// rows when none exists yet. MyAccount carries profile_id as nullable, so the
 	// caller treats pgx.ErrNoRows as a null profile_id rather than an error.
@@ -85,6 +98,18 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// InsertNotification writes the in-platform notification row. It is always
+	// called inside the triggering event's transaction (Enqueue takes a pgx.Tx),
+	// so the notification is committed with the event or not at all (FR-086): a
+	// rolled-back order change leaves no orphan notification. created_at comes from
+	// the Clock, never a DB default (Rule 5).
+	InsertNotification(ctx context.Context, arg InsertNotificationParams) (pgtype.UUID, error)
+	// InsertNotificationChannel queues one external delivery channel for a
+	// notification. The row starts pending with zero attempts; the delivery job
+	// claims it later. The in-platform notification itself needs no channel row,
+	// it is always visible (FR-054); these rows track only email and WhatsApp fan
+	// out.
+	InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) error
 	// InvalidateVerificationCodes consumes all outstanding codes for an account and
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
@@ -98,12 +123,33 @@ type Querier interface {
 	// ListCitiesByProvince returns the cities of one province, for
 	// GET /regions/cities?province=.
 	ListCitiesByProvince(ctx context.Context, provinceCode string) ([]City, error)
+	// ListNotifications returns one account's notifications newest first, keyset
+	// paginated on (created_at, id) so the order is stable across pages even as new
+	// rows arrive. unread_only filters to still-unread rows (FR-051 list). A null
+	// before_created is the first page; later pages pass the last row's cursor.
+	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
 	// ListProvinces returns every province ordered by code, for GET /regions/provinces.
 	ListProvinces(ctx context.Context) ([]Province, error)
 	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
 	LockRateLimitKey(ctx context.Context, pgAdvisoryXactLock int64) error
+	// MarkChannelFailed records a failed attempt: attempts bumped, last_error and
+	// attempted_at stamped. The third failure (attempts reaching 3) flips status to
+	// failed_permanent (FR-085); earlier failures stay pending for the next tick.
+	// The CASE keeps status and attempts consistent with failed_after_three_attempts.
+	MarkChannelFailed(ctx context.Context, arg MarkChannelFailedParams) error
+	// MarkChannelSent records a successful delivery: status sent, attempts bumped to
+	// reflect the try that worked, sent_at and attempted_at stamped from the Clock.
+	// A claimed row had attempts <= 2, so the +1 stays within attempts_max_three.
+	MarkChannelSent(ctx context.Context, arg MarkChannelSentParams) error
+	// MarkNotificationRead stamps read_at on one notification the caller owns. The
+	// account_id predicate is the ownership check: a caller marking another
+	// account's id affects zero rows, which the handler turns into a 404, so the
+	// endpoint never confirms a notification the caller cannot see. COALESCE keeps
+	// the first read time, so re-marking an already-read notification still matches
+	// one row (idempotent 204) instead of a false 404.
+	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
 	// MemberRecorded reports whether member was already recorded under key in the
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
@@ -136,6 +182,11 @@ type Querier interface {
 	// role to an admin account, so the update fails loudly instead of silently
 	// corrupting the role model.
 	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
+	// UpdateNotifPreferences writes the two non-transactional channel toggles and
+	// returns them, backing PUT /notifications/preferences. Transactional
+	// notifications ignore these flags, so only the non-transactional channels are
+	// affected (FR-091).
+	UpdateNotifPreferences(ctx context.Context, arg UpdateNotifPreferencesParams) (UpdateNotifPreferencesRow, error)
 	// UpdatePassword replaces the bcrypt hash during recovery confirmation.
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
 	// UpsertAdmin creates the admin account or, when the email already exists,

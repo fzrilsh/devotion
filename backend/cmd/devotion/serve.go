@@ -17,6 +17,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/account"
 	"github.com/fzrilsh/devotion/backend/internal/db"
 	"github.com/fzrilsh/devotion/backend/internal/masterdata"
+	"github.com/fzrilsh/devotion/backend/internal/notification"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/config"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
@@ -81,6 +82,17 @@ func runServe(ctx context.Context, args []string) error {
 	acc.Register(router)
 	masterdata.New(pool, clock).Register(router)
 
+	// The email sender exists only when Mailjet credentials are configured
+	// (always in production, optional in development). A nil sender fails the
+	// email channel's attempt rather than dropping it silently. WhatsApp has no
+	// transport until T024a, so it is nil here and its channel fails likewise.
+	var email notification.EmailSender
+	if cfg.MailjetAPIKey != "" && cfg.MailjetSecret != "" && cfg.MailFrom != "" {
+		email = notification.NewMailjetSender(cfg.MailFrom, cfg.MailjetAPIKey, cfg.MailjetSecret)
+	}
+	notif := notification.New(pool, clock, acc, email, nil)
+	notif.Register(router)
+
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
 		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))
 	}
@@ -89,6 +101,7 @@ func runServe(ctx context.Context, args []string) error {
 	// R-07), not a second container, so Gate I stays at two services. It stops
 	// when the serve context is cancelled.
 	sched := scheduler.New(pool, clock, log)
+	sched.Register(notif.DeliverJob())
 	go sched.Start(ctx)
 
 	dist, err := fs.Sub(web.FS, "webdist")
