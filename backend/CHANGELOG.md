@@ -370,6 +370,24 @@ perubahannya.
   dari pemanggil untuk constraint `approved_yields_item`; belum ada pembuat item
   katalog dari proposal yang disetujui, jadi T068 perlu menyambungkan pembuatan
   `catalog_item` sesungguhnya saat approve.
+- Test backend US1 (T030): melengkapi cakupan uji US1 di modul `account` dan
+  `listing` tanpa menulis ulang yang sudah ada. Audit menemukan `listing` sudah
+  memenuhi trio (jalur berhasil, penolakan peran, penolakan masukan) untuk
+  seluruh rute-nya plus kasus horizon awal dan perpanjangan idempoten, jadi
+  celah terpusat di `account`. Ditambah `internal/account/us1_test.go`:
+  `TestPatchRoles_MenambahPeran_Berhasil_FR001`,
+  `TestPatchRoles_TanpaSesi_Unauthorized_FR001`,
+  `TestPatchRoles_MencabutSemuaPeran_Ditolak_FR001` (trio PATCH /me/roles),
+  `TestVerifyPhone_JalurBerhasil_FR002`, `TestVerifyPhone_KodeSalah_Ditolak_FR002`,
+  `TestResendCode_ChannelTidakSah_Ditolak_FR002`, `TestResendCode_SelaluDiterima_FR002`
+  (gerbang verifikasi dua kanal FR-002), dan
+  `TestPublicProfile_IdTidakDikenal_NotFound_FR016`. `handlePatchRoles`
+  (`internal/account/handlers.go`) kini menolak permintaan yang mencabut kedua
+  peran dengan 422 (FR-001), menghindari agar constraint `has_at_least_one_role`
+  muncul sebagai 500. Komentar pada
+  `TestCreateListing_TanpaPengajuanVerifikasi_TetapTayang_FR010` diperjelas: spec
+  kita sengaja menyimpang dari status "Menunggu Verifikasi" dokumen sumber, dan
+  test itu mengunci keputusan tersebut (FR-010).
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`

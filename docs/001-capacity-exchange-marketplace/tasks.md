@@ -290,7 +290,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T019, T023
   **Selesai bila**: `POST /master/proposals` sesuai kontrak; pengusul menerima notifikasi saat diputuskan
 
-- [ ] T030 [P] [US1] [BE] Test backend US1
+- [x] T030 [P] [US1] [BE] Test backend US1
   **Modul**: `backend/internal/{account,listing}/`
   **Kemampuan**: jalur berhasil, penolakan peran, penolakan masukan tidak sah untuk setiap endpoint; listing tayang tanpa verifikasi; horizon awal terbentuk benar dan perpanjangan idempoten
   **Dependency**: prasyarat T026, T027, T028, T029
