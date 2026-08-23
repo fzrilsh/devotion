@@ -260,4 +260,11 @@ perubahannya.
   Uji menunjuk FR-082: 503 saat tiap ketergantungan mati, dan scrub membuang
   kata sandi, token, nomor telepon, serta rujukan dokumen identitas. (T025)
 
+### Diperbaiki
+- CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`
+  (1.25.0), sehingga runner tak lagi mengunduh toolchain terpisah tiap run.
+  `actions/setup-go` diberi `cache-dependency-path: backend/go.sum` supaya cache
+  modul menemukan berkas checksum yang ada di subdirektori `backend/`, bukan di
+  root repository.
+
 
