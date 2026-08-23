@@ -283,7 +283,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: setiap `week_start` adalah hari Senin; horizon awal minimal 13 periode; `horizon_until` konsisten dengan `MAX(week_start)`; memperpanjang ke minggu yang sudah tercakup tidak membuat baris ganda
   **Hati-hati**: horizon **bukan** nilai tetap. T035 akan memanggil fungsi perpanjangan ini ketika ada pencarian berdeadline lebih jauh (FR-088), jadi rancang sebagai operasi yang aman dipanggil berulang dan aman dipanggil bersamaan. Batas minggu dihitung di Asia/Jakarta, disimpan sebagai `date`; constraint `week_start_is_monday` akan menolak bila perhitungannya keliru.
 
-- [ ] T029 [P] [US1] [BE] Usulan item daftar baku
+- [x] T029 [P] [US1] [BE] Usulan item daftar baku
   **Modul**: `backend/internal/masterdata/`
   **FR**: FR-061
   **Kemampuan**: pengguna mengusulkan item baru, listing tetap dapat disimpan dengan item yang tersedia
