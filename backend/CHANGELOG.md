@@ -43,7 +43,7 @@ perubahannya.
   adalah galat. Semua variabel hilang dikumpulkan dalam satu galat yang hanya
   memuat nama, tidak pernah nilai. `IsProduction()` untuk penjaga
   `seed:test-data`/`reset:test-data`. (T009)
-- 14 migrasi SQL (`000001_extensions` sampai `000014_rate_limit`, 28 berkas
+- 15 migrasi SQL (`000001_extensions` sampai `000015_verification_code`, 30 berkas
   up/down) yang memetakan data-model.md §12 satu banding satu, ditambah runner
   `internal/platform/migrate`. Runner memakai `iofs` atas migrasi yang di-embed
   (`db/embed.go`), jalan di bawah `pg_try_advisory_lock` dengan kunci konstanta
@@ -51,9 +51,9 @@ perubahannya.
   dipegang proses lain (skip saat rollover deploy). Tanpa `DEFAULT now()` di
   mana pun; kolom waktu diisi aplikasi lewat `Clock`. Down migration kebalikan
   tepat dalam urutan mundur (trigger sebelum fungsi, fungsi sebelum tabel).
-  Uji: versi 14 `dirty=false`, idempoten dua kali, down-up kembali ke versi 14,
+  Uji: versi 15 `dirty=false`, idempoten dua kali, down-up kembali ke versi 15,
   tiga fungsi trigger terpasang lewat `pg_trigger`, empat constraint kunci lewat
-  `pg_constraint`, sapuan larangan `DEFAULT` waktu, dan kelengkapan 14 pasang
+  `pg_constraint`, sapuan larangan `DEFAULT` waktu, dan kelengkapan 15 pasang
   migrasi. Uji integrasi memakai skema terpisah pada Postgres yang sama dan
   `t.Skip` bila `DATABASE_URL_TEST` tak terjangkau. (T010)
 - Lapisan akses data: `sqlc.yaml` (engine postgresql, `schema: db/migrations`
@@ -259,6 +259,19 @@ perubahannya.
   Dependency `github.com/getsentry/sentry-go` dicatat di `docs/dependencies.md`.
   Uji menunjuk FR-082: 503 saat tiap ketergantungan mati, dan scrub membuang
   kata sandi, token, nomor telepon, serta rujukan dokumen identitas. (T025)
+- Kontrak `openapi.yaml` diselaraskan dengan data-model.md dan migrasi untuk
+  jalur User Story 1. `RegisterRequest` kini membawa `city_code` dan `roles`
+  wajib (profil usaha lahir dalam transaksi register, jadi `GET /profile/me`
+  tak pernah 404). `ListingRequest`/`Listing` memakai `weekly_capacity`,
+  `readiness_lead_days`, `product_item_ids`, dan `machines` dengan
+  `machine_count`, menyamai `listing_product`/`listing_machine`, bukan lagi item
+  tunggal. `AvailabilityPeriod`/`PeriodUpdateItem` mendapat `marked_full`.
+  `ProfileUpdateRequest` membuang `address`/`province_code` yang tak berkolom;
+  `MyProfile`/`PublicProfile` menurunkan `city_name`/`province_*` dari `city`.
+  Kode galat `LISTING_ALREADY_EXISTS` (409) ditambahkan ke enum `Problem.code`
+  dan `httpx` (`codes.go` kini 30 kode). Kunci respons validasi `'400'` pada
+  path US1 diseragamkan ke `'422'` (status nyata `httpx.StatusFor`); sisa `'400'`
+  path story lain dicatat sebagai utang di `docs/utang-teknis.md`. (T026-kontrak)
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`

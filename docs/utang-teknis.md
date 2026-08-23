@@ -45,3 +45,20 @@ pilihan struktur.
 
 **Akibat:** ada satu direktori tingkat atas di luar daftar `CLAUDE.md`. Terbatas
 pada definisi CI saja.
+
+## Kode status `'400'` pada path di luar User Story 1
+
+Backend memetakan `VALIDATION_FAILED` ke 422 lewat `httpx.StatusFor`, sehingga
+kunci respons validasi di `openapi.yaml` seharusnya `'422'`, bukan `'400'`. Saat
+mengamandemen kontrak untuk US1, hanya path US1 (`/auth/register`, `/profile/me`
+PUT, `/listing/me` POST/PUT, `/listing/me/periods` PUT, `/master/proposals`) yang
+diseragamkan ke `'422'`.
+
+**Alasan:** path story lain belum diimplementasikan, jadi menyeragamkannya
+sekarang berisiko menyentuh kontrak yang masih akan berubah bersama kodenya.
+Diseragamkan saat masing-masing story dikerjakan.
+
+**Akibat:** untuk sementara `openapi.yaml` memuat campuran `'400'` dan `'422'` pada
+respons validasi. Kunci `'400'` yang tersisa (mis. pada `/auth/login`,
+`/auth/recover/*`, path search dan order) tidak cocok dengan status 422 yang
+sebenarnya dikembalikan backend sampai path itu digarap.
