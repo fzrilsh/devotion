@@ -46,6 +46,136 @@ func (q *Queries) CountProvinces(ctx context.Context) (int64, error) {
 	return column_1, err
 }
 
+const decideItemProposal = `-- name: DecideItemProposal :one
+UPDATE item_proposal
+SET status = $2, admin_note = $3, decided_by = $4, decided_at = $5, item_id = $6
+WHERE id = $1 AND status = 'pending'
+RETURNING id, profile_id, type, proposed_name, status, admin_note, decided_by, decided_at, item_id, created_at
+`
+
+type DecideItemProposalParams struct {
+	ID        pgtype.UUID
+	Status    ProposalStatus
+	AdminNote pgtype.Text
+	DecidedBy pgtype.UUID
+	DecidedAt pgtype.Timestamptz
+	ItemID    pgtype.UUID
+}
+
+// DecideItemProposal applies an admin decision to a still-pending proposal
+// (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+// and the resulting item_id (non-null only on approval), guarding on the current
+// 'pending' status so a second decision on the same row affects nothing and
+// RETURNING yields no row. The decision_complete and approved_yields_item table
+// constraints enforce the shape of an approved versus rejected decision.
+func (q *Queries) DecideItemProposal(ctx context.Context, arg DecideItemProposalParams) (ItemProposal, error) {
+	row := q.db.QueryRow(ctx, decideItemProposal,
+		arg.ID,
+		arg.Status,
+		arg.AdminNote,
+		arg.DecidedBy,
+		arg.DecidedAt,
+		arg.ItemID,
+	)
+	var i ItemProposal
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.Type,
+		&i.ProposedName,
+		&i.Status,
+		&i.AdminNote,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.ItemID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getItemProposalByID = `-- name: GetItemProposalByID :one
+SELECT p.id, p.profile_id, p.type, p.proposed_name, p.status, p.admin_note, p.decided_by, p.decided_at, p.item_id, p.created_at, bp.account_id AS proposer_account_id
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.id = $1
+`
+
+type GetItemProposalByIDRow struct {
+	ID                pgtype.UUID
+	ProfileID         pgtype.UUID
+	Type              ItemType
+	ProposedName      string
+	Status            ProposalStatus
+	AdminNote         pgtype.Text
+	DecidedBy         pgtype.UUID
+	DecidedAt         pgtype.Timestamptz
+	ItemID            pgtype.UUID
+	CreatedAt         pgtype.Timestamptz
+	ProposerAccountID pgtype.UUID
+}
+
+// GetItemProposalByID loads one proposal, joined with the proposer's account id
+// so the decision path knows whom to notify. account_id is the business
+// profile's owner, the recipient of the item_proposal_decision notification.
+func (q *Queries) GetItemProposalByID(ctx context.Context, id pgtype.UUID) (GetItemProposalByIDRow, error) {
+	row := q.db.QueryRow(ctx, getItemProposalByID, id)
+	var i GetItemProposalByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.Type,
+		&i.ProposedName,
+		&i.Status,
+		&i.AdminNote,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.ItemID,
+		&i.CreatedAt,
+		&i.ProposerAccountID,
+	)
+	return i, err
+}
+
+const insertItemProposal = `-- name: InsertItemProposal :one
+INSERT INTO item_proposal (profile_id, type, proposed_name, created_at)
+VALUES ($1, $2, $3, $4)
+RETURNING id, profile_id, type, proposed_name, status, admin_note, decided_by, decided_at, item_id, created_at
+`
+
+type InsertItemProposalParams struct {
+	ProfileID    pgtype.UUID
+	Type         ItemType
+	ProposedName string
+	CreatedAt    pgtype.Timestamptz
+}
+
+// InsertItemProposal records a user's proposal for a new catalog item (FR-061).
+// profile_id is the proposer's business profile, type is product or machine, and
+// created_at comes from the Clock since the column has no DB default. status
+// defaults to 'pending'; decided_* stay null until an admin decides.
+func (q *Queries) InsertItemProposal(ctx context.Context, arg InsertItemProposalParams) (ItemProposal, error) {
+	row := q.db.QueryRow(ctx, insertItemProposal,
+		arg.ProfileID,
+		arg.Type,
+		arg.ProposedName,
+		arg.CreatedAt,
+	)
+	var i ItemProposal
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.Type,
+		&i.ProposedName,
+		&i.Status,
+		&i.AdminNote,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.ItemID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listActiveCatalogItems = `-- name: ListActiveCatalogItems :many
 SELECT id, type, name, active FROM catalog_item
 WHERE type = $1 AND active

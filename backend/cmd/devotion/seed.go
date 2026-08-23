@@ -88,5 +88,5 @@ func newMasterdataService(ctx context.Context) (*masterdata.Service, *pgxpool.Po
 	if err != nil {
 		return nil, nil, err
 	}
-	return masterdata.New(pool, platform.SystemClock{}), pool, nil
+	return masterdata.New(pool, platform.SystemClock{}, nil, nil), pool, nil
 }

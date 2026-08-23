@@ -347,6 +347,29 @@ perubahannya.
   tanpa perubahan kode baru karena cakupannya sudah dites di
   `internal/listing/listing_test.go` (`TestCreateListing_HorizonAwal*`,
   `TestEnsureHorizon_*`).
+- Usulan item daftar baku (T029, FR-061): `POST /api/master/proposals` di
+  `internal/masterdata/http.go` menerima usulan item baru dari pemanggil
+  bisnis, digerbang ke `RoleSubcontractor` dan `RoleBuyer` (keduanya memilih
+  item dari daftar baku yang sama, FR-022). Body divalidasi (`kind` product
+  atau machine, `proposed_name` 2..80 karakter, 422 per-field), usulan tersimpan
+  berstatus `pending` dengan `created_at` dari `Clock` (Rule 5). Metode domain
+  `DecideProposal` (`internal/masterdata/proposal.go`) menerapkan keputusan admin
+  dan mengantre notifikasi `item_proposal_decision` ke pengusul di dalam satu
+  transaksi (FR-086), memenuhi syarat FR-061 bahwa pengusul diberi tahu saat
+  usulannya diputus; permukaan HTTP admin `/admin/proposals` menyusul di T068.
+  Kueri `InsertItemProposal`, `GetItemProposalByID`, `DecideItemProposal` di
+  `db/queries/masterdata.sql` dan hasil `sqlc generate`. Diuji di
+  `internal/masterdata/proposal_test.go` (`TestCreateProposal_Success_FR061`,
+  `TestCreateProposal_RejectsRole_FR061`, `TestCreateProposal_RejectsInvalidInput_FR061`,
+  `TestDecideProposal_NotifiesProposer_FR061`).
+  Dua hal sengaja ditunda ke T068 (permukaan HTTP admin, FR-058): (1)
+  `DecideProposal` memakai UPDATE ber-guard `WHERE status = 'pending'`, jadi
+  keputusan atas proposal yang sudah diputus membuat `DecideItemProposal`
+  mengembalikan `pgx.ErrNoRows` yang naik jadi galat transaksi; T068 harus
+  memetakannya ke 409, bukan 500 mentah. (2) `DecideProposal` menerima `itemID`
+  dari pemanggil untuk constraint `approved_yields_item`; belum ada pembuat item
+  katalog dari proposal yang disetujui, jadi T068 perlu menyambungkan pembuatan
+  `catalog_item` sesungguhnya saat approve.
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`

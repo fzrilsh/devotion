@@ -88,6 +88,13 @@ type Querier interface {
 	// given account and purpose. The plaintext code is delivered out of band (email
 	// or WhatsApp) and never persisted, so a database read cannot reveal it.
 	CreateVerificationCode(ctx context.Context, arg CreateVerificationCodeParams) (VerificationCode, error)
+	// DecideItemProposal applies an admin decision to a still-pending proposal
+	// (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+	// and the resulting item_id (non-null only on approval), guarding on the current
+	// 'pending' status so a second decision on the same row affects nothing and
+	// RETURNING yields no row. The decision_complete and approved_yields_item table
+	// constraints enforce the shape of an approved versus rejected decision.
+	DecideItemProposal(ctx context.Context, arg DecideItemProposalParams) (ItemProposal, error)
 	// DeleteAllSessions removes every session for an account, used when no session
 	// is retained (recovery confirmed without an active caller session).
 	DeleteAllSessions(ctx context.Context, accountID pgtype.UUID) error
@@ -118,6 +125,10 @@ type Querier interface {
 	// GetAccountByPhone loads one account by phone, backing WhatsApp verification
 	// and the emergency user:verify --phone subcommand.
 	GetAccountByPhone(ctx context.Context, phone string) (UserAccount, error)
+	// GetItemProposalByID loads one proposal, joined with the proposer's account id
+	// so the decision path knows whom to notify. account_id is the business
+	// profile's owner, the recipient of the item_proposal_decision notification.
+	GetItemProposalByID(ctx context.Context, id pgtype.UUID) (GetItemProposalByIDRow, error)
 	// GetLatestVerificationCode returns the most recent unconsumed code for an
 	// account and purpose. Verification compares the submitted code's hash against
 	// this row and checks expiry in Go against the injected Clock.
@@ -152,6 +163,11 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// InsertItemProposal records a user's proposal for a new catalog item (FR-061).
+	// profile_id is the proposer's business profile, type is product or machine, and
+	// created_at comes from the Clock since the column has no DB default. status
+	// defaults to 'pending'; decided_* stay null until an admin decides.
+	InsertItemProposal(ctx context.Context, arg InsertItemProposalParams) (ItemProposal, error)
 	// InsertListingMachine links a machine item and its unit count to the listing.
 	InsertListingMachine(ctx context.Context, arg InsertListingMachineParams) error
 	// InsertListingProduct links a product item to the listing. The

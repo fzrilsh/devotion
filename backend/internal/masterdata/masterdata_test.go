@@ -53,9 +53,9 @@ func newService(t *testing.T, name string) (*Service, *httpx.Router) {
 	t.Helper()
 	pool := testdb.New(t, name)
 	clock := platform.NewTestClock(time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC))
-	svc := New(pool, clock)
+	svc := New(pool, clock, nil, nil)
 	r := httpx.NewRouter(quietLogger())
-	svc.Register(r)
+	svc.Register(r, &mockAuth{})
 	return svc, r
 }
 
