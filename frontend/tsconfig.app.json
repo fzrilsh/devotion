@@ -30,6 +30,7 @@
             "@hooks/*": ["./src/hooks/*"],
             "@lib/*": ["./src/lib/*"],
             "@pages/*": ["./src/pages/*"],
+            "@providers/*": ["./src/providers/*"],
             "@routes/*": ["./src/routes/*"],
             "@schemas/*": ["./src/schemas/*"],
             "@styles/*": ["./src/styles/*"]
