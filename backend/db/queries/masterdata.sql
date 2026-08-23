@@ -48,6 +48,36 @@ SELECT id, type, name, active FROM catalog_item
 WHERE type = $1 AND active
 ORDER BY sort_order, name;
 
+-- InsertItemProposal records a user's proposal for a new catalog item (FR-061).
+-- profile_id is the proposer's business profile, type is product or machine, and
+-- created_at comes from the Clock since the column has no DB default. status
+-- defaults to 'pending'; decided_* stay null until an admin decides.
+-- name: InsertItemProposal :one
+INSERT INTO item_proposal (profile_id, type, proposed_name, created_at)
+VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- GetItemProposalByID loads one proposal, joined with the proposer's account id
+-- so the decision path knows whom to notify. account_id is the business
+-- profile's owner, the recipient of the item_proposal_decision notification.
+-- name: GetItemProposalByID :one
+SELECT p.*, bp.account_id AS proposer_account_id
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.id = $1;
+
+-- DecideItemProposal applies an admin decision to a still-pending proposal
+-- (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+-- and the resulting item_id (non-null only on approval), guarding on the current
+-- 'pending' status so a second decision on the same row affects nothing and
+-- RETURNING yields no row. The decision_complete and approved_yields_item table
+-- constraints enforce the shape of an approved versus rejected decision.
+-- name: DecideItemProposal :one
+UPDATE item_proposal
+SET status = $2, admin_note = $3, decided_by = $4, decided_at = $5, item_id = $6
+WHERE id = $1 AND status = 'pending'
+RETURNING *;
+
 -- CountProvinces, CountCities, CountCatalogByType back the seed verification and
 -- the "count is greater than zero" done-check.
 -- name: CountProvinces :one

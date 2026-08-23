@@ -2,6 +2,7 @@ package masterdata
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,36 +10,50 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
+	"github.com/fzrilsh/devotion/backend/internal/notification"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
 
-// Service serves the four public read endpoints and drives the two seed
-// subcommands. It holds the pool and the Clock; the Clock supplies created_at
-// for catalog rows (Rule 5), never time.Now. It carries no per-request state.
+// Service serves the four public read endpoints, the authenticated item
+// proposal endpoint, and drives the two seed subcommands. It holds the pool and
+// the Clock; the Clock supplies created_at for catalog and proposal rows
+// (Rule 5), never time.Now. auth gates POST /master/proposals; notif enqueues
+// the decision notification the proposer receives (FR-061). Both are nil in the
+// seed subcommands, which touch none of that surface. It carries no per-request
+// state.
 type Service struct {
 	pool  *pgxpool.Pool
 	clock platform.Clock
+	auth  httpx.Authenticator
+	notif *notification.Service
 }
 
-// New builds a Service over pool. clock is injected so a test drives catalog
-// timestamps by advancing time rather than reading the wall clock.
-func New(pool *pgxpool.Pool, clock platform.Clock) *Service {
-	return &Service{pool: pool, clock: clock}
+// New builds a Service over pool. clock is injected so a test drives catalog and
+// proposal timestamps by advancing time rather than reading the wall clock. auth
+// and notif may be nil for the seed subcommands, which register no routes.
+func New(pool *pgxpool.Pool, clock platform.Clock, auth httpx.Authenticator, notif *notification.Service) *Service {
+	return &Service{pool: pool, clock: clock, auth: auth, notif: notif}
 }
 
 // queries returns a Queries bound to the pool for a standalone statement.
 func (s *Service) queries() *sqlcgen.Queries { return sqlcgen.New(s.pool) }
 
-// Register wires the four read routes. All carry security:[] in the contract,
-// so they register as Public: they are covered without a role check and stay
-// out of the router's uncovered set. Region and catalog lists are reference
-// data a signed-out visitor may read.
-func (s *Service) Register(r *httpx.Router) {
+// Register wires the four read routes plus the item proposal endpoint. The read
+// routes carry security:[] in the contract, so they register as Public: covered
+// without a role check and out of the router's uncovered set. POST
+// /master/proposals has no security:[], so it is gated to the two business roles
+// (FR-061: a user proposes an item when none fits; both subcontractors filling a
+// listing and buyers searching pick from the same catalog, FR-022). Admins
+// manage the catalog through the T068 surface, not this proposal path.
+func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	r.Public("GET /api/master/products", s.handleProducts)
 	r.Public("GET /api/master/machines", s.handleMachines)
 	r.Public("GET /api/regions/provinces", s.handleProvinces)
 	r.Public("GET /api/regions/cities", s.handleCities)
+
+	gate := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer)
+	r.Gated("POST /api/master/proposals", gate, s.handleCreateProposal)
 }
 
 // catalogItem is the CatalogItem response body. The field names follow the
@@ -129,6 +144,75 @@ func (s *Service) handleCities(w http.ResponseWriter, r *http.Request) {
 		out = append(out, cityItem{Code: row.Code, ProvinceCode: row.ProvinceCode, Name: row.Name})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// maxProposalBody caps the proposal request body. The payload is two short
+// strings, so this stops a client from streaming an unbounded body into the
+// decoder.
+const maxProposalBody = 8 << 10
+
+// handleCreateProposal records a user's item proposal (FR-061). The route is
+// gated to the two business roles, so a missing Principal is an invariant break
+// (500). A createProposal error is a validationError (422) or an invariant 500.
+func (s *Service) handleCreateProposal(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	var in proposalInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	view, err := s.createProposal(r.Context(), acc.ID, in)
+	if err != nil {
+		writeProposalErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+// writeProposalErr maps a proposal service error to its problem response. A
+// validationError renders per field; everything else, including the profile
+// invariant break, is a 500.
+func writeProposalErr(w http.ResponseWriter, err error) {
+	var verr *validationError
+	if errors.As(err, &verr) {
+		httpx.WriteValidation(w, "Masukan tidak sah.", verr.fields)
+		return
+	}
+	httpx.WriteInternal(w)
+}
+
+// decodeJSON reads a JSON body into dst, rejecting unknown fields and oversized
+// bodies. It returns false and writes a validation problem on failure, so a
+// handler can `if !decodeJSON(...) { return }`.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxProposalBody)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Format permintaan tidak sah.")
+		return false
+	}
+	return true
+}
+
+// principalAccount pulls the authenticated UserAccount off the request context.
+// The route is gated, so a missing Principal or a wrong Account type is an
+// invariant violation and becomes a 500. The bool is false when it already
+// wrote the 500, so the handler returns early.
+func principalAccount(w http.ResponseWriter, r *http.Request) (sqlcgen.UserAccount, bool) {
+	p, ok := httpx.PrincipalFromContext(r.Context())
+	if !ok {
+		httpx.WriteInternal(w)
+		return sqlcgen.UserAccount{}, false
+	}
+	acc, ok := p.Account.(sqlcgen.UserAccount)
+	if !ok {
+		httpx.WriteInternal(w)
+		return sqlcgen.UserAccount{}, false
+	}
+	return acc, true
 }
 
 // writeJSON encodes v as the 2xx body. Error bodies go through

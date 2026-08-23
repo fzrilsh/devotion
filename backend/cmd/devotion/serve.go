@@ -93,7 +93,6 @@ func runServe(ctx context.Context, args []string) error {
 	router := httpx.NewRouter(log)
 	acc := account.New(pool, clock, sessions, limiter, nil)
 	acc.Register(router)
-	masterdata.New(pool, clock).Register(router)
 	listing.New(pool, clock).Register(router, acc)
 
 	// The WhatsApp manager runs the whatsmeow client as a goroutine inside this
@@ -118,6 +117,11 @@ func runServe(ctx context.Context, args []string) error {
 	}
 	notif := notification.New(pool, clock, acc, email, wa)
 	notif.Register(router)
+
+	// masterdata registers after notif because its proposal decision path
+	// enqueues a notification to the proposer (FR-061); the read routes are
+	// public, POST /master/proposals is gated to the two business roles.
+	masterdata.New(pool, clock, acc, notif).Register(router, acc)
 
 	// GET /health probes the database, the WhatsApp link, and free space on the
 	// upload volume. The free-space floor is one file's worth: below it a new
