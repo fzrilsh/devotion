@@ -5,8 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/fzrilsh/devotion/backend/internal/db"
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
 	"github.com/fzrilsh/devotion/backend/internal/platform/ratelimit"
 )
@@ -21,23 +23,29 @@ var (
 	errCodeExpired    = errors.New("account: kode kedaluwarsa")
 	errRolesActive    = errors.New("account: peran masih dipakai order aktif")
 	errAccountUnknown = errors.New("account: akun tidak ditemukan")
+	errCityUnknown    = errors.New("account: kota tidak dikenal")
 )
 
-// registerInput is the validated RegisterRequest. business_name is accepted per
-// the contract but has no user_account column: registration creates an account
-// only, and the business profile is a separate resource, so the field is not
-// persisted here.
+// registerInput is the validated RegisterRequest. Registration creates the
+// account and its business profile in one transaction, so BusinessName and
+// CityCode are persisted here: GET /api/profile/me then never 404s, and every
+// downstream lookup that keys on business_profile has a row to find.
 type registerInput struct {
 	Email         string
 	Phone         string
 	Password      string
+	BusinessName  string
+	CityCode      string
 	Subcontractor bool
 	Buyer         bool
 }
 
-// register creates the account, then mints and delivers an email code and a
-// phone code. A duplicate email or phone is a 409. Code delivery is best effort:
-// a send failure does not fail registration, since the codes can be resent.
+// register creates the account and its business profile in one transaction,
+// then mints and delivers an email code and a phone code. A duplicate email or
+// phone is a 409; an unknown city is errCityUnknown so the handler answers 422
+// rather than surfacing a foreign key violation as a 500. Code delivery runs
+// after the commit and is best effort: a send failure must not roll back a
+// registration that already succeeded, since the codes can be resent.
 func (s *Service) register(ctx context.Context, in registerInput) (sqlcgen.UserAccount, error) {
 	q := s.queries()
 	emailExists, err := q.EmailExists(ctx, in.Email)
@@ -54,26 +62,52 @@ func (s *Service) register(ctx context.Context, in registerInput) (sqlcgen.UserA
 	if phoneExists {
 		return sqlcgen.UserAccount{}, errPhoneTaken
 	}
+	cityExists, err := q.CityExists(ctx, in.CityCode)
+	if err != nil {
+		return sqlcgen.UserAccount{}, err
+	}
+	if !cityExists {
+		return sqlcgen.UserAccount{}, errCityUnknown
+	}
 
 	hash, err := hashPassword(in.Password)
 	if err != nil {
 		return sqlcgen.UserAccount{}, err
 	}
 	now := s.clock.Now()
-	acc, err := q.CreateAccount(ctx, sqlcgen.CreateAccountParams{
-		Email:             in.Email,
-		Phone:             in.Phone,
-		PasswordHash:      hash,
-		RoleSubcontractor: in.Subcontractor,
-		RoleBuyer:         in.Buyer,
-		CreatedAt:         tstz(now),
+
+	var acc sqlcgen.UserAccount
+	err = db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
+		qtx := sqlcgen.New(tx)
+		a, err := qtx.CreateAccount(ctx, sqlcgen.CreateAccountParams{
+			Email:             in.Email,
+			Phone:             in.Phone,
+			PasswordHash:      hash,
+			RoleSubcontractor: in.Subcontractor,
+			RoleBuyer:         in.Buyer,
+			CreatedAt:         tstz(now),
+		})
+		if err != nil {
+			return err
+		}
+		if _, err := qtx.CreateProfile(ctx, sqlcgen.CreateProfileParams{
+			AccountID:    a.ID,
+			BusinessName: in.BusinessName,
+			CityCode:     in.CityCode,
+			CreatedAt:    tstz(now),
+		}); err != nil {
+			return err
+		}
+		acc = a
+		return nil
 	})
 	if err != nil {
 		return sqlcgen.UserAccount{}, err
 	}
 
-	// Both codes are best effort; failures to deliver are swallowed so a flaky
-	// mail or WhatsApp channel never blocks account creation.
+	// Both codes are best effort and run only after the account and profile are
+	// committed; a flaky mail or WhatsApp channel never blocks registration and
+	// never rolls back a row that already landed.
 	s.issueAndSend(ctx, acc, sqlcgen.VerificationPurposeEmail)
 	s.issueAndSend(ctx, acc, sqlcgen.VerificationPurposePhone)
 	return acc, nil

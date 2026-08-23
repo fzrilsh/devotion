@@ -8,7 +8,7 @@ perubahannya.
 
 ### Ditambahkan
 - Modul Go `github.com/fzrilsh/devotion/backend` dengan toolchain dipatok
-  `go 1.23.4`.
+  `go 1.25.0`.
 - Dispatcher subcommand di `cmd/devotion` dengan delapan perintah terdaftar:
   `serve`, `admin:create`, `seed:regions`, `seed:master-data`,
   `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`. Semua
@@ -25,7 +25,7 @@ perubahannya.
   (ekstrak quickstart.md A-B), `skenario-uji-manual.md` (penunjuk ke §F),
   `utang-teknis.md` (tiga item Complexity Tracking). `cloudflare-ips.md`
   menyusul di T013. (T006)
-- `backend/Dockerfile` multi-stage (build `golang:1.23.4-alpine`, runtime
+- `backend/Dockerfile` multi-stage (build `golang:1.24.1-alpine`, runtime
   `alpine:3.20` non-root) dan `.github/workflows/ci.yml`. Urutan pipeline:
   `go vet` -> `go test` (Postgres sebagai layanan CI, bukan runtime, jadi Gate I
   tetap dua) -> build frontend -> salin `frontend/dist/.` ke `backend/webdist/`
@@ -272,6 +272,20 @@ perubahannya.
   dan `httpx` (`codes.go` kini 30 kode). Kunci respons validasi `'400'` pada
   path US1 diseragamkan ke `'422'` (status nyata `httpx.StatusFor`); sisa `'400'`
   path story lain dicatat sebagai utang di `docs/utang-teknis.md`. (T026-kontrak)
+- Profil usaha (`internal/account/profile.go`, `profile_http.go`,
+  `db/queries/profile.sql`): `GET /api/profile/me` dan `PUT /api/profile/me` di
+  balik autentikasi, `GET /api/profile/{profileId}` publik. Profil kini lahir
+  bersama akun dalam satu transaksi `POST /api/auth/register` (`CreateAccount` +
+  `CreateProfile` di `db.WithTx`), sehingga `RegisterRequest` mewajibkan
+  `city_code`/`business_name` dan `GET /profile/me` tak pernah 404. Kota tak
+  dikenal menjadi 422 `FieldError` pada `city_code`, bukan pelanggaran foreign
+  key 500. `PUT` memvalidasi nama minimal 3 karakter, koordinat lengkap atau
+  kosong sebagai pasangan, dan rentang dalam wilayah Indonesia (menyalin
+  `coordinates_within_indonesia`). `MyProfile`/`PublicProfile` menurunkan
+  `city_name`/`province_code`/`province_name` dari join `city`+`province`;
+  `verification_status` null dan reputasi kosong di US1. Id profil yang cacat
+  atau tak dikenal pada path publik dijawab 404 tanpa membedakan keduanya.
+  (T026)
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`
