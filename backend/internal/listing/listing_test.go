@@ -433,7 +433,10 @@ func TestCreateListing_ItemMesinSebagaiProduk_Ditolak_FR012(t *testing.T) {
 }
 
 // TestCreateListing_TanpaPengajuanVerifikasi_TetapTayang_FR010 proves a fresh
-// listing is published immediately, with no verification gate.
+// listing is published immediately, with no verification gate. The source
+// document places a "Menunggu Verifikasi" status on the listing flow; our spec
+// deliberately deviates (FR-010: a listing is searchable regardless of identity
+// verification), and this test locks that decision in.
 func TestCreateListing_TanpaPengajuanVerifikasi_TetapTayang_FR010(t *testing.T) {
 	h := newHarness(t, "create_tayang")
 	rec := h.do("POST", "/api/listing/me", h.validCreate(500))

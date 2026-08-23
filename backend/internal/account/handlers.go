@@ -365,6 +365,15 @@ func (s *Service) handlePatchRoles(w http.ResponseWriter, r *http.Request, acc s
 	if !decodeJSON(w, r, &body) {
 		return
 	}
+	// FR-001: an account keeps at least one business role. Dropping both would
+	// violate has_at_least_one_role, so refuse it as input rather than letting the
+	// constraint surface as a 500.
+	if !body.Subcontractor && !body.Buyer {
+		httpx.WriteValidation(w, "Masukan tidak sah.", []httpx.FieldError{
+			{Field: "roles", Message: "Pilih minimal satu peran: subkontraktor atau pemberi order."},
+		})
+		return
+	}
 	updated, err := s.setRoles(r.Context(), acc, body.Subcontractor, body.Buyer)
 	if err != nil {
 		switch {
