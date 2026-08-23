@@ -17,6 +17,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/account"
 	"github.com/fzrilsh/devotion/backend/internal/admin"
 	"github.com/fzrilsh/devotion/backend/internal/db"
+	"github.com/fzrilsh/devotion/backend/internal/listing"
 	"github.com/fzrilsh/devotion/backend/internal/masterdata"
 	"github.com/fzrilsh/devotion/backend/internal/notification"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
@@ -93,6 +94,7 @@ func runServe(ctx context.Context, args []string) error {
 	acc := account.New(pool, clock, sessions, limiter, nil)
 	acc.Register(router)
 	masterdata.New(pool, clock).Register(router)
+	listing.New(pool, clock).Register(router, acc)
 
 	// The WhatsApp manager runs the whatsmeow client as a goroutine inside this
 	// same process (research R-08), with its session store on the same Postgres

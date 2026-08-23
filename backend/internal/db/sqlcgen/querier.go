@@ -26,6 +26,11 @@ type Querier interface {
 	// consumed_at IS NULL guard makes double-consume a no-op, and the returned row
 	// count lets the caller detect a code already spent.
 	ConsumeVerificationCode(ctx context.Context, arg ConsumeVerificationCodeParams) (int64, error)
+	// CountActiveCatalogItemsOfType counts how many of the given ids are active
+	// items of the expected type. The service compares this to the number of ids it
+	// sent: any shortfall means an unknown, inactive, or wrong-type id, which it
+	// reports as a 422 before the type-checking trigger would raise a bare 500.
+	CountActiveCatalogItemsOfType(ctx context.Context, arg CountActiveCatalogItemsOfTypeParams) (int64, error)
 	// CountActiveOrdersAsBuyer counts a profile's orders that are not terminal, on
 	// the buyer side. Revoking the buyer role while any of these exist is refused,
 	// because it would strip a party from an order still in flight.
@@ -39,6 +44,9 @@ type Querier interface {
 	// the current window. Each (address, member) pair is one row, so the row count
 	// is the distinct-member count. The pattern is address + separator + '%'.
 	CountDistinctMembers(ctx context.Context, arg CountDistinctMembersParams) (int64, error)
+	// CountPeriods counts a listing's periods, backing the FR-088 "at least 13
+	// periods" check.
+	CountPeriods(ctx context.Context, listingID pgtype.UUID) (int64, error)
 	// CountProvinces, CountCities, CountCatalogByType back the seed verification and
 	// the "count is greater than zero" done-check.
 	CountProvinces(ctx context.Context) (int64, error)
@@ -49,6 +57,17 @@ type Querier interface {
 	// the table level; the caller passes only the roles chosen at registration.
 	// password_hash is a bcrypt digest, never the plaintext password.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (UserAccount, error)
+	// Capacity listing and its availability calendar. One listing per profile
+	// (one_listing_per_profile); the weekly capacity is the central number
+	// (FR-012/FR-014) propagated to future periods on edit (FR-089). Periods are
+	// stored as the Monday date of each week (week_start_is_monday); the horizon is
+	// the furthest Monday that already has a period.
+	// CreateListing inserts the single listing a profile may own. horizon_until is
+	// seeded to the current week's Monday (it is NOT NULL and must be a Monday);
+	// EnsureHorizon raises it and generates the calendar in the same transaction.
+	// calendar_updated_at starts at creation time; only an owner edit to the
+	// calendar advances it afterward (FR-021).
+	CreateListing(ctx context.Context, arg CreateListingParams) (CapacityListing, error)
 	// CreateProfile inserts the business profile that is born together with the
 	// account inside the registration transaction. latitude and longitude arrive
 	// null at registration; the owner sets them later through PUT /profile/me. The
@@ -72,6 +91,11 @@ type Querier interface {
 	// DeleteAllSessions removes every session for an account, used when no session
 	// is retained (recovery confirmed without an active caller session).
 	DeleteAllSessions(ctx context.Context, accountID pgtype.UUID) error
+	// DeleteListingMachines clears a listing's machine links before rewriting them.
+	DeleteListingMachines(ctx context.Context, listingID pgtype.UUID) error
+	// DeleteListingProducts clears a listing's product links before rewriting them
+	// on an edit.
+	DeleteListingProducts(ctx context.Context, listingID pgtype.UUID) error
 	// DeleteOtherSessions removes every session for an account except the one whose
 	// hash is kept. Recovery confirmation uses this to end all other sessions after
 	// a password reset, without logging the current caller out mid-request.
@@ -81,6 +105,11 @@ type Querier interface {
 	// EmailExists reports whether an email is already registered, so registration
 	// can answer 409 without leaking through a full row read.
 	EmailExists(ctx context.Context, email string) (bool, error)
+	// FindFutureAllocatedPeriodOverCapacity returns the earliest future period whose
+	// used capacity already exceeds the proposed new weekly capacity, so a listing
+	// edit that would strand a running order is rejected with a 409 that names the
+	// offending week and amount rather than silently corrupting the calendar.
+	FindFutureAllocatedPeriodOverCapacity(ctx context.Context, arg FindFutureAllocatedPeriodOverCapacityParams) (FindFutureAllocatedPeriodOverCapacityRow, error)
 	// GetAccountByEmail loads one account by its case-insensitive email. Used by
 	// login and recovery; both must run the rate limit before this lookup.
 	GetAccountByEmail(ctx context.Context, email string) (UserAccount, error)
@@ -93,6 +122,12 @@ type Querier interface {
 	// account and purpose. Verification compares the submitted code's hash against
 	// this row and checks expiry in Go against the injected Clock.
 	GetLatestVerificationCode(ctx context.Context, arg GetLatestVerificationCodeParams) (VerificationCode, error)
+	// GetListingByID loads any listing by its own id, for the public profile join.
+	GetListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
+	// GetListingByProfile loads a profile's listing, backing GET /listing/me. A
+	// missing row is a genuine 404 (the profile has not created a listing yet), not
+	// an invariant violation.
+	GetListingByProfile(ctx context.Context, profileID pgtype.UUID) (CapacityListing, error)
 	// GetNotifPreferences reads the two non-transactional channel toggles for one
 	// account, backing GET /notifications/preferences (FR-054).
 	GetNotifPreferences(ctx context.Context, id pgtype.UUID) (GetNotifPreferencesRow, error)
@@ -117,6 +152,12 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// InsertListingMachine links a machine item and its unit count to the listing.
+	InsertListingMachine(ctx context.Context, arg InsertListingMachineParams) error
+	// InsertListingProduct links a product item to the listing. The
+	// trg_reject_wrong_product_item trigger rejects a machine id here, but the
+	// service checks the item type first so a mismatch is a 422, not a 500.
+	InsertListingProduct(ctx context.Context, arg InsertListingProductParams) error
 	// InsertNotification writes the in-platform notification row. It is always
 	// called inside the triggering event's transaction (Enqueue takes a pgx.Tx),
 	// so the notification is committed with the event or not at all (FR-086): a
@@ -129,6 +170,16 @@ type Querier interface {
 	// it is always visible (FR-054); these rows track only email and WhatsApp fan
 	// out.
 	InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) error
+	// ── availability calendar ──
+	// InsertPeriodsUpToWeek generates every missing weekly period from the current
+	// horizon forward to untilWeek in one statement. The series runs on date, not
+	// timestamptz, so there is no timezone shift that could nudge a Monday to
+	// Sunday. Each new period starts at the listing's weekly_capacity, zero used.
+	// ON CONFLICT keeps it idempotent and safe under concurrent calls: a week that
+	// already exists is left untouched (one_period_per_week). The lower bound is
+	// passed in already clamped to at least the current week's Monday so past weeks
+	// are never created.
+	InsertPeriodsUpToWeek(ctx context.Context, arg InsertPeriodsUpToWeekParams) error
 	// InvalidateVerificationCodes consumes all outstanding codes for an account and
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
@@ -142,13 +193,34 @@ type Querier interface {
 	// ListCitiesByProvince returns the cities of one province, for
 	// GET /regions/cities?province=.
 	ListCitiesByProvince(ctx context.Context, provinceCode string) ([]City, error)
+	// ListListingMachines returns the machine items of a listing with their counts.
+	ListListingMachines(ctx context.Context, listingID pgtype.UUID) ([]ListListingMachinesRow, error)
+	// ListListingProducts returns the product items of a listing joined to their
+	// catalog rows, so the response carries names, not bare ids.
+	ListListingProducts(ctx context.Context, listingID pgtype.UUID) ([]ListListingProductsRow, error)
 	// ListNotifications returns one account's notifications newest first, keyset
 	// paginated on (created_at, id) so the order is stable across pages even as new
 	// rows arrive. unread_only filters to still-unread rows (FR-051 list). A null
 	// before_created is the first page; later pages pass the last row's cursor.
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	// ListPeriodsInRange returns the periods of a listing within an inclusive
+	// week_start range, ordered ascending, for GET /listing/me/periods. allocated
+	// is the sum of active allocation quantities on each period; remaining is the
+	// capacity left, floored at zero and forced to zero when the week is marked
+	// full.
+	ListPeriodsInRange(ctx context.Context, arg ListPeriodsInRangeParams) ([]ListPeriodsInRangeRow, error)
 	// ListProvinces returns every province ordered by code, for GET /regions/provinces.
 	ListProvinces(ctx context.Context) ([]Province, error)
+	// LockListingByProfile takes a row lock on the profile's listing so a capacity
+	// edit and its propagation to future periods run as one serialized unit. The
+	// listing row is always locked before any availability_period row, and that
+	// order is fixed across the codebase to prevent deadlocks.
+	LockListingByProfile(ctx context.Context, profileID pgtype.UUID) (CapacityListing, error)
+	// LockPeriodByWeek locks a single period row for an owner edit, returning its
+	// current capacity and usage. A missing row means the week is beyond the
+	// horizon and must be generated first. Taken only after the listing row is
+	// locked, keeping the fixed lock order.
+	LockPeriodByWeek(ctx context.Context, arg LockPeriodByWeekParams) (AvailabilityPeriod, error)
 	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
@@ -169,13 +241,28 @@ type Querier interface {
 	// the first read time, so re-marking an already-read notification still matches
 	// one row (idempotent 204) instead of a false 404.
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
+	// MaxPeriodWeek returns the furthest week_start a listing has, so a test can
+	// assert horizon_until equals the last generated period.
+	MaxPeriodWeek(ctx context.Context, listingID pgtype.UUID) (pgtype.Date, error)
 	// MemberRecorded reports whether member was already recorded under key in the
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
 	MemberRecorded(ctx context.Context, arg MemberRecordedParams) (bool, error)
+	// PeriodHasActiveAllocation reports whether a period carries any unreversed
+	// allocation, gating the "cannot mark full" and "cannot lower below used" edits.
+	PeriodHasActiveAllocation(ctx context.Context, periodID pgtype.UUID) (bool, error)
 	// PhoneExists reports whether a phone is already registered.
 	PhoneExists(ctx context.Context, phone string) (bool, error)
 	Ping(ctx context.Context) (int32, error)
+	// PropagateCapacityToFuturePeriods sets total_capacity on every future period
+	// that carries no active allocation (FR-089): a capacity change flows to weeks
+	// the owner has not committed yet, while allocated weeks keep their agreed
+	// number. The EXISTS predicate uses idx_allocation_period. week_start >= the
+	// current Monday keeps past weeks frozen.
+	PropagateCapacityToFuturePeriods(ctx context.Context, arg PropagateCapacityToFuturePeriodsParams) error
+	// RaiseHorizonUntil moves the horizon forward, never back: GREATEST keeps the
+	// result independent of commit order when two requests extend it at once.
+	RaiseHorizonUntil(ctx context.Context, arg RaiseHorizonUntilParams) error
 	// RecordMember records that member was used under key in the current window.
 	// DO NOTHING keeps it idempotent within the window.
 	RecordMember(ctx context.Context, arg RecordMemberParams) error
@@ -184,12 +271,20 @@ type Querier interface {
 	RenewSession(ctx context.Context, arg RenewSessionParams) error
 	// SetEmailVerified marks the email verified after a valid code is consumed.
 	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error
+	// SetListingPublished toggles visibility for PUT /listing/me/visibility. A
+	// hidden listing keeps its calendar and allocations; it simply drops out of
+	// search until re-enabled.
+	SetListingPublished(ctx context.Context, arg SetListingPublishedParams) (CapacityListing, error)
 	// SetPhoneVerified marks the phone verified after a valid code is consumed.
 	SetPhoneVerified(ctx context.Context, arg SetPhoneVerifiedParams) error
 	// SumUploadedBytesByOwner totals the bytes a profile already holds, so a new
 	// upload can be rejected before it pushes the owner past the 500MB quota.
 	// COALESCE keeps the result 0 rather than NULL for an owner with no files yet.
 	SumUploadedBytesByOwner(ctx context.Context, ownerProfileID pgtype.UUID) (int64, error)
+	// TouchCalendarUpdatedAt stamps the calendar as freshly edited. This is the
+	// only path that advances calendar_updated_at, so a listing whose owner never
+	// edits the calendar reads as stale and FR-021 keeps working.
+	TouchCalendarUpdatedAt(ctx context.Context, arg TouchCalendarUpdatedAtParams) error
 	// TouchRateLimit increments the counter for one (target, key) in the current
 	// window bucket, creating the row on first use, and returns the new count. The
 	// ON CONFLICT DO UPDATE is atomic and takes a row lock, so two concurrent
@@ -201,6 +296,10 @@ type Querier interface {
 	// role to an admin account, so the update fails loudly instead of silently
 	// corrupting the role model.
 	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
+	// UpdateListing writes the owner-editable listing fields. Publication state is
+	// changed through SetListingPublished, not here, so a capacity edit never flips
+	// visibility by accident.
+	UpdateListing(ctx context.Context, arg UpdateListingParams) (CapacityListing, error)
 	// UpdateNotifPreferences writes the two non-transactional channel toggles and
 	// returns them, backing PUT /notifications/preferences. Transactional
 	// notifications ignore these flags, so only the non-transactional channels are
@@ -226,6 +325,11 @@ type Querier interface {
 	// (dots stripped, four digits) by the seeder before it reaches here, so the
 	// city_code_format and city_belongs_to_province constraints hold.
 	UpsertCity(ctx context.Context, arg UpsertCityParams) error
+	// UpsertPeriod writes one period's capacity and full flag on an owner edit. The
+	// period row is expected to exist (EnsureHorizon generated it); ON CONFLICT
+	// updates it in place, keeping used_capacity untouched so an in-flight order is
+	// never disturbed.
+	UpsertPeriod(ctx context.Context, arg UpsertPeriodParams) error
 	// Master data queries: reference regions (province, city) and the baseline
 	// catalog of product and machine types. The seeders upsert by code/name so
 	// running them twice never duplicates and never deletes; business_profile

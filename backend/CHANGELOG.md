@@ -286,6 +286,56 @@ perubahannya.
   `verification_status` null dan reputasi kosong di US1. Id profil yang cacat
   atau tak dikenal pada path publik dijawab 404 tanpa membedakan keduanya.
   (T026)
+- Fondasi listing kapasitas (T027, sedang berjalan): kueri SQL listing dan
+  kalender di `db/queries/listing.sql` (`CreateListing`, `GetListingByProfile`,
+  `GetListingByID`, `LockListingByProfile` `FOR UPDATE`, `UpdateListing`,
+  `SetListingPublished`, `TouchCalendarUpdatedAt`, `RaiseHorizonUntil` dengan
+  `GREATEST` agar horizon tak pernah mundur, `InsertPeriodsUpToWeek` idempoten
+  lewat `ON CONFLICT`, `ListPeriodsInRange`, `LockPeriodByWeek`, `UpsertPeriod`,
+  `PropagateCapacityToFuturePeriods`, `FindFutureAllocatedPeriodOverCapacity`,
+  `PeriodHasActiveAllocation`, `CountActiveCatalogItemsOfType`, dan tautan
+  `listing_product`/`listing_machine`), hasil `sqlc generate` di
+  `internal/db/sqlcgen`, `internal/platform/dateid.go` (`FormatDateID` menghasilkan
+  "24 Agustus 2026" ter-lokalisasi Asia/Jakarta untuk periode dan notifikasi),
+  serta kerangka paket `internal/listing/listing.go` (`Service{pool, clock}`,
+  `New`, `queries()`, `InitialHorizonWeeks = 14` yang memenuhi sekaligus minimal
+  13 periode FR-088 dan minimal 3 bulan FR-017, `MaxPeriodBatch = 26`).
+- Listing kapasitas subkontraktor (T027): enam rute di `internal/listing/http.go`,
+  semuanya di belakang `httpx.RequireRole(auth, RoleSubcontractor)` sehingga tak
+  ada yang lolos gerbang `UncoveredAPIRoutes()` dan peran salah ditolak 403.
+  `GET /api/listing/me`, `POST /api/listing/me` (FR-010: listing langsung tayang
+  tanpa gerbang verifikasi, `published` true sejak insert), `PUT /api/listing/me`,
+  `PUT /api/listing/me/visibility` (nonaktif sementara lalu aktifkan kembali,
+  FR-015), `GET /api/listing/me/periods`, dan `PUT /api/listing/me/periods`.
+  `EnsureHorizon` menjamin setiap periode mingguan sampai minggu target ada lalu
+  menaikkan `horizon_until`; idempoten dan aman dipanggil bersamaan tanpa
+  advisory lock karena duplikasi dicegah `one_period_per_week`, kemunduran
+  horizon dicegah `GREATEST`, dan deadlock dicegah urutan lock tetap (baris
+  listing sebelum `availability_period`). Batas minggu dihitung satu tempat lewat
+  `platform.WeekStart`, jadi `week_start_is_monday` dan `horizon_is_monday` tak
+  bisa dilanggar. Propagasi kapasitas FR-089 di `PUT /api/listing/me`:
+  `FindFutureAllocatedPeriodOverCapacity` menolak seluruh permintaan dengan 409
+  `CAPACITY_ALREADY_ALLOCATED` bila ada periode mendatang yang pemakaiannya sudah
+  melebihi kapasitas baru, `PropagateCapacityToFuturePeriods` menulis kapasitas
+  baru hanya ke minggu `>= minggu berjalan` yang belum teralokasi, dan periode
+  teralokasi dibiarkan utuh. Pra-pemeriksaan `CountActiveCatalogItemsOfType`
+  memvalidasi tipe item sebelum insert, sehingga id mesin yang dikirim sebagai
+  produk dijawab 422 menyebut `product_item_ids`, bukan 500 dari
+  `trg_reject_wrong_product_item`. `PUT /api/listing/me/periods` memvalidasi
+  seluruh batch (1..26 elemen, tiap `week_start` hari Senin dalam rentang minggu
+  berjalan sampai 26 minggu ke depan, kapasitas non-negatif, tanpa minggu ganda)
+  sebelum menulis apa pun, lalu dalam satu transaksi mengunci listing,
+  memperpanjang horizon, dan mengunci tiap periode urut menaik; kapasitas di
+  bawah pemakaian jadi 409 `CAPACITY_ALREADY_ALLOCATED` dan tanda penuh saat ada
+  alokasi aktif jadi 409 `PERIOD_ALREADY_ALLOCATED`. `TouchCalendarUpdatedAt`
+  adalah satu-satunya jalur yang memajukan `calendar_updated_at` (FR-021).
+  `platform.ParseDate` mengurai `week_start` sebagai tengah malam Asia/Jakarta
+  agar tanggal Senin tetap Senin, bukan bergeser sehari akibat lokalisasi UTC.
+  Terpasang di `cmd/devotion/serve.go` lewat `listing.New(pool, clock).Register(router, acc)`
+  sebelum gerbang rute. Uji pendamping di `internal/listing/listing_test.go`
+  (jalur berhasil, penolakan peran, dan masukan tak sah tiap rute; propagasi
+  FR-089; idempotensi dan konsistensi horizon; `FormatDateID` di
+  `internal/platform/dateid_test.go`).
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`
