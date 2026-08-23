@@ -11,6 +11,10 @@ import (
 )
 
 type Querier interface {
+	// CityExists reports whether a city code is known, so registration and profile
+	// edits can answer 422 on an unknown city instead of surfacing a foreign key
+	// violation as a 500.
+	CityExists(ctx context.Context, code string) (bool, error)
 	// ClaimPendingChannels returns channels still awaiting delivery, oldest first
 	// (attempted_at NULLS FIRST puts never-tried rows ahead of retried ones), with
 	// the recipient address and message text joined in so the delivery job needs no
@@ -45,6 +49,12 @@ type Querier interface {
 	// the table level; the caller passes only the roles chosen at registration.
 	// password_hash is a bcrypt digest, never the plaintext password.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (UserAccount, error)
+	// CreateProfile inserts the business profile that is born together with the
+	// account inside the registration transaction. latitude and longitude arrive
+	// null at registration; the owner sets them later through PUT /profile/me. The
+	// coordinates_complete_or_empty and coordinates_within_indonesia constraints
+	// accept a null pair, so a fresh profile carries no location yet.
+	CreateProfile(ctx context.Context, arg CreateProfileParams) (BusinessProfile, error)
 	// CreateSession stores a new session row keyed by the SHA-256 hash of the
 	// opaque token. The raw token lives only in the cookie; the database never
 	// sees it, so a database read cannot reconstruct a usable session token.
@@ -86,6 +96,15 @@ type Querier interface {
 	// GetNotifPreferences reads the two non-transactional channel toggles for one
 	// account, backing GET /notifications/preferences (FR-054).
 	GetNotifPreferences(ctx context.Context, id pgtype.UUID) (GetNotifPreferencesRow, error)
+	// GetProfileByAccount loads the caller's own profile by account id, backing
+	// GET /profile/me. The city join resolves the human-readable city and province
+	// names the contract returns as read-only fields, so the client never has to
+	// look them up separately.
+	GetProfileByAccount(ctx context.Context, accountID pgtype.UUID) (GetProfileByAccountRow, error)
+	// GetProfileByID loads any profile by its id for the public view, joining city
+	// and province for their names. The public handler decides which columns to
+	// expose; this query returns the full row and the caller projects it.
+	GetProfileByID(ctx context.Context, id pgtype.UUID) (GetProfileByIDRow, error)
 	// GetProfileIDByAccount returns the business profile id for an account, or no
 	// rows when none exists yet. MyAccount carries profile_id as nullable, so the
 	// caller treats pgx.ErrNoRows as a null profile_id rather than an error.
@@ -189,6 +208,10 @@ type Querier interface {
 	UpdateNotifPreferences(ctx context.Context, arg UpdateNotifPreferencesParams) (UpdateNotifPreferencesRow, error)
 	// UpdatePassword replaces the bcrypt hash during recovery confirmation.
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	// UpdateProfile writes the fields the owner may change through PUT /profile/me:
+	// the business name, the chosen city, the map coordinates, and the free-text
+	// description. account_id and verified are never touched here.
+	UpdateProfile(ctx context.Context, arg UpdateProfileParams) (BusinessProfile, error)
 	// UpsertAdmin creates the admin account or, when the email already exists,
 	// resets its password. Idempotent so admin:create can run twice without a
 	// duplicate. role_admin is set true and the two business roles false, which the

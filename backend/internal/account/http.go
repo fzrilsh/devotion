@@ -46,6 +46,11 @@ var phoneRe = regexp.MustCompile(`^\+62[0-9]{8,13}$`)
 // codeRe matches the six-digit codes this service mints.
 var codeRe = regexp.MustCompile(`^[0-9]{6}$`)
 
+// cityCodeRe matches a four-digit BPS city code, the key of the city table's
+// primary key. Registration and profile edits check it before touching the
+// database so a malformed code is a 422, not a foreign key 500.
+var cityCodeRe = regexp.MustCompile(`^[0-9]{4}$`)
+
 // normalizeEmail lowercases and trims an email so lookups are case-insensitive
 // and stable against stray whitespace. The column is citext, but normalizing in
 // Go keeps the stored value tidy too.

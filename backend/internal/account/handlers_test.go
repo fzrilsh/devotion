@@ -62,10 +62,32 @@ func newHarness(t *testing.T, name string) *harness {
 	delivery := &captureDelivery{}
 	svc := New(pool, clock, sessions, limiter, delivery)
 
+	// The profile born with every account keys a city, so registration needs a
+	// city row to point at. Seed one province and one city the tests reuse.
+	seedCity(t, pool)
+
 	r := httpx.NewRouter(quietLogger())
 	svc.Register(r)
 
 	return &harness{svc: svc, handler: r.Handler(), pool: pool, clock: clock, delivery: delivery}
+}
+
+// testCityCode is the seeded city every register call in these tests points at.
+const testCityCode = "3273"
+
+// seedCity inserts the one province and city registration needs. It is
+// idempotent so a reused schema does not error on the second run.
+func seedCity(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO province (code, name) VALUES ('32', 'Jawa Barat') ON CONFLICT DO NOTHING`); err != nil {
+		t.Fatalf("seed province: %v", err)
+	}
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO city (code, province_code, name) VALUES ('3273', '32', 'Kota Bandung') ON CONFLICT DO NOTHING`); err != nil {
+		t.Fatalf("seed city: %v", err)
+	}
 }
 
 func quietLogger() *slog.Logger {
@@ -104,7 +126,9 @@ func (h *harness) registerAndLogin(t *testing.T, email, phone, password string) 
 	t.Helper()
 	rec := h.do("POST", "/api/auth/register", map[string]any{
 		"email": email, "phone": phone, "password": password,
-		"roles": map[string]any{"buyer": true},
+		"business_name": "Konveksi Contoh",
+		"city_code":     testCityCode,
+		"roles":         map[string]any{"buyer": true},
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: status %d, body %s", rec.Code, rec.Body.String())
@@ -139,8 +163,8 @@ func TestRegisterLoginMe_HappyPath(t *testing.T) {
 	if me.Email != "buyer@example.com" {
 		t.Fatalf("email = %q", me.Email)
 	}
-	if me.ProfileID != nil {
-		t.Fatal("profile_id mau null untuk akun baru")
+	if me.ProfileID == nil {
+		t.Fatal("profile_id mau terisi karena profil lahir bersama akun")
 	}
 }
 

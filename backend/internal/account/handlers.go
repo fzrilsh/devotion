@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -43,6 +44,10 @@ func (s *Service) Register(r *httpx.Router) {
 	r.Gated("POST /api/auth/logout", auth, s.handleLogout)
 	r.Gated("GET /api/me", auth, s.fromPrincipal(s.handleGetMe))
 	r.Gated("PATCH /api/me/roles", auth, s.fromPrincipal(s.handlePatchRoles))
+
+	r.Gated("GET /api/profile/me", auth, s.fromPrincipal(s.handleGetProfileMe))
+	r.Gated("PUT /api/profile/me", auth, s.fromPrincipal(s.handlePutProfileMe))
+	r.Public("GET /api/profile/{profileId}", s.handleGetPublicProfile)
 }
 
 // authedHandler is a handler that has already resolved the caller's account
@@ -56,6 +61,7 @@ func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 		Phone        string `json:"phone"`
 		Password     string `json:"password"`
 		BusinessName string `json:"business_name"`
+		CityCode     string `json:"city_code"`
 		Roles        *struct {
 			Subcontractor bool `json:"subcontractor"`
 			Buyer         bool `json:"buyer"`
@@ -75,6 +81,18 @@ func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if len(body.Password) < 8 {
 		fields = append(fields, httpx.FieldError{Field: "password", Message: "Kata sandi minimal 8 karakter."})
 	}
+	// business_name is persisted on the profile born with the account, so it is
+	// required here. minLength 3 after trim mirrors the business_name_not_empty
+	// constraint, turning a would-be 500 into a 422.
+	businessName := strings.TrimSpace(body.BusinessName)
+	if len(businessName) < 3 {
+		fields = append(fields, httpx.FieldError{Field: "business_name", Message: "Nama usaha minimal 3 karakter."})
+	}
+	// city_code keys the profile's city FK. A four-digit code is required; an
+	// unknown one is answered 422 by the service, not a foreign key 500.
+	if !cityCodeRe.MatchString(body.CityCode) {
+		fields = append(fields, httpx.FieldError{Field: "city_code", Message: "Kode kota harus empat digit angka."})
+	}
 	// FR-001: registration selects at least one business role. An account with no
 	// role would fail the has_at_least_one_role constraint, so reject it here as
 	// input rather than surfacing a 500.
@@ -85,7 +103,13 @@ func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteValidation(w, "Masukan tidak sah.", fields)
 		return
 	}
-	in := registerInput{Email: email, Phone: normalizePhone(body.Phone), Password: body.Password}
+	in := registerInput{
+		Email:        email,
+		Phone:        normalizePhone(body.Phone),
+		Password:     body.Password,
+		BusinessName: businessName,
+		CityCode:     body.CityCode,
+	}
 	if body.Roles != nil {
 		in.Subcontractor = body.Roles.Subcontractor
 		in.Buyer = body.Roles.Buyer
@@ -95,6 +119,10 @@ func (s *Service) handleRegister(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, errEmailTaken), errors.Is(err, errPhoneTaken):
 			httpx.WriteProblem(w, httpx.CodeEmailAlreadyRegistered, "Data sudah terdaftar.")
+		case errors.Is(err, errCityUnknown):
+			httpx.WriteValidation(w, "Masukan tidak sah.", []httpx.FieldError{
+				{Field: "city_code", Message: "Kota tidak dikenal."},
+			})
 		default:
 			httpx.WriteInternal(w)
 		}
