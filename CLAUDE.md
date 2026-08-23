@@ -236,6 +236,17 @@ Catat entri di CHANGELOG pada branch kerja yang sama dengan perubahannya, dalam
 commit yang sama bila memungkinkan, supaya riwayat dan catatan tidak terpisah.
 Perubahan tanpa entri CHANGELOG dianggap belum selesai.
 
+### Menandai task selesai
+
+Saat sebuah task di `docs/001-capacity-exchange-marketplace/tasks.md` betul-betul
+tuntas (semua kondisi "Selesai bila" terpenuhi, uji lulus, entri CHANGELOG ada),
+ubah kotaknya dari `- [ ]` menjadi `- [x]` pada baris task itu. Jangan ubah teks
+task yang lain, hanya penanda kotaknya.
+
+Perubahan `tasks.md` ada di `docs/`, di luar `backend/` dan `frontend/`, jadi
+dicatat terpisah dari CHANGELOG area dan tidak ikut branch kerja area. Tandai
+hanya setelah task benar-benar selesai, bukan saat masih dikerjakan.
+
 ---
 
 ## Backend (Go)
