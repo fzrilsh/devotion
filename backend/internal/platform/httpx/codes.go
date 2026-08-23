@@ -30,6 +30,7 @@ const (
 	CodeUnsupportedFileType       Code = "UNSUPPORTED_FILE_TYPE"
 	CodeStorageQuotaFull          Code = "STORAGE_QUOTA_FULL"
 	CodeListingNotFound           Code = "LISTING_NOT_FOUND"
+	CodeListingAlreadyExists      Code = "LISTING_ALREADY_EXISTS"
 	CodeCapacityAlreadyAllocated  Code = "CAPACITY_ALREADY_ALLOCATED"
 	CodePeriodAlreadyAllocated    Code = "PERIOD_ALREADY_ALLOCATED"
 	CodeSelfRequest               Code = "SELF_REQUEST"
@@ -73,6 +74,7 @@ var codes = map[Code]codeMeta{
 	CodeUnsupportedFileType:         {415, "Tipe berkas tidak diizinkan"},
 	CodeStorageQuotaFull:            {507, "Kuota penyimpanan penuh"},
 	CodeListingNotFound:             {404, "Listing tidak ditemukan"},
+	CodeListingAlreadyExists:        {409, "Listing sudah ada"},
 	CodeCapacityAlreadyAllocated:    {409, "Kapasitas sudah dialokasikan"},
 	CodePeriodAlreadyAllocated:      {409, "Periode sudah dialokasikan"},
 	CodeSelfRequest:                 {409, "Kandidat tidak sah"},

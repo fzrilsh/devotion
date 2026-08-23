@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// TestCodes_EveryCodeMapsToOneStatus proves the 29 codes each resolve to a
+// TestCodes_EveryCodeMapsToOneStatus proves the 30 codes each resolve to a
 // status, so no handler can emit a code without a defined status. openapi.yaml
-// lists 29 codes in the Problem.code enum. FR: contract error catalogue.
+// lists 30 codes in the Problem.code enum. FR: contract error catalogue.
 func TestCodes_EveryCodeMapsToOneStatus(t *testing.T) {
 	all := []Code{
 		CodeValidationFailed, CodeNotAuthenticated, CodeForbidden, CodeNotFound,
@@ -20,7 +20,8 @@ func TestCodes_EveryCodeMapsToOneStatus(t *testing.T) {
 		CodeInvalidVerificationCode, CodeVerificationCodeExpired, CodeEmailNotVerified,
 		CodePhoneNotVerified, CodeIdentityNotVerified, CodeIdentityAlreadyVerified,
 		CodeVerificationPending, CodeFileTooLarge, CodeUnsupportedFileType,
-		CodeStorageQuotaFull, CodeListingNotFound, CodeCapacityAlreadyAllocated,
+		CodeStorageQuotaFull, CodeListingNotFound, CodeListingAlreadyExists,
+		CodeCapacityAlreadyAllocated,
 		CodePeriodAlreadyAllocated, CodeSelfRequest, CodeInsufficientCapacity,
 		CodeRequestExpired, CodeRequestAlreadyAgreed, CodeCapacityAlreadyTaken,
 		CodeInvalidStatusTransition, CodeCancellationAfterProduction,
