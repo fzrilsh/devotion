@@ -336,6 +336,17 @@ perubahannya.
   (jalur berhasil, penolakan peran, dan masukan tak sah tiap rute; propagasi
   FR-089; idempotensi dan konsistensi horizon; `FormatDateID` di
   `internal/platform/dateid_test.go`).
+- Kalender awal dan horizon (T028): kemampuan FR-017 dan FR-088 sudah terkirim
+  utuh di dalam T027 lewat `EnsureHorizon` (`internal/listing/calendar.go`) yang
+  membuat periode mingguan minimal 13 minggu ke depan saat listing dibuat,
+  memakai kapasitas mingguan sebagai kapasitas total, menyimpan periode terjauh
+  di `horizon_until` konsisten dengan `MAX(week_start)`, dan memperpanjang
+  horizon secara idempoten serta aman dipanggil bersamaan tanpa membuat baris
+  ganda. T035 memanggil fungsi perpanjangan ini sebagai API internal, bukan kode
+  yang hanya dipakai saat pembuatan listing. Ditandai selesai di `tasks.md`;
+  tanpa perubahan kode baru karena cakupannya sudah dites di
+  `internal/listing/listing_test.go` (`TestCreateListing_HorizonAwal*`,
+  `TestEnsureHorizon_*`).
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`

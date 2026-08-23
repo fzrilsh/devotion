@@ -266,7 +266,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T014, T017, T019
   **Selesai bila**: `/profile/me` dan `/profile/{profileId}` sesuai kontrak; koordinat di luar Indonesia ditolak; lintang tanpa bujur ditolak
 
-- [ ] T027 [US1] [BE] Listing kapasitas
+- [x] T027 [US1] [BE] Listing kapasitas
   **Modul**: `backend/internal/listing/`
   **FR**: FR-012, FR-013, FR-014, FR-015, FR-076
   **Kemampuan**: buat, ubah, nonaktifkan, aktifkan kembali; satu angka kapasitas mingguan untuk seluruh jenis produk; jeda kesiapan mulai dalam hari
@@ -275,7 +275,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Saran**: pisahkan service dan handler; validasi di service supaya dapat dites tanpa HTTP
   **Hati-hati**: **jangan** buat kolom kapasitas per jenis produk (FR-076). Mesin dan tenaga kerjanya berbagi, sehingga angka terpisah akan mengizinkan penyanggupan ganda pada minggu yang sama. **Jeda kesiapan mulai bukan durasi menyelesaikan pekerjaan**, melainkan jeda sebelum produksi dapat dimulai.
 
-- [ ] T028 [US1] [BE] Kalender awal dan horizon
+- [x] T028 [US1] [BE] Kalender awal dan horizon
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-088
   **Kemampuan**: periode mingguan dibuat otomatis untuk minimal 3 bulan ke depan saat listing dibuat, memakai kapasitas mingguan sebagai kapasitas total; kolom `horizon_until` menyimpan periode terjauh yang sudah dibuat; fungsi memperpanjang horizon sampai minggu tertentu, idempoten dan dapat dipanggil ulang
