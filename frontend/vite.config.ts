@@ -11,6 +11,7 @@ export default defineConfig({
             "@api": path.resolve(import.meta.dirname, "./src/api"),
             "@assets": path.resolve(import.meta.dirname, "./src/assets"),
             "@components": path.resolve(import.meta.dirname, "./src/components"),
+            "@data": path.resolve(import.meta.dirname, "./src/data"),
             "@hooks": path.resolve(import.meta.dirname, "./src/hooks"),
             "@lib": path.resolve(import.meta.dirname, "./src/lib"),
             "@pages": path.resolve(import.meta.dirname, "./src/pages"),

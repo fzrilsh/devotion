@@ -26,6 +26,7 @@
             "@api/*": ["./src/api/*"],
             "@assets/*": ["./src/assets/*"],
             "@components/*": ["./src/components/*"],
+            "@data/*": ["./src/data/*"],
             "@hooks/*": ["./src/hooks/*"],
             "@lib/*": ["./src/lib/*"],
             "@pages/*": ["./src/pages/*"],
