@@ -55,7 +55,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tidak ada direktori tingkat atas di luar daftar konstitusi; `.env` masuk `.gitignore`
   **Hati-hati**: `.env.example` tidak boleh memuat satu pun nilai sungguhan. Repository ini publik. `CLAUDE.md` di root, bukan di `docs/`, agar terbaca agent.
 
-- [ ] T002 [P] [BE] Inisialisasi modul Go dan subcommand
+- [x] T002 [P] [BE] Inisialisasi modul Go dan subcommand
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `go.mod` dengan Go 1.22+, dispatcher subcommand: `serve`, `admin:create`, `seed:regions`, `seed:master-data`, `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`
   **Dependency**: tidak ada, `flag.NewFlagSet` dari standard library; prasyarat T001
@@ -105,7 +105,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **⚠️ Tidak ada pekerjaan user story yang boleh dimulai sebelum fase ini selesai.**
 
-- [ ] T008 [BE] Clock yang dapat digantikan
+- [x] T008 [BE] Clock yang dapat digantikan
   **Modul**: `backend/internal/platform/clock.go` (path dipatok)
   **FR**: Prinsip V
   **Kemampuan**: interface `Clock` dengan `Now()`, implementasi nyata, implementasi uji yang waktunya dapat disetel dan digeser
@@ -113,14 +113,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: ada test yang membuktikan waktu dapat digeser
   **Hati-hati**: dikerjakan **sekarang**, bukan menyusul. Menambahkannya setelah service jadi berarti menyentuh seluruh service. `time.Now()` dilarang muncul di dalam logika bisnis mana pun. `data-model.md` juga melarang `DEFAULT now()` pada seluruh tabel, setiap `INSERT` mengirim waktunya dari `Clock`.
 
-- [ ] T009 [BE] Konfigurasi dan bootstrap
+- [x] T009 [BE] Konfigurasi dan bootstrap
   **Modul**: `backend/internal/platform/config/`
   **Kemampuan**: memuat variabel lingkungan, memvalidasi yang wajib saat startup, membedakan `APP_ENV=development` dan `production`
   **Dependency**: tidak ada, `os.Getenv` cukup; prasyarat T007
   **Selesai bila**: variabel wajib yang hilang menghentikan startup dengan pesan yang menyebut nama variabelnya
   **Saran**: pada `development`, backend melayani HTTP biasa tanpa TLS dan tanpa pemeriksaan sertifikat klien Cloudflare.
 
-- [ ] T010 [BE] Migrasi basis data
+- [x] T010 [BE] Migrasi basis data
   **Modul**: `backend/db/migrations/` (path dipatok)
   **FR**: seluruh entitas
   **Kemampuan**: 14 migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
@@ -128,14 +128,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: `docker compose up` menjalankan migrasi sampai versi terakhir; `schema_migrations.dirty = false`; menjalankan dua kali tidak menimbulkan galat
   **Hati-hati**: seluruh constraint, indeks, dan **tiga trigger** wajib ikut: `used_capacity_within_total`, `week_start_is_monday`, `readiness_not_past_deadline`, `city_belongs_to_province`, trigger jenis item, trigger cegah request ke diri sendiri, trigger cegah alokasi sebelum kesiapan. Constraint itu bukan hiasan: ia yang menahan kerusakan data ketika logika aplikasi keliru. **Tidak ada `DEFAULT now()` di satu pun tabel.**
 
-- [ ] T011 [BE] Lapisan akses data
+- [x] T011 [BE] Lapisan akses data
   **Modul**: `backend/db/queries/` + konfigurasi `sqlc`
   **Kemampuan**: `sqlc.yaml`, pool `pgx` dengan `MaxConns=15`, helper transaksi
   **Dependency**: `pgx/v5`, `sqlc` (perkakas build); prasyarat T007, T009, T010
   **Selesai bila**: `sqlc generate` berhasil; pool tersambung; helper transaksi punya test
   **Hati-hati**: pool 15 dari `max_connections` 20, lima disisakan untuk `pg_dump`, `psql`, dan migrasi. Tanpa sisa itu, cadangan harian gagal justru saat trafik tinggi.
 
-- [ ] T012 [P] [BE] Lapisan HTTP dan format galat
+- [x] T012 [P] [BE] Lapisan HTTP dan format galat
   **Modul**: `backend/internal/platform/httpx/`
   **FR**: seluruh endpoint
   **Kemampuan**: router `net/http`, middleware request ID, pemulihan panic, `application/problem+json` dengan 28 kode galat dari `openapi.yaml`, log `slog` JSON dengan request ID di setiap baris
@@ -143,14 +143,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: galat validasi mengembalikan bentuk `ProblemValidasi` beserta daftar field; setiap baris log memuat request ID
   **Hati-hati**: `/api/*` yang tidak dikenali mengembalikan 404 JSON, **bukan** `index.html`. Kalau HTML, kesalahan penulisan alamat endpoint jadi menyesatkan saat diagnosis.
 
-- [ ] T013 [P] [BE] Kepercayaan alamat asal
+- [x] T013 [P] [BE] Kepercayaan alamat asal
   **Modul**: `backend/internal/platform/cloudflare/`
   **Kemampuan**: rentang alamat Cloudflare dipatok sebagai konstanta beserta tanggal pengambilan, fungsi `RealIP` yang hanya mempercayai header bila koneksi datang dari rentang itu
   **Dependency**: tidak ada; prasyarat T007
   **Selesai bila**: test membuktikan header diabaikan pada koneksi di luar rentang; `docs/cloudflare-ips.md` memuat daftar beserta tanggal
   **Hati-hati**: daftar rentang di `research.md` R-01 ditulis dari ingatan dan **wajib dicocokkan** ke `cloudflare.com/ips-v4` dan `ips-v6` sebelum dipatok. Jangan mengambilnya lewat jaringan saat startup, satu kegagalan HTTP akan membuat aplikasi gagal menyala.
 
-- [ ] T014 [BE] Sesi, autentikasi, dan akun
+- [x] T014 [BE] Sesi, autentikasi, dan akun
   **Modul**: `backend/internal/platform/session/` + `backend/internal/account/`
   **FR**: FR-001, FR-002, FR-003, FR-005
   **Kemampuan**: registrasi, verifikasi kode enam digit untuk email dan nomor, masuk, keluar, pemulihan kata sandi, cookie `httpOnly Secure SameSite=Lax`, hash token di basis data. **Ditambah**: `GET /me` (akun yang sedang masuk dalam bentuk `MyAccount`: `roles{subcontractor,buyer}`, `profile_id`, `is_admin`) dan `PATCH /me/roles` (menambah peran usaha, menolak pencabutan bila masih ada pesanan aktif)
@@ -158,7 +158,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: seluruh endpoint `/auth/*`, `/me`, dan `/me/roles` sesuai `openapi.yaml`; keluar akun benar-benar mengakhiri sesi; test membuktikan yang disimpan adalah hash, bukan token mentah
   **Hati-hati**: `POST /auth/recover/request` selalu 202, agar tidak membocorkan apakah sebuah email terdaftar. Dua endpoint `/me` sebelumnya tidak punya task pemilik, itu celah yang ditemukan `/analyze`.
 
-- [ ] T015 [BE] Middleware peran
+- [x] T015 [BE] Middleware peran
   **Modul**: `backend/internal/platform/httpx/`
   **FR**: FR-005
   **Kemampuan**: pemeriksaan peran per endpoint; satu akun boleh memegang dua peran usaha; admin terpisah dari peran usaha
@@ -166,14 +166,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: test membuktikan penolakan untuk setiap kombinasi peran yang tidak berwenang
   **Hati-hati**: endpoint tanpa pemeriksaan peran dianggap **cacat**, bukan belum lengkap. Ini gerbang yang diperiksa di setiap story.
 
-- [ ] T016 [P] [BE] Pembatasan laju berbasis data domain
+- [x] T016 [P] [BE] Pembatasan laju berbasis data domain
   **Modul**: `backend/internal/platform/ratelimit/`
   **Kemampuan**: batas per akun untuk percobaan masuk (5/15 menit), per nomor untuk kode sekali pakai (3/jam), per alamat asal untuk kode (10 nomor/jam), per pengguna untuk request kuota (20/jam)
   **Dependency**: tidak ada, tabel Postgres; prasyarat T011, T013
   **Selesai bila**: keempat batas punya test; respons 429 menyertakan `Retry-After`
   **Hati-hati**: tabel, bukan penyimpanan dalam memori. Kalau di memori, penerapan versi baru jadi cara termudah melewatinya. Batas per alamat asal yang menutup pemutaran nomor, itu yang melindungi nomor WhatsApp dari pemblokiran.
 
-- [ ] T017 [P] [BE] Penyimpanan berkas
+- [x] T017 [P] [BE] Penyimpanan berkas
   **Modul**: `backend/internal/platform/storage/`
   **FR**: FR-006, FR-009
   **Kemampuan**: unggah maksimal 5MB, nama berkas UUID dibuat sistem, tipe divalidasi dari magic bytes, metadata lokasi gambar dibuang, kuota total 500MB, akses hanya lewat handler yang memeriksa peran
@@ -181,7 +181,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: bukan pemilik dan bukan admin ditolak (test wajib); berkas dengan ekstensi menipu ditolak; kuota penuh mengembalikan pesan yang jelas
   **Hati-hati**: **jangan pernah** melayani berkas lewat path statis. Foto lokasi usaha dari ponsel membawa koordinat GPS, dan banyak konveksi rumahan berarti itu alamat rumah orang. Dokumen sumber memitigasi risiko kebocoran data identitas dengan enkripsi AES-256, akses RBAC, dan penetration test kuartalan [1]; versi ini hanya menegakkan kontrol akses, sehingga pengujiannya wajib.
 
-- [ ] T018 [BE] Penjadwal dua lapisan
+- [x] T018 [BE] Penjadwal dua lapisan
   **Modul**: `backend/internal/platform/scheduler/`
   **FR**: FR-021, FR-037, FR-045, FR-068, FR-069
   **Kemampuan**: `time.Ticker` 5 menit di dalam proses yang sama, setiap pekerjaan dibungkus advisory lock
@@ -189,7 +189,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: penjadwal menyala saat startup dan tercatat di log; test membuktikan pekerjaan tidak berjalan ganda
   **Hati-hati**: perhitungan tenggat ditulis **satu kali** di satu fungsi domain, dipakai bersama lapisan hitung-saat-baca. Kalau diduplikasi, pesanan yang sama akan tampak berbeda status di halaman berbeda. Bukan proses kedua, Gate I.
 
-- [ ] T019 [BE] Data acuan: wilayah dan daftar baku
+- [x] T019 [BE] Data acuan: wilayah dan daftar baku
   **Modul**: `backend/internal/masterdata/` + subcommand seed
   **FR**: FR-058, FR-062, FR-075
   **Kemampuan**: `seed:regions` mengambil provinsi dan kabupaten/kota dari wilayah.id dengan flag `--refresh`, default membaca salinan `docs/master-data/regions.json`; `seed:master-data` mengisi jenis produk dan mesin; keduanya idempoten memakai kode sebagai identitas. **Ditambah**: endpoint baca `GET /master/products`, `GET /master/machines`, `GET /regions/provinces`, `GET /regions/cities?province=`; `Normalisasi kode kabupaten/kota dengan membuang titik (32.73 → 3273) sebelum menyimpan.`
@@ -197,7 +197,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: kedua perintah jalan dua kali tanpa menduplikasi; hitungan provinsi, kota, produk, mesin semuanya lebih dari nol; keempat endpoint sesuai kontrak
   **Hati-hati**: Bentuk respons sudah diverifikasi; lihat docs/master-data/README.md. Normalisasi kode adalah langkah yang paling mudah terlupakan dan gagalnya senyap sampai constraint menolak seluruh baris. Jalankan kueri verifikasi di README itu setelah seed.
 
-- [ ] T020 [BE] Admin pertama
+- [x] T020 [BE] Admin pertama
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `admin:create` meminta kata sandi lewat prompt tanpa menampilkan ketikan, idempoten
   **Dependency**: prasyarat T014
@@ -212,14 +212,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: dapat masuk dan keluar lewat antarmuka; alur inti dapat diselesaikan dengan keyboard
   **Hati-hati**: token **tidak pernah** disimpan di `localStorage` maupun `sessionStorage`. Satu celah XSS akan langsung berarti pengambilalihan akun, dan aplikasi ini memuat dokumen identitas.
 
-- [ ] T022 [BE] Penyajian frontend oleh backend
+- [x] T022 [BE] Penyajian frontend oleh backend
   **Modul**: `backend/internal/platform/httpx/` + `backend/webdist/` (path dipatok)
   **Kemampuan**: `embed.FS` menyematkan hasil build, berkas statis ber-hash dengan cache panjang, fallback `index.html` untuk path non-API, TLS dengan Cloudflare Origin Certificate dan verifikasi sertifikat klien
   **Dependency**: prasyarat T012, T021
   **Selesai bila**: penyegaran pada halaman dalam tidak menghasilkan 404; `/api/*` tak dikenal mengembalikan JSON
   **Hati-hati**: ini yang membuat Gate I terpenuhi tanpa layanan frontend maupun proxy. Pastikan Cloudflare tidak meng-cache `/api/*`, hasil pencarian ter-cache menampilkan kapasitas basi, persis masalah informasi tidak aktual yang platform ini dibangun untuk menyelesaikan.
 
-- [ ] T023 [BE] Notifikasi
+- [x] T023 [BE] Notifikasi
   **Modul**: `backend/internal/notification/`
   **FR**: FR-051 sampai FR-054, FR-074, FR-085, FR-086, FR-091
   **Kemampuan**: baris notifikasi ditulis di dalam transaksi kejadiannya beserta kolom `transactional`; goroutine pengirim ke email dan WhatsApp maksimal 3 percobaan; notifikasi di dalam platform selalu tampil; preferensi kanal hanya berlaku bagi kejadian non-transaksional
@@ -227,7 +227,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: test membuktikan kegagalan kirim tidak menggagalkan transaksi pemicunya; setelah 3 percobaan ditandai gagal permanen; endpoint `/notifications` dan `/notifications/preferences` sesuai kontrak
   **Hati-hati**: penggolongan transaksional versus non-transaksional ada di `data-model.md` §9, hanya `calendar_stale`, `deadline_approaching`, dan `rating_request` yang non-transaksional. Perhatikan bahwa `confirmation_due_approaching` **transaksional** karena berujung pada penutupan pesanan otomatis, jadi tidak boleh dapat dimatikan. Notifikasi di dalam platform adalah satu-satunya jalur pengamatan bagi penguji manual.
 
-- [ ] T024a [BE] Sambungan WhatsApp dan endpoint QR
+- [x] T024a [BE] Sambungan WhatsApp dan endpoint QR
   **Modul**: `backend/internal/admin/`
   **FR**: FR-002, FR-052
   **Kemampuan**: kelola sesi `whatsmeow`, endpoint yang menyajikan QR dan status sambungan, penyambungan ulang tanpa akses server; `user:verify --phone` sebagai jalan darurat; status WhatsApp masuk ke endpoint health
@@ -243,7 +243,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: QR dapat dipindai lewat antarmuka; status tersambung terlihat
   **Hati-hati**: halaman ini yang mencegah kehilangan demo saat sesi WhatsApp lepas. Render dari endpoint, jangan menyimpan status di sisi klien.
 
-- [ ] T025 [P] [BE] Health check dan Sentry
+- [x] T025 [P] [BE] Health check dan Sentry
   **Modul**: `backend/internal/platform/`
   **Kemampuan**: `GET /health` memeriksa basis data, WhatsApp, dan kuota penyimpanan; Sentry dengan pembersihan data sensitif
   **Dependency**: `sentry-go`; prasyarat T011, T012, T024a
@@ -259,7 +259,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: daftar sebagai subkontraktor, buat listing lengkap, buka halaman publiknya sebagai pengunjung lain, seluruh atribut kapasitas tampil benar.
 
-- [ ] T026 [P] [US1] [BE] Profil usaha
+- [x] T026 [P] [US1] [BE] Profil usaha
   **Modul**: `backend/internal/account/`
   **FR**: FR-004, FR-057
   **Kemampuan**: baca dan ubah profil sendiri, profil publik, kota dari data wilayah, koordinat opsional
