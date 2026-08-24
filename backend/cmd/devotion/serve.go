@@ -30,6 +30,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/scheduler"
 	"github.com/fzrilsh/devotion/backend/internal/platform/session"
 	"github.com/fzrilsh/devotion/backend/internal/platform/tlsconf"
+	"github.com/fzrilsh/devotion/backend/internal/quota"
 	"github.com/fzrilsh/devotion/backend/internal/search"
 )
 
@@ -125,6 +126,11 @@ func runServe(ctx context.Context, args []string) error {
 	// enqueues a notification to the proposer (FR-061); the read routes are
 	// public, POST /master/proposals is gated to the two business roles.
 	masterdata.New(pool, clock, acc, notif).Register(router, acc)
+
+	// quota registers after notif because sending a request enqueues a
+	// request_received notification per candidate inside the request's
+	// transaction (FR-029); both routes are gated to the buyer role.
+	quota.New(pool, clock, notif).Register(router, acc)
 
 	// GET /health probes the database, the WhatsApp link, and free space on the
 	// upload volume. The free-space floor is one file's worth: below it a new

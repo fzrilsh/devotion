@@ -2039,11 +2039,20 @@ components:
 
     QuotaRequestCreate:
       type: object
-      required: [listing_id, product_item_id, quantity, deadline]
+      description: |
+        Satu request dikirim ke beberapa kandidat sekaligus dalam satu tindakan (FR-029),
+        jadi listing_ids memuat satu atau lebih listing tujuan. material wajib karena
+        setiap request menyebut bahan yang diminta.
+      required: [listing_ids, product_item_id, quantity, material, deadline]
       properties:
-        listing_id: { type: string, format: uuid }
+        listing_ids:
+          type: array
+          minItems: 1
+          description: Satu atau lebih listing kandidat tujuan request ini (FR-029).
+          items: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer, minimum: 1 }
+        material: { type: string, minLength: 1, maxLength: 200 }
         deadline: { type: string, format: date }
         note: { type: string, maxLength: 1000 }
 
@@ -2053,15 +2062,18 @@ components:
 
     QuotaRequestDetail:
       type: object
-      required: [request_id, listing_id, quantity, deadline, status, created_at]
+      description: |
+        Satu request kuota dengan daftar kandidatnya. Status per kandidat ada di
+        candidates[].status, bukan di tingkat request, karena satu request dapat
+        berada pada status berbeda di tiap kandidat (FR-029, FR-030).
+      required: [request_id, product_item_id, quantity, material, deadline, candidates, created_at]
       properties:
         request_id: { type: string, format: uuid }
-        listing_id: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer }
+        material: { type: string }
         deadline: { type: string, format: date }
         note: { type: string, nullable: true }
-        status: { $ref: '#/components/schemas/CandidateStatus' }
         candidates:
           type: array
           items: { $ref: '#/components/schemas/RequestCandidate' }
@@ -2070,9 +2082,10 @@ components:
 
     RequestCandidate:
       type: object
-      required: [candidate_id, profile_id, status]
+      required: [candidate_id, listing_id, profile_id, status]
       properties:
         candidate_id: { type: string, format: uuid }
+        listing_id: { type: string, format: uuid }
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }

@@ -413,6 +413,18 @@ perubahannya.
   di luar horizon awal tetap dihitung penuh sampai deadline lalu periodenya
   benar-benar dimaterialisasi (SC-021, FR-088); filter mesin kosong membuat
   kriterianya terpenuhi dan dilaporkan tidak dievaluasi (FR-023, FR-026).
+- Modul request kuota (T039): paket tulis `internal/quota` dengan dua rute
+  `POST /api/quota-requests` dan `GET /api/quota-requests`, keduanya digerbang
+  peran pembeli. Satu aksi mengirim satu request ke beberapa listing kandidat
+  sekaligus, tiap kandidat membawa statusnya sendiri (FR-029), dan pembeli
+  melihat daftar request-nya sendiri dengan keyset pagination kursor opaque
+  terbaru dulu (FR-030, FR-080). Jendela balasan 72 jam (`reply_due_at`) dan
+  `created_at` keduanya diambil dari `Clock` yang disuntikkan, bukan
+  `time.Now()` (FR-082, Aturan 5). Listing tak dikenal atau belum tayang jadi
+  422; listing milik pembeli sendiri ditolak 409 `SELF_REQUEST` sebelum ada
+  insert apa pun, trigger basis data hanya jaring pengaman (FR-083). Tiap
+  kandidat memicu notifikasi `request_received` di dalam transaksi yang sama
+  sehingga kegagalan antrean membatalkan seluruh request.
 
 ### Diperbaiki
 - Keyset pagination mesin pencarian (T036): klausa `WHERE` kursor yang memakai
