@@ -285,6 +285,18 @@ type Querier interface {
 	// RenewSession slides the expiry forward and records access time, implementing
 	// rolling 7-day renewal on each authenticated request.
 	RenewSession(ctx context.Context, arg RenewSessionParams) error
+	// SearchCandidates ranks published listings against the four hard criteria
+	// (FR-023..FR-025) and returns one keyset page. The query shape follows
+	// data-model.md section 10: score lives in the `ranked` CTE so the keyset WHERE
+	// can filter on it, capacity is summed across the readiness..deadline range
+	// (FR-080), and periods past horizon_until are counted optimistically as full
+	// (FR-088). The application rounds the deadline to Monday before calling this,
+	// so Go stays the single source of truth for that rounding, and horizon
+	// extension happens outside this read query for passing candidates only. A NULL
+	// product/machine/lead filter counts as satisfied (FR-023, decision C-4) so the
+	// score stays 0..4 with no weighting or normalization (FR-024). The keyset tuple
+	// ends in listing_id to make the order total and repeatable across pages.
+	SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error)
 	// SetEmailVerified marks the email verified after a valid code is consumed.
 	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error
 	// SetListingPublished toggles visibility for PUT /listing/me/visibility. A

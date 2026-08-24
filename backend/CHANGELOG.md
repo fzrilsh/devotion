@@ -388,6 +388,20 @@ perubahannya.
   `TestCreateListing_TanpaPengajuanVerifikasi_TetapTayang_FR010` diperjelas: spec
   kita sengaja menyimpang dari status "Menunggu Verifikasi" dokumen sumber, dan
   test itu mengunci keputusan tersebut (FR-010).
+- Mesin pencarian (T035): modul baca `internal/search` dengan rute tunggal
+  `GET /api/search` bergerbang `RoleBuyer`. Kueri `SearchCandidates` di
+  `db/queries/search.sql` mengikuti `data-model.md` §10: rentang kapasitas per
+  kandidat dari minggu kesiapan (Senin dari tanggal pencarian + `readiness_lead_days`)
+  sampai minggu deadline, minggu di luar `horizon_until` dihitung berkapasitas
+  penuh (FR-088), empat kriteria keras dijumlahkan menjadi skor 0-4 tanpa
+  pembobotan maupun normalisasi (FR-023, FR-024), filter yang tidak diisi
+  dihitung terpenuhi dan dilaporkan tidak dievaluasi (FR-026), pemecah seri lima
+  tingkat berakhir di `listing_id` (FR-025), keyset pagination opaque (FR-080),
+  dan pengecualian listing milik pencari (FR-081). Perluasan wilayah kota →
+  provinsi → nasional lewat parameter `region_level`, saran pelonggaran saat
+  hasil kosong di tingkat nasional (FR-028), dan perpanjangan horizon kandidat
+  lolos di transaksi tersendiri di luar kueri baca (FR-088). Skor tidak
+  terpengaruh reputasi, verifikasi, kebaruan kalender, maupun jarak (FR-024).
 
 ### Diperbaiki
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`
