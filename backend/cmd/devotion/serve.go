@@ -30,6 +30,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/scheduler"
 	"github.com/fzrilsh/devotion/backend/internal/platform/session"
 	"github.com/fzrilsh/devotion/backend/internal/platform/tlsconf"
+	"github.com/fzrilsh/devotion/backend/internal/search"
 )
 
 // devPort is the plain-HTTP listen port outside production. Production always
@@ -93,7 +94,9 @@ func runServe(ctx context.Context, args []string) error {
 	router := httpx.NewRouter(log)
 	acc := account.New(pool, clock, sessions, limiter, nil)
 	acc.Register(router)
-	listing.New(pool, clock).Register(router, acc)
+	ls := listing.New(pool, clock)
+	ls.Register(router, acc)
+	search.New(pool, clock, ls).Register(router, acc)
 
 	// The WhatsApp manager runs the whatsmeow client as a goroutine inside this
 	// same process (research R-08), with its session store on the same Postgres

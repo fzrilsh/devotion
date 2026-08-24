@@ -335,7 +335,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: dengan listing yang sudah tayang, cari 3.000 potong dengan deadline delapan minggu; kandidat berkapasitas 500 per minggu berjeda 0 hari ikut muncul dan ditandai memenuhi kriteria kapasitas.
 
-- [ ] T035 [US2] [BE] Mesin pencarian
+- [x] T035 [US2] [BE] Mesin pencarian
   **Modul**: `backend/internal/search/`
   **FR**: FR-022 sampai FR-028, FR-063, FR-080, FR-081, FR-087, FR-088
   **Kemampuan**:
