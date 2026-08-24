@@ -457,5 +457,9 @@ perubahannya.
   `actions/setup-go` diberi `cache-dependency-path: backend/go.sum` supaya cache
   modul menemukan berkas checksum yang ada di subdirektori `backend/`, bukan di
   root repository.
+- `TestCodes_EveryCodeMapsToOneStatus`: daftar kode uji diselaraskan menjadi 31
+  kode setelah `READINESS_AFTER_DEADLINE` masuk peta kode dan enum `openapi.yaml`.
+  Test masih menegakkan jumlah kode uji sama dengan jumlah entri peta status,
+  jadi kode baru tanpa status akan tetap ketahuan.
 
 
