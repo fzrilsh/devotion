@@ -42,6 +42,7 @@ const (
 	CodeCancellationAfterProduction Code = "CANCELLATION_AFTER_PRODUCTION"
 	CodeWorkOrderNotCompleted     Code = "WORK_ORDER_NOT_COMPLETED"
 	CodeReviewAlreadySubmitted    Code = "REVIEW_ALREADY_SUBMITTED"
+	CodeReadinessAfterDeadline    Code = "READINESS_AFTER_DEADLINE"
 )
 
 // codeMeta binds a code to its HTTP status and Indonesian title. Deriving both
@@ -86,6 +87,7 @@ var codes = map[Code]codeMeta{
 	CodeCancellationAfterProduction: {409, "Pembatalan tidak tersedia"},
 	CodeWorkOrderNotCompleted:       {409, "Pesanan belum dikonfirmasi"},
 	CodeReviewAlreadySubmitted:      {409, "Ulasan sudah dikirim"},
+	CodeReadinessAfterDeadline:      {422, "Kesiapan melewati tenggat"},
 }
 
 // StatusFor returns the HTTP status bound to code, or 500 if the code is

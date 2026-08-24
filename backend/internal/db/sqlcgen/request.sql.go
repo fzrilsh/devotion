@@ -11,6 +11,75 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getCandidateForOffer = `-- name: GetCandidateForOffer :one
+SELECT
+    c.id                  AS candidate_id,
+    c.status              AS candidate_status,
+    c.subcontractor_id,
+    sub.account_id        AS subcontractor_account,
+    r.id                  AS request_id,
+    r.quantity,
+    r.deadline,
+    r.reply_due_at,
+    r.buyer_id,
+    buyer.account_id      AS buyer_account,
+    l.id                  AS listing_id,
+    l.weekly_capacity,
+    l.readiness_lead_days,
+    l.horizon_until
+FROM request_candidate c
+JOIN quota_request r      ON r.id = c.request_id
+JOIN capacity_listing l   ON l.id = c.listing_id
+JOIN business_profile sub ON sub.id = c.subcontractor_id
+JOIN business_profile buyer ON buyer.id = r.buyer_id
+WHERE c.id = $1
+`
+
+type GetCandidateForOfferRow struct {
+	CandidateID          pgtype.UUID
+	CandidateStatus      CandidateStatus
+	SubcontractorID      pgtype.UUID
+	SubcontractorAccount pgtype.UUID
+	RequestID            pgtype.UUID
+	Quantity             int32
+	Deadline             pgtype.Date
+	ReplyDueAt           pgtype.Timestamptz
+	BuyerID              pgtype.UUID
+	BuyerAccount         pgtype.UUID
+	ListingID            pgtype.UUID
+	WeeklyCapacity       int32
+	ReadinessLeadDays    int32
+	HorizonUntil         pgtype.Date
+}
+
+// GetCandidateForOffer loads one candidate with everything the offer and reject
+// paths need in a single read: the candidate's status and its owning
+// subcontractor account (for the role check), the request's quantity, deadline,
+// and reply window (FR-035, FR-090, expiry), and the listing's capacity shape
+// (weekly_capacity, readiness_lead_days, horizon_until) plus the buyer account to
+// notify. It is the incoming-side counterpart to GetCandidateListings.
+func (q *Queries) GetCandidateForOffer(ctx context.Context, id pgtype.UUID) (GetCandidateForOfferRow, error) {
+	row := q.db.QueryRow(ctx, getCandidateForOffer, id)
+	var i GetCandidateForOfferRow
+	err := row.Scan(
+		&i.CandidateID,
+		&i.CandidateStatus,
+		&i.SubcontractorID,
+		&i.SubcontractorAccount,
+		&i.RequestID,
+		&i.Quantity,
+		&i.Deadline,
+		&i.ReplyDueAt,
+		&i.BuyerID,
+		&i.BuyerAccount,
+		&i.ListingID,
+		&i.WeeklyCapacity,
+		&i.ReadinessLeadDays,
+		&i.HorizonUntil,
+	)
+	return i, err
+}
+
 const getCandidateListings = `-- name: GetCandidateListings :many
 SELECT l.id AS listing_id, l.profile_id, l.published, p.account_id, p.business_name
 FROM capacity_listing l
@@ -54,6 +123,137 @@ func (q *Queries) GetCandidateListings(ctx context.Context, dollar_1 []pgtype.UU
 		return nil, err
 	}
 	return items, nil
+}
+
+const getOfferForCounter = `-- name: GetOfferForCounter :one
+SELECT
+    o.id            AS offer_id,
+    o.candidate_id,
+    o.proposed_by,
+    o.sequence,
+    o.readiness_lead_days,
+    c.status        AS candidate_status,
+    r.id            AS request_id,
+    sub.account_id  AS subcontractor_account,
+    buyer.account_id AS buyer_account
+FROM offer o
+JOIN request_candidate c  ON c.id = o.candidate_id
+JOIN quota_request r      ON r.id = c.request_id
+JOIN business_profile sub ON sub.id = c.subcontractor_id
+JOIN business_profile buyer ON buyer.id = r.buyer_id
+WHERE o.id = $1
+ORDER BY o.sequence DESC
+LIMIT 1
+`
+
+type GetOfferForCounterRow struct {
+	OfferID              pgtype.UUID
+	CandidateID          pgtype.UUID
+	ProposedBy           OfferParty
+	Sequence             int32
+	ReadinessLeadDays    int32
+	CandidateStatus      CandidateStatus
+	RequestID            pgtype.UUID
+	SubcontractorAccount pgtype.UUID
+	BuyerAccount         pgtype.UUID
+}
+
+// GetOfferForCounter loads one offer with the context the counter-offer path
+// needs: the candidate it belongs to, that candidate's status, and both parties'
+// accounts so the service can check the caller alternates with the last proposer
+// and notify the other side (FR-033).
+func (q *Queries) GetOfferForCounter(ctx context.Context, id pgtype.UUID) (GetOfferForCounterRow, error) {
+	row := q.db.QueryRow(ctx, getOfferForCounter, id)
+	var i GetOfferForCounterRow
+	err := row.Scan(
+		&i.OfferID,
+		&i.CandidateID,
+		&i.ProposedBy,
+		&i.Sequence,
+		&i.ReadinessLeadDays,
+		&i.CandidateStatus,
+		&i.RequestID,
+		&i.SubcontractorAccount,
+		&i.BuyerAccount,
+	)
+	return i, err
+}
+
+const getRequestForBuyer = `-- name: GetRequestForBuyer :one
+SELECT r.id, r.buyer_id, r.product_item_id, r.quantity, r.material, r.deadline, r.note, r.reply_due_at, r.created_at
+FROM quota_request r
+JOIN business_profile p ON p.id = r.buyer_id
+WHERE r.id = $1 AND p.account_id = $2
+`
+
+type GetRequestForBuyerParams struct {
+	ID        pgtype.UUID
+	AccountID pgtype.UUID
+}
+
+// GetRequestForBuyer loads one request owned by a buyer account, for the detail
+// view (FR-032). The buyer account guard makes a request that is not the
+// caller's a 404 rather than leaking its existence.
+func (q *Queries) GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyerParams) (QuotaRequest, error) {
+	row := q.db.QueryRow(ctx, getRequestForBuyer, arg.ID, arg.AccountID)
+	var i QuotaRequest
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerID,
+		&i.ProductItemID,
+		&i.Quantity,
+		&i.Material,
+		&i.Deadline,
+		&i.Note,
+		&i.ReplyDueAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertOffer = `-- name: InsertOffer :one
+INSERT INTO offer (candidate_id, sequence, proposed_by, total_price, readiness_lead_days, note, created_at)
+VALUES (
+    $1,
+    coalesce((SELECT max(sequence) FROM offer WHERE candidate_id = $1), 0) + 1,
+    $2, $3, $4, $5, $6
+)
+RETURNING id, candidate_id, sequence, proposed_by, total_price, readiness_lead_days, note, created_at
+`
+
+type InsertOfferParams struct {
+	CandidateID       pgtype.UUID
+	ProposedBy        OfferParty
+	TotalPrice        int64
+	ReadinessLeadDays int32
+	Note              pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+}
+
+// InsertOffer appends one offer to a candidate's chain, computing the next
+// sequence as max+1 so every counter-offer is a new row and the full history is
+// preserved (FR-033). created_at comes from the injected Clock (Rule 5).
+func (q *Queries) InsertOffer(ctx context.Context, arg InsertOfferParams) (Offer, error) {
+	row := q.db.QueryRow(ctx, insertOffer,
+		arg.CandidateID,
+		arg.ProposedBy,
+		arg.TotalPrice,
+		arg.ReadinessLeadDays,
+		arg.Note,
+		arg.CreatedAt,
+	)
+	var i Offer
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.Sequence,
+		&i.ProposedBy,
+		&i.TotalPrice,
+		&i.ReadinessLeadDays,
+		&i.Note,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const insertQuotaRequest = `-- name: InsertQuotaRequest :one
@@ -190,6 +390,158 @@ func (q *Queries) ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtyp
 	return items, nil
 }
 
+const listIncomingCandidates = `-- name: ListIncomingCandidates :many
+SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
+       c.status, c.rejection_reason, p.business_name,
+       r.created_at
+FROM request_candidate c
+JOIN capacity_listing l ON l.id = c.listing_id
+JOIN business_profile owner ON owner.id = l.profile_id
+JOIN quota_request r ON r.id = c.request_id
+JOIN business_profile p ON p.id = r.buyer_id
+WHERE owner.account_id = $1
+  AND ($5::candidate_status IS NULL OR c.status = $5::candidate_status)
+  AND (r.created_at, r.id) < ($2::timestamptz, $3::uuid)
+ORDER BY r.created_at DESC, r.id DESC
+LIMIT $4
+`
+
+type ListIncomingCandidatesParams struct {
+	AccountID pgtype.UUID
+	Column2   pgtype.Timestamptz
+	Column3   pgtype.UUID
+	Limit     int32
+	Status    NullCandidateStatus
+}
+
+type ListIncomingCandidatesRow struct {
+	CandidateID     pgtype.UUID
+	RequestID       pgtype.UUID
+	ListingID       pgtype.UUID
+	SubcontractorID pgtype.UUID
+	Status          CandidateStatus
+	RejectionReason pgtype.Text
+	BusinessName    string
+	CreatedAt       pgtype.Timestamptz
+}
+
+// ListIncomingCandidates returns one keyset page of candidates whose listing the
+// subcontractor account owns, newest request first (FR-030). An optional status
+// filter narrows to one candidate_status. The cursor tuple is (created_at, id)
+// of the request, matching the buyer-side list.
+func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listIncomingCandidates,
+		arg.AccountID,
+		arg.Column2,
+		arg.Column3,
+		arg.Limit,
+		arg.Status,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListIncomingCandidatesRow{}
+	for rows.Next() {
+		var i ListIncomingCandidatesRow
+		if err := rows.Scan(
+			&i.CandidateID,
+			&i.RequestID,
+			&i.ListingID,
+			&i.SubcontractorID,
+			&i.Status,
+			&i.RejectionReason,
+			&i.BusinessName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOffersByCandidate = `-- name: ListOffersByCandidate :many
+SELECT id, candidate_id, sequence, proposed_by, total_price, readiness_lead_days, note, created_at
+FROM offer
+WHERE candidate_id = $1
+ORDER BY sequence ASC
+`
+
+// ListOffersByCandidate returns a candidate's full offer chain oldest first so
+// the buyer sees every round side by side (FR-032).
+func (q *Queries) ListOffersByCandidate(ctx context.Context, candidateID pgtype.UUID) ([]Offer, error) {
+	rows, err := q.db.Query(ctx, listOffersByCandidate, candidateID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Offer{}
+	for rows.Next() {
+		var i Offer
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.Sequence,
+			&i.ProposedBy,
+			&i.TotalPrice,
+			&i.ReadinessLeadDays,
+			&i.Note,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOffersByRequest = `-- name: ListOffersByRequest :many
+SELECT o.id, o.candidate_id, o.sequence, o.proposed_by, o.total_price,
+       o.readiness_lead_days, o.note, o.created_at
+FROM offer o
+JOIN request_candidate c ON c.id = o.candidate_id
+WHERE c.request_id = $1
+ORDER BY o.candidate_id, o.sequence ASC
+`
+
+// ListOffersByRequest returns every offer across all candidates of a request so
+// the detail view attaches each candidate's chain in one query (FR-032).
+func (q *Queries) ListOffersByRequest(ctx context.Context, requestID pgtype.UUID) ([]Offer, error) {
+	rows, err := q.db.Query(ctx, listOffersByRequest, requestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Offer{}
+	for rows.Next() {
+		var i Offer
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.Sequence,
+			&i.ProposedBy,
+			&i.TotalPrice,
+			&i.ReadinessLeadDays,
+			&i.Note,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listQuotaRequestsByBuyer = `-- name: ListQuotaRequestsByBuyer :many
 SELECT id, buyer_id, product_item_id, quantity, material, deadline, note, reply_due_at, created_at
 FROM quota_request
@@ -243,4 +595,92 @@ func (q *Queries) ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaReq
 		return nil, err
 	}
 	return items, nil
+}
+
+const rejectCandidate = `-- name: RejectCandidate :exec
+UPDATE request_candidate
+SET status = 'rejected', rejection_reason = $2, updated_at = $3
+WHERE id = $1
+`
+
+type RejectCandidateParams struct {
+	ID              pgtype.UUID
+	RejectionReason pgtype.Text
+	UpdatedAt       pgtype.Timestamptz
+}
+
+// RejectCandidate marks a candidate rejected with the subcontractor's reason
+// (FR-031), stamping updated_at from the Clock.
+func (q *Queries) RejectCandidate(ctx context.Context, arg RejectCandidateParams) error {
+	_, err := q.db.Exec(ctx, rejectCandidate, arg.ID, arg.RejectionReason, arg.UpdatedAt)
+	return err
+}
+
+const remainingCapacityForOffer = `-- name: RemainingCapacityForOffer :one
+WITH param AS (
+    SELECT
+        $1::uuid       AS listing_id,
+        $2::date    AS readiness_week,
+        $3::date     AS deadline_week,
+        $4::int    AS weekly_capacity,
+        $5::date     AS horizon_until
+)
+SELECT (
+    coalesce(sum(pk.total_capacity - pk.used_capacity), 0)
+    + greatest(0, (
+        (p.deadline_week - greatest(p.readiness_week, p.horizon_until + 7)) / 7 + 1
+    )) * p.weekly_capacity
+)::bigint AS remaining_capacity
+FROM param p
+LEFT JOIN availability_period pk
+       ON pk.listing_id = p.listing_id
+      AND NOT pk.marked_full
+      AND pk.week_start BETWEEN p.readiness_week AND p.deadline_week
+GROUP BY p.deadline_week, p.readiness_week, p.horizon_until, p.weekly_capacity
+`
+
+type RemainingCapacityForOfferParams struct {
+	ListingID      pgtype.UUID
+	ReadinessWeek  pgtype.Date
+	DeadlineWeek   pgtype.Date
+	WeeklyCapacity int32
+	HorizonUntil   pgtype.Date
+}
+
+// RemainingCapacityForOffer sums the subcontractor's remaining capacity across
+// the readiness..deadline week range for FR-035, mirroring the capacity CTE of
+// SearchCandidates: recorded remaining over non-full availability periods in
+// range, plus periods past horizon_until counted optimistically as full weekly
+// capacity (FR-088). The caller computes readiness_week and deadline_week in Go
+// so week rounding stays in one place (Rule 4).
+func (q *Queries) RemainingCapacityForOffer(ctx context.Context, arg RemainingCapacityForOfferParams) (int64, error) {
+	row := q.db.QueryRow(ctx, remainingCapacityForOffer,
+		arg.ListingID,
+		arg.ReadinessWeek,
+		arg.DeadlineWeek,
+		arg.WeeklyCapacity,
+		arg.HorizonUntil,
+	)
+	var remaining_capacity int64
+	err := row.Scan(&remaining_capacity)
+	return remaining_capacity, err
+}
+
+const setCandidateStatus = `-- name: SetCandidateStatus :exec
+UPDATE request_candidate
+SET status = $2, updated_at = $3
+WHERE id = $1
+`
+
+type SetCandidateStatusParams struct {
+	ID        pgtype.UUID
+	Status    CandidateStatus
+	UpdatedAt pgtype.Timestamptz
+}
+
+// SetCandidateStatus moves a candidate to a new status (offered on a reply,
+// FR-031), stamping updated_at from the Clock.
+func (q *Queries) SetCandidateStatus(ctx context.Context, arg SetCandidateStatusParams) error {
+	_, err := q.db.Exec(ctx, setCandidateStatus, arg.ID, arg.Status, arg.UpdatedAt)
+	return err
 }

@@ -425,6 +425,24 @@ perubahannya.
   insert apa pun, trigger basis data hanya jaring pengaman (FR-083). Tiap
   kandidat memicu notifikasi `request_received` di dalam transaksi yang sama
   sehingga kegagalan antrean membatalkan seluruh request.
+- Penawaran dan negosiasi kuota (T040): melengkapi `internal/quota` dengan lima
+  rute. `POST /api/candidates/{candidateId}/offers` (digerbang subkontraktor)
+  membalas kandidat dengan harga rupiah bulat `int64` dan kesiapan dalam hari,
+  memvalidasi pemilik listing, menolak kesiapan yang melewati tenggat
+  (`READINESS_AFTER_DEADLINE`, 422, FR-090) dan jumlah melebihi sisa kapasitas
+  lintas minggu kesiapan..tenggat (`INSUFFICIENT_CAPACITY`, 409 dengan meta
+  `quantity_requested`, `remaining_capacity`, `until_week`, FR-035).
+  `POST /api/candidates/{candidateId}/reject` menolak kandidat dengan alasan,
+  tanpa notifikasi (FR-031). `POST /api/offers/{offerId}/counter` (digerbang
+  kedua peran) merantai penawaran balik sebagai baris baru, bukan pembaruan,
+  bergiliran antar pihak dan menyimpan seluruh riwayat (FR-033).
+  `GET /api/quota-requests/{requestId}` (digerbang pembeli) menampilkan detail
+  request dengan tiap kandidat membawa penawaran terakhirnya berdampingan,
+  memakai penjaga akun pembeli sehingga request milik pembeli lain jadi 404
+  bukan 403 (FR-030, FR-032). `GET /api/quota-requests/incoming` (digerbang
+  subkontraktor) menampilkan satu halaman keyset kandidat masuk dengan filter
+  status opsional (FR-030, FR-031). Semua waktu diambil dari `Clock` yang
+  disuntikkan (Aturan 5).
 
 ### Diperbaiki
 - Keyset pagination mesin pencarian (T036): klausa `WHERE` kursor yang memakai

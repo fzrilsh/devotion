@@ -71,6 +71,138 @@ func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	gate := httpx.RequireRole(auth, httpx.RoleBuyer)
 	r.Gated("POST /api/quota-requests", gate, s.handleCreate)
 	r.Gated("GET /api/quota-requests", gate, s.handleList)
+
+	subGate := httpx.RequireRole(auth, httpx.RoleSubcontractor)
+	r.Gated("POST /api/candidates/{candidateId}/offers", subGate, s.handleOffer)
+	r.Gated("POST /api/candidates/{candidateId}/reject", subGate, s.handleReject)
+
+	// A counter-offer can come from either party (FR-033), so the route admits
+	// both roles; counterOffer checks the caller is a party to the negotiation
+	// and alternates with the last proposer.
+	counterGate := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer)
+	r.Gated("POST /api/offers/{offerId}/counter", counterGate, s.handleCounter)
+
+	// The incoming list is the subcontractor's side of FR-030; it must be
+	// registered before the {requestId} detail route so the literal path wins.
+	r.Gated("GET /api/quota-requests/incoming", subGate, s.handleIncoming)
+	r.Gated("GET /api/quota-requests/{requestId}", gate, s.handleDetail)
+}
+
+// handleDetail returns one of the buyer's own requests with every candidate and
+// its latest offer (FR-030, FR-032). The route is buyer-gated; the service loads
+// the request under a buyer-account guard so another buyer's id is a 404.
+func (s *Service) handleDetail(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	requestID, ok := parseUUID(r.PathValue("requestId"))
+	if !ok {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Id permintaan tidak sah.")
+		return
+	}
+	view, err := s.requestDetail(r.Context(), acc.ID, requestID)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// handleIncoming returns one keyset page of the subcontractor's incoming
+// candidates (FR-030), optionally filtered by candidate status (FR-031). The
+// route is gated behind RoleSubcontractor.
+func (s *Service) handleIncoming(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	q, verr := parseIncomingQuery(r)
+	if verr != nil {
+		httpx.WriteValidation(w, "Masukan tidak sah.", verr.fields)
+		return
+	}
+	view, err := s.listIncoming(r.Context(), acc.ID, q)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// handleCounter chains a counter-offer onto an existing offer (FR-033). The
+// route admits either party; the service checks the caller is a party to the
+// negotiation and did not make the last offer, then records a new offer row.
+func (s *Service) handleCounter(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	offerID, ok := parseUUID(r.PathValue("offerId"))
+	if !ok {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Id penawaran tidak sah.")
+		return
+	}
+	var in counterInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	view, err := s.counterOffer(r.Context(), acc.ID, offerID, in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
+}
+
+// handleReject declines a candidate on behalf of its subcontractor (FR-031).
+// The route is gated behind RoleSubcontractor; the service also checks the
+// caller owns the candidate's listing. On success it returns 204 with no body;
+// the buyer sees the outcome and reason on the request detail page (FR-030).
+func (s *Service) handleReject(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	candidateID, ok := parseUUID(r.PathValue("candidateId"))
+	if !ok {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Id kandidat tidak sah.")
+		return
+	}
+	var in rejectInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if err := s.rejectCandidate(r.Context(), acc.ID, candidateID, in); err != nil {
+		writeErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleOffer records a subcontractor's reply to a candidate (FR-031). The route
+// is gated behind RoleSubcontractor; the service also checks the caller owns the
+// candidate's listing so one subcontractor cannot reply for another.
+func (s *Service) handleOffer(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	candidateID, ok := parseUUID(r.PathValue("candidateId"))
+	if !ok {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Id kandidat tidak sah.")
+		return
+	}
+	var in offerInput
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	view, err := s.createOffer(r.Context(), acc.ID, candidateID, in)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, view)
 }
 
 func (s *Service) handleCreate(w http.ResponseWriter, r *http.Request) {
@@ -223,6 +355,11 @@ func writeErr(w http.ResponseWriter, err error) {
 	var cerr *conflictError
 	if errors.As(err, &cerr) {
 		httpx.WriteProblem(w, cerr.code, cerr.detail)
+		return
+	}
+	var merr *metaError
+	if errors.As(err, &merr) {
+		httpx.WriteProblemMeta(w, merr.code, merr.detail, merr.meta)
 		return
 	}
 	httpx.WriteInternal(w)

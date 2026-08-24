@@ -395,7 +395,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T008, T015, T023, T027
   **Hati-hati**: aplikasi mengirim **kedua** nilai `dibuat_pada` dan `batas_balasan_pada` dari `Clock`; basis data tidak punya `DEFAULT now()` dan constraint-nya hanya menjaga urutan. Angka 72 jam ditegakkan aplikasi dan diuji. FR-083 menyebut jalur "tanpa melalui hasil pencarian" secara eksplisit; trigger basis data adalah jaring pengamannya.
 
-- [ ] T040 [US3] [BE] Penawaran dan negosiasi
+- [x] T040 [US3] [BE] Penawaran dan negosiasi
   **Modul**: `backend/internal/quota/`
   **FR**: FR-031, FR-032, FR-033, FR-035, FR-090
   **Kemampuan**: balas dengan harga dan jeda kesiapan, tolak beralasan, counter-offer berantai dengan riwayat lengkap, perbandingan berdampingan; penolakan bila jumlah melampaui total kapasitas di dalam rentang kapasitas; penolakan bila minggu kesiapan mulai kandidat jatuh setelah periode deadline
