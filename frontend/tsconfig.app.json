@@ -26,12 +26,14 @@
             "@api/*": ["./src/api/*"],
             "@assets/*": ["./src/assets/*"],
             "@components/*": ["./src/components/*"],
+            "@data/*": ["./src/data/*"],
+            "@hooks/*": ["./src/hooks/*"],
             "@lib/*": ["./src/lib/*"],
             "@pages/*": ["./src/pages/*"],
+            "@providers/*": ["./src/providers/*"],
             "@routes/*": ["./src/routes/*"],
             "@schemas/*": ["./src/schemas/*"],
-            "@styles/*": ["./src/styles/*"],
-            "@types/*": ["./src/types/*"]
+            "@styles/*": ["./src/styles/*"]
         }
     },
     "include": ["src"]

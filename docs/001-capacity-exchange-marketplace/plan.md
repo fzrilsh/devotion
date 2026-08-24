@@ -18,7 +18,7 @@ Pendekatan teknis: satu biner Go yang menyajikan frontend React hasil build, men
 
 ## Technical Context
 
-**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip VI, tidak ada rentang terbuka.
+**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip IV, tidak ada rentang terbuka.
 
 **Primary Dependencies**:
 
@@ -57,7 +57,7 @@ Empat pertentangan antar artefak yang ditemukan `/analyze` dan diselesaikan pada
 | Isu | Keputusan | Dampak |
 |-----|-----------|--------|
 | Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `jeda_kesiapan_hari`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `pesanan.minggu_kesiapan_mulai` + trigger; kueri pencarian |
-| Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `listing_kapasitas.horizon_sampai` |
+| Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `capacity_listing.horizon_until` |
 | Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh 25 tabel; menegakkan Prinsip V pada tingkat data |
 | Kriteria mesin tidak terdefinisi ketika filternya dikosongkan | Kriteria yang filternya tidak diisi dihitung **terpenuhi**; respons menyebut kriteria mana yang dievaluasi. Skor tetap 0–4, tanpa normalisasi | FR-023, FR-026 |
 
@@ -99,7 +99,7 @@ Satu keputusan bersyarat dan tiga hal yang wajib diverifikasi sebelum task terka
 |--------|-------|--------|
 | Setiap story dapat didemokan lewat antarmuka | `quickstart.md` §F: 83 langkah verifikasi manual, tujuh story | LOLOS |
 | Data contoh keadaan berhasil dan gagal | T075: hasil pencarian kosong, penawaran tertolak karena kapasitas, kalender basi, request kedaluwarsa | LOLOS |
-| Data acuan terisi dengan satu perintah | `seed:wilayah`, `seed:master-data` (T019) | LOLOS |
+| Data acuan terisi dengan satu perintah | `seed:regions`, `seed:master-data` (T019) | LOLOS |
 | Demo tidak bergantung layanan yang bisa mati | Notifikasi di dalam platform sebagai jalur pengamatan; WhatsApp dan email boleh gagal tanpa merusak alur (FR-054, FR-086) | LOLOS |
 
 Turunan yang mengikat urutan: pengisian daftar baku dan wilayah adalah prasyarat data bagi US1 dan US2, sehingga masuk fase Foundational (T019), terpisah dari antarmuka admin yang tetap di prioritas terakhir (T073). Tanpa itu, US7 harus naik ke awal padahal prioritasnya P7.
@@ -152,7 +152,7 @@ Sebelas dependency runtime, seluruhnya dengan pembenaran di `plan.md` versi ini 
 | Batasan | Bukti | Status |
 |---------|-------|--------|
 | Batas keuangan | Tidak ada payment gateway; `catatan_pembayaran` tanpa kolom jumlah uang. Escrow yang menahan dana dan merilisnya saat pesanan dikonfirmasi selesai [1] sengaja tidak dibangun | LOLOS |
-| Unggahan tidak lewat path statis | `GET /api/berkas/{id}` memeriksa peran sebelum mengirim byte | LOLOS |
+| Unggahan tidak lewat path statis | `GET /api/files/{fileId}` memeriksa peran sebelum mengirim byte | LOLOS |
 | Nama berkas dibuat sistem, tipe dari isi | UUID sebagai `path_penyimpanan`; magic bytes | LOLOS |
 | Metadata lokasi gambar dibuang | Dekode–enkode ulang saat unggah | LOLOS |
 | Segmen origin terenkripsi, koneksi non-Cloudflare ditolak | R-01: tiga lapisan (firewall, Origin Certificate + Full (strict), Authenticated Origin Pulls) | LOLOS |

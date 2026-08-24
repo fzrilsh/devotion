@@ -216,12 +216,12 @@ MAILJET_API_KEY=
 MAILJET_SECRET_KEY=
 MAIL_FROM=noreply@devotion.cloud
 
-WHATSAPP_NOMOR=
+WHATSAPP_NUMBER=
 SENTRY_DSN=
 
-UNGGAHAN_PATH=/opt/devotion/unggahan
-UNGGAHAN_BATAS_TOTAL_MB=500
-UNGGAHAN_BATAS_BERKAS_MB=5
+UPLOAD_PATH=/opt/devotion/unggahan
+UPLOAD_TOTAL_LIMIT_MB=500
+UPLOAD_FILE_LIMIT_MB=5
 ```
 
 `.env` tidak pernah masuk repository. `.env.example` hanya memuat nama kunci tanpa nilai.
@@ -348,7 +348,7 @@ dan antarmuka pencocokan tidak dapat didemokan tanpa ketiganya.
 ```bash
 # Wilayah: dua tingkat administratif saja (provinsi, kota/kabupaten).
 # Di server, baca dari salinan repository, jangan bergantung pada layanan luar.
-docker compose exec backend /devotion seed:wilayah
+docker compose exec backend /devotion seed:regions
 
 # Daftar baku jenis produk dan jenis mesin.
 docker compose exec backend /devotion seed:master-data
@@ -361,25 +361,25 @@ docker compose exec -it backend /devotion admin:create --email admin@devotion.cl
 Ketiganya idempoten: menjalankan dua kali tidak menduplikasi data.
 
 Pengambilan pertama data wilayah dari sumber luar dilakukan **sekali di mesin lokal**,
-bukan di server, lalu hasilnya di-commit ke `docs/master-data/wilayah.json`:
+bukan di server, lalu hasilnya di-commit ke `docs/master-data/regions.json`:
 
 ```bash
-./devotion seed:wilayah --refresh    # hanya di mesin lokal, sekali
+./devotion seed:regions --refresh    # hanya di mesin lokal, sekali
 ```
 
 Verifikasi:
 
 ```bash
 docker compose exec postgres psql -U ${POSTGRES_USER} -d devotion -c "
-  select (select count(*) from wilayah_provinsi) as provinsi,
-         (select count(*) from wilayah_kota)     as kota,
-         (select count(*) from item_daftar_baku where jenis='produk') as produk,
-         (select count(*) from item_daftar_baku where jenis='mesin')  as mesin,
-         (select count(*) from akun_pengguna where peran_admin)       as admin;"
+  select (select count(*) from province)                          as provinsi,
+         (select count(*) from city)                              as kota,
+         (select count(*) from catalog_item where type='product') as produk,
+         (select count(*) from catalog_item where type='machine') as mesin,
+         (select count(*) from user_account where role_admin)     as admin;"
 ```
 
 Kelimanya harus lebih dari nol. Bila `kota` nol sementara `provinsi` terisi, pemetaan kode
-gagal. Constraint `kota_milik_provinsinya` menolak baris yang dua digit pertama kodenya
+gagal. Constraint `city_belongs_to_province` menolak baris yang dua digit pertama kodenya
 tidak cocok dengan kode provinsinya, dan itu memang gunanya: gagal keras saat seed, bukan
 senyap saat pencarian.
 
@@ -765,7 +765,7 @@ diterima sebagai utang dengan alasannya.
 | Login berhasil lalu langsung keluar | Mode Flexible; cookie `Secure` tidak terkirim | Setel ke Full (strict) |
 | `curl https://<IP_VPS>` berhasil | Aturan firewall tidak berlaku; lapisan tepi dapat dilewati | `sudo ufw status numbered`; ulangi B4 |
 | Aplikasi tidak naik, log menyebut migrasi | Migrasi gagal di tengah | Periksa `schema_migrations.dirty` |
-| Kota kosong setelah seed wilayah | Kode kota tidak cocok dengan kode provinsinya | Periksa `docs/master-data/wilayah.json`; jalankan `--refresh` di lokal |
+| Kota kosong setelah seed wilayah | Kode kota tidak cocok dengan kode provinsinya | Periksa `docs/master-data/regions.json`; jalankan `--refresh` di lokal |
 | Pencarian tidak menghasilkan apa pun | Daftar baku atau wilayah belum terisi | Ulangi B12 dan verifikasi hitungannya |
 | Kode verifikasi email tidak sampai | SPF/DKIM belum benar, atau masuk spam | Dasbor Mailjet; periksa folder spam |
 | Kode WhatsApp tidak sampai | Sesi lepas atau nomor terblokir | `/admin/whatsapp`; jalur darurat `user:verify` |

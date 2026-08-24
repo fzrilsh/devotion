@@ -57,7 +57,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 - [ ] T002 [P] [BE] Inisialisasi modul Go dan subcommand
   **Modul**: `backend/cmd/devotion/`
-  **Kemampuan**: `go.mod` dengan Go 1.22+, dispatcher subcommand: `serve`, `admin:create`, `seed:wilayah`, `seed:master-data`, `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`
+  **Kemampuan**: `go.mod` dengan Go 1.22+, dispatcher subcommand: `serve`, `admin:create`, `seed:regions`, `seed:master-data`, `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`
   **Dependency**: tidak ada, `flag.NewFlagSet` dari standard library; prasyarat T001
   **Selesai bila**: `go run ./cmd/devotion` menampilkan daftar subcommand; `go vet ./...` bersih
   **Saran**: satu berkas per subcommand, dispatcher tipis di `main.go`. Subcommand adalah proses sekali jalan, bukan proses runtime, jadi tidak melanggar Gate I.
@@ -124,14 +124,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Modul**: `backend/db/migrations/` (path dipatok)
   **FR**: seluruh entitas
   **Kemampuan**: 14 migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
-  **Dependency**: `golang-migrate` (versi dipatok); prasyarat T011
+  **Dependency**: `golang-migrate` (versi dipatok); prasyarat T007, T009
   **Selesai bila**: `docker compose up` menjalankan migrasi sampai versi terakhir; `schema_migrations.dirty = false`; menjalankan dua kali tidak menimbulkan galat
-  **Hati-hati**: seluruh constraint, indeks, dan **tiga trigger** wajib ikut: `kapasitas_terpakai_tidak_melebihi_total`, `minggu_mulai_hari_senin`, `kesiapan_tidak_melewati_deadline`, `kota_milik_provinsinya`, trigger jenis item, trigger cegah request ke diri sendiri, trigger cegah alokasi sebelum kesiapan. Constraint itu bukan hiasan: ia yang menahan kerusakan data ketika logika aplikasi keliru. **Tidak ada `DEFAULT now()` di satu pun tabel.**
+  **Hati-hati**: seluruh constraint, indeks, dan **tiga trigger** wajib ikut: `used_capacity_within_total`, `week_start_is_monday`, `readiness_not_past_deadline`, `city_belongs_to_province`, trigger jenis item, trigger cegah request ke diri sendiri, trigger cegah alokasi sebelum kesiapan. Constraint itu bukan hiasan: ia yang menahan kerusakan data ketika logika aplikasi keliru. **Tidak ada `DEFAULT now()` di satu pun tabel.**
 
 - [ ] T011 [BE] Lapisan akses data
   **Modul**: `backend/db/queries/` + konfigurasi `sqlc`
   **Kemampuan**: `sqlc.yaml`, pool `pgx` dengan `MaxConns=15`, helper transaksi
-  **Dependency**: `pgx/v5`, `sqlc` (perkakas build); prasyarat T007, T009
+  **Dependency**: `pgx/v5`, `sqlc` (perkakas build); prasyarat T007, T009, T010
   **Selesai bila**: `sqlc generate` berhasil; pool tersambung; helper transaksi punya test
   **Hati-hati**: pool 15 dari `max_connections` 20, lima disisakan untuk `pg_dump`, `psql`, dan migrasi. Tanpa sisa itu, cadangan harian gagal justru saat trafik tinggi.
 
@@ -153,10 +153,10 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [ ] T014 [BE] Sesi, autentikasi, dan akun
   **Modul**: `backend/internal/platform/session/` + `backend/internal/account/`
   **FR**: FR-001, FR-002, FR-003, FR-005
-  **Kemampuan**: registrasi, verifikasi kode enam digit untuk email dan nomor, masuk, keluar, pemulihan kata sandi, cookie `httpOnly Secure SameSite=Lax`, hash token di basis data. **Ditambah**: `GET /saya` (akun yang sedang masuk beserta penanda `boleh_membuat_listing` dan `boleh_kirim_request`) dan `PATCH /saya/peran` (menambah peran usaha, menolak pencabutan bila masih ada pesanan aktif)
+  **Kemampuan**: registrasi, verifikasi kode enam digit untuk email dan nomor, masuk, keluar, pemulihan kata sandi, cookie `httpOnly Secure SameSite=Lax`, hash token di basis data. **Ditambah**: `GET /me` (akun yang sedang masuk dalam bentuk `MyAccount`: `roles{subcontractor,buyer}`, `profile_id`, `is_admin`) dan `PATCH /me/roles` (menambah peran usaha, menolak pencabutan bila masih ada pesanan aktif)
   **Dependency**: `bcrypt` cost 10; prasyarat T010, T011, T012, T016
-  **Selesai bila**: seluruh endpoint `/auth/*`, `/saya`, dan `/saya/peran` sesuai `openapi.yaml`; keluar akun benar-benar mengakhiri sesi; test membuktikan yang disimpan adalah hash, bukan token mentah
-  **Hati-hati**: `POST /auth/pulihkan/permintaan` selalu 202, agar tidak membocorkan apakah sebuah email terdaftar. Dua endpoint `/saya` sebelumnya tidak punya task pemilik, itu celah yang ditemukan `/analyze`.
+  **Selesai bila**: seluruh endpoint `/auth/*`, `/me`, dan `/me/roles` sesuai `openapi.yaml`; keluar akun benar-benar mengakhiri sesi; test membuktikan yang disimpan adalah hash, bukan token mentah
+  **Hati-hati**: `POST /auth/recover/request` selalu 202, agar tidak membocorkan apakah sebuah email terdaftar. Dua endpoint `/me` sebelumnya tidak punya task pemilik, itu celah yang ditemukan `/analyze`.
 
 - [ ] T015 [BE] Middleware peran
   **Modul**: `backend/internal/platform/httpx/`
@@ -192,7 +192,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [ ] T019 [BE] Data acuan: wilayah dan daftar baku
   **Modul**: `backend/internal/masterdata/` + subcommand seed
   **FR**: FR-058, FR-062, FR-075
-  **Kemampuan**: `seed:wilayah` mengambil provinsi dan kabupaten/kota dari wilayah.id dengan flag `--refresh`, default membaca salinan `docs/master-data/wilayah.json`; `seed:master-data` mengisi jenis produk dan mesin; keduanya idempoten memakai kode sebagai identitas. **Ditambah**: endpoint baca `GET /master/produk`, `GET /master/mesin`, `GET /wilayah/provinsi`, `GET /wilayah/kota?provinsi=`; `Normalisasi kode kabupaten/kota dengan membuang titik (32.73 → 3273) sebelum menyimpan.`
+  **Kemampuan**: `seed:regions` mengambil provinsi dan kabupaten/kota dari wilayah.id dengan flag `--refresh`, default membaca salinan `docs/master-data/regions.json`; `seed:master-data` mengisi jenis produk dan mesin; keduanya idempoten memakai kode sebagai identitas. **Ditambah**: endpoint baca `GET /master/products`, `GET /master/machines`, `GET /regions/provinces`, `GET /regions/cities?province=`; `Normalisasi kode kabupaten/kota dengan membuang titik (32.73 → 3273) sebelum menyimpan.`
   **Dependency**: tidak ada, `net/http` dan `encoding/json`; prasyarat T010, T011, T012
   **Selesai bila**: kedua perintah jalan dua kali tanpa menduplikasi; hitungan provinsi, kota, produk, mesin semuanya lebih dari nol; keempat endpoint sesuai kontrak
   **Hati-hati**: Bentuk respons sudah diverifikasi; lihat docs/master-data/README.md. Normalisasi kode adalah langkah yang paling mudah terlupakan dan gagalnya senyap sampai constraint menolak seluruh baris. Jalankan kueri verifikasi di README itu setelah seed.
@@ -222,10 +222,10 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [ ] T023 [BE] Notifikasi
   **Modul**: `backend/internal/notification/`
   **FR**: FR-051 sampai FR-054, FR-074, FR-085, FR-086, FR-091
-  **Kemampuan**: baris notifikasi ditulis di dalam transaksi kejadiannya beserta kolom `transaksional`; goroutine pengirim ke email dan WhatsApp maksimal 3 percobaan; notifikasi di dalam platform selalu tampil; preferensi kanal hanya berlaku bagi kejadian non-transaksional
+  **Kemampuan**: baris notifikasi ditulis di dalam transaksi kejadiannya beserta kolom `transactional`; goroutine pengirim ke email dan WhatsApp maksimal 3 percobaan; notifikasi di dalam platform selalu tampil; preferensi kanal hanya berlaku bagi kejadian non-transaksional
   **Dependency**: `net/smtp` (standard library, Mailjet lewat SMTP), `whatsmeow`; prasyarat T010, T011, T018
-  **Selesai bila**: test membuktikan kegagalan kirim tidak menggagalkan transaksi pemicunya; setelah 3 percobaan ditandai gagal permanen; endpoint `/notifikasi` dan `/notifikasi/preferensi` sesuai kontrak
-  **Hati-hati**: penggolongan transaksional versus non-transaksional ada di `data-model.md` §9, hanya `kalender_basi`, `deadline_mendekat`, dan `permintaan_rating` yang non-transaksional. Perhatikan bahwa `tenggat_konfirmasi_mendekat` **transaksional** karena berujung pada penutupan pesanan otomatis, jadi tidak boleh dapat dimatikan. Notifikasi di dalam platform adalah satu-satunya jalur pengamatan bagi penguji manual.
+  **Selesai bila**: test membuktikan kegagalan kirim tidak menggagalkan transaksi pemicunya; setelah 3 percobaan ditandai gagal permanen; endpoint `/notifications` dan `/notifications/preferences` sesuai kontrak
+  **Hati-hati**: penggolongan transaksional versus non-transaksional ada di `data-model.md` §9, hanya `calendar_stale`, `deadline_approaching`, dan `rating_request` yang non-transaksional. Perhatikan bahwa `confirmation_due_approaching` **transaksional** karena berujung pada penutupan pesanan otomatis, jadi tidak boleh dapat dimatikan. Notifikasi di dalam platform adalah satu-satunya jalur pengamatan bagi penguji manual.
 
 - [ ] T024a [BE] Sambungan WhatsApp dan endpoint QR
   **Modul**: `backend/internal/admin/`
@@ -264,31 +264,31 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **FR**: FR-004, FR-057
   **Kemampuan**: baca dan ubah profil sendiri, profil publik, kota dari data wilayah, koordinat opsional
   **Dependency**: prasyarat T014, T017, T019
-  **Selesai bila**: `/profil/saya` dan `/profil/{id}` sesuai kontrak; koordinat di luar Indonesia ditolak; lintang tanpa bujur ditolak
+  **Selesai bila**: `/profile/me` dan `/profile/{profileId}` sesuai kontrak; koordinat di luar Indonesia ditolak; lintang tanpa bujur ditolak
 
 - [ ] T027 [US1] [BE] Listing kapasitas
   **Modul**: `backend/internal/listing/`
   **FR**: FR-012, FR-013, FR-014, FR-015, FR-076
   **Kemampuan**: buat, ubah, nonaktifkan, aktifkan kembali; satu angka kapasitas mingguan untuk seluruh jenis produk; jeda kesiapan mulai dalam hari
   **Dependency**: prasyarat T015, T019, T026
-  **Selesai bila**: `/listing/saya` sesuai kontrak; atribut wajib kosong ditolak dengan menyebut kolomnya
+  **Selesai bila**: `/listing/me` sesuai kontrak; atribut wajib kosong ditolak dengan menyebut kolomnya
   **Saran**: pisahkan service dan handler; validasi di service supaya dapat dites tanpa HTTP
   **Hati-hati**: **jangan** buat kolom kapasitas per jenis produk (FR-076). Mesin dan tenaga kerjanya berbagi, sehingga angka terpisah akan mengizinkan penyanggupan ganda pada minggu yang sama. **Jeda kesiapan mulai bukan durasi menyelesaikan pekerjaan**, melainkan jeda sebelum produksi dapat dimulai.
 
 - [ ] T028 [US1] [BE] Kalender awal dan horizon
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-088
-  **Kemampuan**: periode mingguan dibuat otomatis untuk minimal 3 bulan ke depan saat listing dibuat, memakai kapasitas mingguan sebagai kapasitas total; kolom `horizon_sampai` menyimpan periode terjauh yang sudah dibuat; fungsi memperpanjang horizon sampai minggu tertentu, idempoten dan dapat dipanggil ulang
+  **Kemampuan**: periode mingguan dibuat otomatis untuk minimal 3 bulan ke depan saat listing dibuat, memakai kapasitas mingguan sebagai kapasitas total; kolom `horizon_until` menyimpan periode terjauh yang sudah dibuat; fungsi memperpanjang horizon sampai minggu tertentu, idempoten dan dapat dipanggil ulang
   **Dependency**: prasyarat T008, T027
-  **Selesai bila**: setiap `minggu_mulai` adalah hari Senin; horizon awal minimal 13 periode; `horizon_sampai` konsisten dengan `MAX(minggu_mulai)`; memperpanjang ke minggu yang sudah tercakup tidak membuat baris ganda
-  **Hati-hati**: horizon **bukan** nilai tetap. T035 akan memanggil fungsi perpanjangan ini ketika ada pencarian berdeadline lebih jauh (FR-088), jadi rancang sebagai operasi yang aman dipanggil berulang dan aman dipanggil bersamaan. Batas minggu dihitung di Asia/Jakarta, disimpan sebagai `date`; constraint `minggu_mulai_hari_senin` akan menolak bila perhitungannya keliru.
+  **Selesai bila**: setiap `week_start` adalah hari Senin; horizon awal minimal 13 periode; `horizon_until` konsisten dengan `MAX(week_start)`; memperpanjang ke minggu yang sudah tercakup tidak membuat baris ganda
+  **Hati-hati**: horizon **bukan** nilai tetap. T035 akan memanggil fungsi perpanjangan ini ketika ada pencarian berdeadline lebih jauh (FR-088), jadi rancang sebagai operasi yang aman dipanggil berulang dan aman dipanggil bersamaan. Batas minggu dihitung di Asia/Jakarta, disimpan sebagai `date`; constraint `week_start_is_monday` akan menolak bila perhitungannya keliru.
 
 - [ ] T029 [P] [US1] [BE] Usulan item daftar baku
   **Modul**: `backend/internal/masterdata/`
   **FR**: FR-061
   **Kemampuan**: pengguna mengusulkan item baru, listing tetap dapat disimpan dengan item yang tersedia
   **Dependency**: prasyarat T019, T023
-  **Selesai bila**: `POST /master/usulan` sesuai kontrak; pengusul menerima notifikasi saat diputuskan
+  **Selesai bila**: `POST /master/proposals` sesuai kontrak; pengusul menerima notifikasi saat diputuskan
 
 - [ ] T030 [P] [US1] [BE] Test backend US1
   **Modul**: `backend/internal/{account,listing}/`
@@ -313,7 +313,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Saran**: beri label yang jelas pada jeda kesiapan mulai, misalnya "berapa hari setelah kesepakatan Anda bisa mulai produksi", karena pengguna mudah salah mengira ini lama pengerjaan.
 
 - [ ] T033 [US1] [FE] Frontend: profil publik
-  **Modul**: `frontend/src/pages/profil/`
+  **Modul**: `frontend/src/pages/profile/`
   **FR**: FR-016, FR-064
   **Kemampuan**: atribut listing, ketersediaan terkini, peta lokasi, ringkasan reputasi, lencana verifikasi
   **Dependency**: Leaflet + tile OpenStreetMap; prasyarat T021, T026
@@ -341,10 +341,10 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Kemampuan**:
   - Hitung **minggu kesiapan mulai** per kandidat = Senin dari (tanggal pencarian + `jeda_kesiapan_hari` listing). Ini batas awal **rentang kapasitas**; batas akhirnya periode yang memuat deadline.
   - Jumlahkan kapasitas tersisa hanya di dalam rentang itu. Kandidat yang minggu kesiapannya melampaui minggu deadline memiliki rentang kosong sehingga kapasitasnya nol.
-  - Perpanjang horizon: bila `horizon_sampai < minggu_deadline`, hitung minggu yang belum dibuat sebagai berkapasitas penuh, lalu panggil fungsi perpanjangan T028 untuk kandidat yang lolos, di dalam transaksi tersendiri, **di luar** kueri pencarian.
+  - Perpanjang horizon: bila `horizon_until < minggu_deadline`, hitung minggu yang belum dibuat sebagai berkapasitas penuh, lalu panggil fungsi perpanjangan T028 untuk kandidat yang lolos, di dalam transaksi tersendiri, **di luar** kueri pencarian.
   - Empat kriteria keras sebagai empat nilai boolean yang dijumlahkan; **kriteria yang filternya tidak diisi dihitung terpenuhi** dan responsnya menyebutkan kriteria mana yang tidak dievaluasi.
   - Pemecah seri lima tingkat, keyset pagination, perluasan wilayah kota → provinsi → nasional, saran pelonggaran saat kosong, pengecualian listing sendiri.
-  **Selesai bila**: `GET /pencarian` sesuai kontrak; bentuk kueri mengikuti `data-model.md` §10; skor tetap bernilai 0–4
+  **Selesai bila**: `GET /search` sesuai kontrak; bentuk kueri mengikuti `data-model.md` §10; skor tetap bernilai 0–4
   **Dependency**: prasyarat T027, T028
   **Hati-hati**: **tidak ada pembobotan dan tidak ada normalisasi skor.** Rating, tingkat penyelesaian, verifikasi, kebaruan kalender, jarak, dan tanggal pendaftaran tidak boleh mempengaruhi urutan (FR-024), termasuk kebaruan kalender, meski dokumen sumber justru menyarankan penalti penurunan skor pencarian bagi yang tidak update kalender [1]. `listing_id` sebagai pemecah seri terakhir wajib ada; tanpanya urutan bisa bertukar antar permintaan. Pencarian tetap operasi baca: perpanjangan horizon jangan diletakkan di dalam kueri, karena itu akan memicu penulisan pada setiap permintaan.
 
@@ -365,7 +365,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Hati-hati**: ini kelompok test terpenting di seluruh project. Empat di antaranya, yaitu SC-020, SC-021, dan dua kasus jeda kesiapan, menutup bug yang **tidak akan** tertangkap pengujian manual karena angka totalnya tetap tampak masuk akal.
 
 - [ ] T037 [P] [US2] [FE] Frontend: halaman pencarian
-  **Modul**: `frontend/src/pages/pencarian/`
+  **Modul**: `frontend/src/pages/search/`
   **FR**: FR-022, FR-026, FR-027, FR-028, FR-063, FR-080
   **Kemampuan**: filter produk, mesin, wilayah, jumlah, deadline, jeda maksimal; kartu hasil menampilkan seluruh atribut keputusan termasuk minggu kesiapan mulai dan total kapasitas sampai deadline; penjelasan kriteria yang tidak terpenuhi dan yang tidak dievaluasi; tombol perluas yang menyebut tingkat berikutnya; keadaan kosong beserta saran
   **Selesai bila**: kursor diteruskan apa adanya; tidak ada kandidat ganda saat berpindah halaman
@@ -391,7 +391,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Modul**: `backend/internal/quota/`
   **FR**: FR-029, FR-030, FR-082, FR-083
   **Kemampuan**: kirim ke beberapa kandidat dalam satu tindakan; status per kandidat; batas balasan 72 jam ditetapkan sistem dari `Clock`; penolakan request ke listing sendiri
-  **Selesai bila**: `/request-kuota` sesuai kontrak; tidak ada kolom untuk mengatur batas waktu sendiri
+  **Selesai bila**: `/quota-requests` sesuai kontrak; tidak ada kolom untuk mengatur batas waktu sendiri
   **Dependency**: prasyarat T008, T015, T023, T027
   **Hati-hati**: aplikasi mengirim **kedua** nilai `dibuat_pada` dan `batas_balasan_pada` dari `Clock`; basis data tidak punya `DEFAULT now()` dan constraint-nya hanya menjaga urutan. Angka 72 jam ditegakkan aplikasi dan diuji. FR-083 menyebut jalur "tanpa melalui hasil pencarian" secara eksplisit; trigger basis data adalah jaring pengamannya.
 
@@ -408,7 +408,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **FR**: FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087
   **Kemampuan**:
   - Hitung dan simpan `minggu_kesiapan_mulai` pesanan = Senin dari (tanggal kesepakatan + `jeda_kesiapan_hari` listing saat itu). Disimpan, bukan dihitung ulang, karena jeda pada listing dapat berubah kemudian sementara alokasi tidak boleh bergeser.
-  - Satu transaksi mencakup pembentukan pesanan dan seluruh baris alokasi; penguncian baris periode terurut menaik menurut `minggu_mulai`.
+  - Satu transaksi mencakup pembentukan pesanan dan seluruh baris alokasi; penguncian baris periode terurut menaik menurut `week_start`.
   - Alokasi mengisi periode paling awal **di dalam rentang kapasitas** lebih dulu, melewati yang penuh atau habis; kandidat lain ditutup dengan notifikasi.
   **Selesai bila**: pola transaksi mengikuti `research.md` R-04; kegagalan pada salah satu periode membatalkan seluruh pembentukan; tidak ada baris alokasi pada periode sebelum `minggu_kesiapan_mulai`
   **Dependency**: prasyarat T008, T027, T040
@@ -460,8 +460,8 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [ ] T047 [US4] [BE] Pengelolaan kalender
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-019, FR-021, FR-089
-  **Kemampuan**: baca dan perbarui beberapa periode sekaligus, tandai penuh, penanda kalender basi lebih dari 7 hari; **propagasi perubahan kapasitas mingguan**, yakni ketika `kapasitas_mingguan` listing diubah, perbarui `kapasitas_total` seluruh periode mendatang yang **belum memiliki alokasi aktif**, dan biarkan periode yang sudah memiliki alokasi tetap seperti semula
-  **Selesai bila**: `/listing/saya/periode` sesuai kontrak; penanda basi tidak mengubah urutan pencarian; mengubah kapasitas listing benar-benar mengubah periode tanpa alokasi dan tidak menyentuh yang punya alokasi
+  **Kemampuan**: baca dan perbarui beberapa periode sekaligus, tandai penuh, penanda kalender basi lebih dari 7 hari; **propagasi perubahan kapasitas mingguan**, yakni ketika `weekly_capacity` listing diubah, perbarui `total_capacity` seluruh periode mendatang yang **belum memiliki alokasi aktif**, dan biarkan periode yang sudah memiliki alokasi tetap seperti semula
+  **Selesai bila**: `/listing/me/periods` sesuai kontrak; penanda basi tidak mengubah urutan pencarian; mengubah kapasitas listing benar-benar mengubah periode tanpa alokasi dan tidak menyentuh yang punya alokasi
   **Dependency**: prasyarat T028, T041
   **Hati-hati**: `kalender_diperbarui_pada` terpisah dari `diperbarui_pada`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
 
@@ -519,7 +519,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **FR**: FR-038, FR-039, FR-044
   **Kemampuan**: transisi sesuai diagram `data-model.md` §7; riwayat status dengan waktu dan pelaku; penolakan transisi melompat beserta daftar transisi yang diizinkan
   **Dependency**: prasyarat T041
-  **Selesai bila**: `PesananDetail` mengirim `transisi_diizinkan` dan `boleh_dibatalkan_sendiri`; galat `TRANSISI_STATUS_TIDAK_SAH` menyebut urutan yang benar
+  **Selesai bila**: `WorkOrderDetail` mengirim `allowed_transitions` dan `self_cancellable`; galat `INVALID_STATUS_TRANSITION` menyebut urutan yang benar
   **Hati-hati**: perubahan oleh penjadwal ditandai `oleh_sistem`, bukan dibiarkan tanpa identitas.
 
 - [ ] T054 [US5] [BE] Pembatalan
@@ -560,15 +560,15 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Hati-hati**: seluruh test tenggat memakai `Clock` yang digeser, bukan menunggu waktu nyata.
 
 - [ ] T059 [US5] [FE] Frontend: dashboard pesanan
-  **Modul**: `frontend/src/pages/pesanan/`
+  **Modul**: `frontend/src/pages/work-orders/`
   **FR**: FR-038, FR-039, FR-041, FR-044
   **Kemampuan**: daftar aktif dan riwayat, detail dengan riwayat status, rincian alokasi per minggu, tombol transisi, form pembatalan, catatan pembayaran, tombol laporkan sengketa
   **Dependency**: prasyarat T021, T053, T054, T056, T057
-  **Selesai bila**: tombol dirender dari `transisi_diizinkan` yang dikirim backend
+  **Selesai bila**: tombol dirender dari `allowed_transitions` yang dikirim backend
   **Hati-hati**: **jangan** duplikasi mesin keadaan pesanan di React. Kalau logikanya ditulis ulang, dua tempat akan berbeda pada suatu titik.
 
 - [ ] T060 [US5] [FE] Frontend: tenggat konfirmasi
-  **Modul**: `frontend/src/pages/pesanan/`
+  **Modul**: `frontend/src/pages/work-orders/`
   **FR**: FR-068, FR-069
   **Kemampuan**: tanggal pesanan akan dianggap diterima ditampilkan jelas pada pesanan berstatus Dikirim; penanda bahwa penutupan terjadi otomatis
   **Dependency**: prasyarat T055, T059
@@ -616,7 +616,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **FR**: FR-047, FR-048, FR-049, FR-073
   **Kemampuan**: form rating setelah pesanan dikonfirmasi, daftar ulasan pada profil dengan nama pemberi dan tanggal transaksi, ringkasan reputasi
   **Dependency**: prasyarat T021, T062, T063
-  **Selesai bila**: bila `cukup_data: false`, yang tampil adalah keterangannya, bukan persentase
+  **Selesai bila**: bila `enough_data: false`, yang tampil adalah keterangannya, bukan persentase
 
 - [ ] T066 [US6] [OPS] Skenario uji manual US6
   **Modul**: `docs/skenario-uji-manual.md`
@@ -782,7 +782,7 @@ Query dan model → service → handler → test. Frontend setelah endpoint ters
 ### Peluang paralel
 
 - Seluruh task Setup bertanda `[P]` kecuali T001 dan T007
-- Di Foundational: T012, T013, T016, T017, T025 dapat paralel setelah T008–T011
+- Di Foundational: T012 dan T013 dapat paralel setelah T009; T016 setelah T011 dan T013; T017 setelah T015; T025 setelah T024a
 - Setelah Foundational: tujuh story dapat paralel bila ada beberapa pelaksana, dengan memperhatikan tabel ketergantungan baru di atas
 - Task test bertanda `[P]` karena modulnya berbeda dari implementasi
 
