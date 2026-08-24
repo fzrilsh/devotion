@@ -125,6 +125,11 @@ type Querier interface {
 	// GetAccountByPhone loads one account by phone, backing WhatsApp verification
 	// and the emergency user:verify --phone subcommand.
 	GetAccountByPhone(ctx context.Context, phone string) (UserAccount, error)
+	// GetCandidateListings resolves each listing id to its owning profile and that
+	// profile's account, and reports whether the listing is published. The service
+	// uses this to reject unknown or unpublished listings (422) and to detect a
+	// listing owned by the searcher's own profile (FR-083) before any insert.
+	GetCandidateListings(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetCandidateListingsRow, error)
 	// GetItemProposalByID loads one proposal, joined with the proposer's account id
 	// so the decision path knows whom to notify. account_id is the business
 	// profile's owner, the recipient of the item_proposal_decision notification.
@@ -196,6 +201,16 @@ type Querier interface {
 	// passed in already clamped to at least the current week's Monday so past weeks
 	// are never created.
 	InsertPeriodsUpToWeek(ctx context.Context, arg InsertPeriodsUpToWeekParams) error
+	// InsertQuotaRequest creates one quota request. Both created_at and reply_due_at
+	// are supplied by the caller from the injected Clock (FR-082, Rule 5): the table
+	// has no DEFAULT now(), and its only time constraint enforces reply_due_at >
+	// created_at. The 72-hour window is computed in the service, not here.
+	InsertQuotaRequest(ctx context.Context, arg InsertQuotaRequestParams) (QuotaRequest, error)
+	// InsertRequestCandidate links one listing to a request as a candidate. status
+	// defaults to 'awaiting_reply'. The trg_reject_self_request trigger raises when
+	// subcontractor_id equals the request's buyer_id; the service rejects that case
+	// first (FR-083), so this insert is the safety net.
+	InsertRequestCandidate(ctx context.Context, arg InsertRequestCandidateParams) (RequestCandidate, error)
 	// InvalidateVerificationCodes consumes all outstanding codes for an account and
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
@@ -203,6 +218,10 @@ type Querier interface {
 	// ListActiveCatalogItems returns the active items of one type ordered for
 	// display, for GET /master/products and /master/machines.
 	ListActiveCatalogItems(ctx context.Context, type_ ItemType) ([]ListActiveCatalogItemsRow, error)
+	// ListCandidatesByRequests returns every candidate of the given requests, joined
+	// to its subcontractor profile for the business name, ordered so a request's
+	// candidates group together deterministically.
+	ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListCandidatesByRequestsRow, error)
 	// ListCities returns every city ordered by code, for GET /regions/cities with no
 	// province filter.
 	ListCities(ctx context.Context) ([]City, error)
@@ -227,6 +246,11 @@ type Querier interface {
 	ListPeriodsInRange(ctx context.Context, arg ListPeriodsInRangeParams) ([]ListPeriodsInRangeRow, error)
 	// ListProvinces returns every province ordered by code, for GET /regions/provinces.
 	ListProvinces(ctx context.Context) ([]Province, error)
+	// ListQuotaRequestsByBuyer returns one keyset page of a buyer's own requests,
+	// newest first, ordered by (created_at, id) so the order is total and stable
+	// across pages (FR-030, FR-080). The cursor tuple admits every row on the first
+	// page via sentinels above the maxima.
+	ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaRequestsByBuyerParams) ([]QuotaRequest, error)
 	// LockListingByProfile takes a row lock on the profile's listing so a capacity
 	// edit and its propagation to future periods run as one serialized unit. The
 	// listing row is always locked before any availability_period row, and that

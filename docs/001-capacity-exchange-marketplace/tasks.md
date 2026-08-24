@@ -387,7 +387,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: kirim ke tiga kandidat, balas dari dua dengan harga berbeda, bandingkan, terima satu.
 
-- [ ] T039 [US3] [BE] Request kuota
+- [x] T039 [US3] [BE] Request kuota
   **Modul**: `backend/internal/quota/`
   **FR**: FR-029, FR-030, FR-082, FR-083
   **Kemampuan**: kirim ke beberapa kandidat dalam satu tindakan; status per kandidat; batas balasan 72 jam ditetapkan sistem dari `Clock`; penolakan request ke listing sendiri
