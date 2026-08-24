@@ -243,9 +243,10 @@ tuntas (semua kondisi "Selesai bila" terpenuhi, uji lulus, entri CHANGELOG ada),
 ubah kotaknya dari `- [ ]` menjadi `- [x]` pada baris task itu. Jangan ubah teks
 task yang lain, hanya penanda kotaknya.
 
-Perubahan `tasks.md` ada di `docs/`, di luar `backend/` dan `frontend/`, jadi
-dicatat terpisah dari CHANGELOG area dan tidak ikut branch kerja area. Tandai
-hanya setelah task benar-benar selesai, bukan saat masih dikerjakan.
+Penanda `tasks.md` di-commit di branch kerja task yang sama dengan
+perubahannya, bukan di branch penanda terpisah, supaya riwayat dan penanda
+selesai tidak terpisah. Tandai hanya setelah task benar-benar selesai, bukan
+saat masih dikerjakan.
 
 ---
 
