@@ -125,6 +125,13 @@ type Querier interface {
 	// GetAccountByPhone loads one account by phone, backing WhatsApp verification
 	// and the emergency user:verify --phone subcommand.
 	GetAccountByPhone(ctx context.Context, phone string) (UserAccount, error)
+	// GetCandidateForOffer loads one candidate with everything the offer and reject
+	// paths need in a single read: the candidate's status and its owning
+	// subcontractor account (for the role check), the request's quantity, deadline,
+	// and reply window (FR-035, FR-090, expiry), and the listing's capacity shape
+	// (weekly_capacity, readiness_lead_days, horizon_until) plus the buyer account to
+	// notify. It is the incoming-side counterpart to GetCandidateListings.
+	GetCandidateForOffer(ctx context.Context, id pgtype.UUID) (GetCandidateForOfferRow, error)
 	// GetCandidateListings resolves each listing id to its owning profile and that
 	// profile's account, and reports whether the listing is published. The service
 	// uses this to reject unknown or unpublished listings (422) and to detect a
@@ -147,6 +154,11 @@ type Querier interface {
 	// GetNotifPreferences reads the two non-transactional channel toggles for one
 	// account, backing GET /notifications/preferences (FR-054).
 	GetNotifPreferences(ctx context.Context, id pgtype.UUID) (GetNotifPreferencesRow, error)
+	// GetOfferForCounter loads one offer with the context the counter-offer path
+	// needs: the candidate it belongs to, that candidate's status, and both parties'
+	// accounts so the service can check the caller alternates with the last proposer
+	// and notify the other side (FR-033).
+	GetOfferForCounter(ctx context.Context, id pgtype.UUID) (GetOfferForCounterRow, error)
 	// GetProfileByAccount loads the caller's own profile by account id, backing
 	// GET /profile/me. The city join resolves the human-readable city and province
 	// names the contract returns as read-only fields, so the client never has to
@@ -160,6 +172,10 @@ type Querier interface {
 	// rows when none exists yet. MyAccount carries profile_id as nullable, so the
 	// caller treats pgx.ErrNoRows as a null profile_id rather than an error.
 	GetProfileIDByAccount(ctx context.Context, accountID pgtype.UUID) (pgtype.UUID, error)
+	// GetRequestForBuyer loads one request owned by a buyer account, for the detail
+	// view (FR-032). The buyer account guard makes a request that is not the
+	// caller's a 404 rather than leaking its existence.
+	GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyerParams) (QuotaRequest, error)
 	// GetSessionByTokenHash loads a live session by token hash. The expiry check is
 	// in SQL so an expired row is treated as absent without a second round trip.
 	GetSessionByTokenHash(ctx context.Context, arg GetSessionByTokenHashParams) (Session, error)
@@ -191,6 +207,10 @@ type Querier interface {
 	// it is always visible (FR-054); these rows track only email and WhatsApp fan
 	// out.
 	InsertNotificationChannel(ctx context.Context, arg InsertNotificationChannelParams) error
+	// InsertOffer appends one offer to a candidate's chain, computing the next
+	// sequence as max+1 so every counter-offer is a new row and the full history is
+	// preserved (FR-033). created_at comes from the injected Clock (Rule 5).
+	InsertOffer(ctx context.Context, arg InsertOfferParams) (Offer, error)
 	// ── availability calendar ──
 	// InsertPeriodsUpToWeek generates every missing weekly period from the current
 	// horizon forward to untilWeek in one statement. The series runs on date, not
@@ -228,6 +248,11 @@ type Querier interface {
 	// ListCitiesByProvince returns the cities of one province, for
 	// GET /regions/cities?province=.
 	ListCitiesByProvince(ctx context.Context, provinceCode string) ([]City, error)
+	// ListIncomingCandidates returns one keyset page of candidates whose listing the
+	// subcontractor account owns, newest request first (FR-030). An optional status
+	// filter narrows to one candidate_status. The cursor tuple is (created_at, id)
+	// of the request, matching the buyer-side list.
+	ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error)
 	// ListListingMachines returns the machine items of a listing with their counts.
 	ListListingMachines(ctx context.Context, listingID pgtype.UUID) ([]ListListingMachinesRow, error)
 	// ListListingProducts returns the product items of a listing joined to their
@@ -238,6 +263,12 @@ type Querier interface {
 	// rows arrive. unread_only filters to still-unread rows (FR-051 list). A null
 	// before_created is the first page; later pages pass the last row's cursor.
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	// ListOffersByCandidate returns a candidate's full offer chain oldest first so
+	// the buyer sees every round side by side (FR-032).
+	ListOffersByCandidate(ctx context.Context, candidateID pgtype.UUID) ([]Offer, error)
+	// ListOffersByRequest returns every offer across all candidates of a request so
+	// the detail view attaches each candidate's chain in one query (FR-032).
+	ListOffersByRequest(ctx context.Context, requestID pgtype.UUID) ([]Offer, error)
 	// ListPeriodsInRange returns the periods of a listing within an inclusive
 	// week_start range, ordered ascending, for GET /listing/me/periods. allocated
 	// is the sum of active allocation quantities on each period; remaining is the
@@ -306,6 +337,16 @@ type Querier interface {
 	// RecordMember records that member was used under key in the current window.
 	// DO NOTHING keeps it idempotent within the window.
 	RecordMember(ctx context.Context, arg RecordMemberParams) error
+	// RejectCandidate marks a candidate rejected with the subcontractor's reason
+	// (FR-031), stamping updated_at from the Clock.
+	RejectCandidate(ctx context.Context, arg RejectCandidateParams) error
+	// RemainingCapacityForOffer sums the subcontractor's remaining capacity across
+	// the readiness..deadline week range for FR-035, mirroring the capacity CTE of
+	// SearchCandidates: recorded remaining over non-full availability periods in
+	// range, plus periods past horizon_until counted optimistically as full weekly
+	// capacity (FR-088). The caller computes readiness_week and deadline_week in Go
+	// so week rounding stays in one place (Rule 4).
+	RemainingCapacityForOffer(ctx context.Context, arg RemainingCapacityForOfferParams) (int64, error)
 	// RenewSession slides the expiry forward and records access time, implementing
 	// rolling 7-day renewal on each authenticated request.
 	RenewSession(ctx context.Context, arg RenewSessionParams) error
@@ -329,6 +370,9 @@ type Querier interface {
 	// first page passes a score sentinel of 5, above the 0..4 maximum, so the first
 	// clause admits every row.
 	SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error)
+	// SetCandidateStatus moves a candidate to a new status (offered on a reply,
+	// FR-031), stamping updated_at from the Clock.
+	SetCandidateStatus(ctx context.Context, arg SetCandidateStatusParams) error
 	// SetEmailVerified marks the email verified after a valid code is consumed.
 	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error
 	// SetListingPublished toggles visibility for PUT /listing/me/visibility. A

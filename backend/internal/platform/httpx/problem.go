@@ -59,6 +59,21 @@ func WriteValidation(w http.ResponseWriter, detail string, fields []FieldError) 
 	})
 }
 
+// WriteProblemMeta writes a problem+json like WriteProblem but attaches the
+// given structured context under "meta". FR-035 uses it to state the actual
+// remaining capacity and the until-week the reply cannot cover, so a client can
+// render the shortfall without parsing the Indonesian detail string.
+func WriteProblemMeta(w http.ResponseWriter, code Code, detail string, meta map[string]any) {
+	writeProblem(w, Problem{
+		Type:   typeBaseURI + slugFor(code),
+		Title:  TitleFor(code),
+		Status: StatusFor(code),
+		Code:   code,
+		Detail: detail,
+		Meta:   meta,
+	})
+}
+
 func writeProblem(w http.ResponseWriter, p Problem) {
 	w.Header().Set("Content-Type", problemContentType)
 	w.WriteHeader(p.Status)

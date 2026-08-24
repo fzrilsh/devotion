@@ -166,7 +166,8 @@ func seedListing(t *testing.T, h *harness, name string) (pgtype.UUID, pgtype.UUI
 	acc := seedAccount(t, pool, "subkon-"+name+"@contoh.test", nextPhone(), true)
 	prof := seedProfile(t, pool, acc, name, "3273")
 
-	horizon := platform.WeekStart(baseTime).AddDate(0, 0, 7*8)
+	weekNow := platform.WeekStart(baseTime)
+	horizon := weekNow.AddDate(0, 0, 7*8)
 	var listingID pgtype.UUID
 	err := pool.QueryRow(ctx,
 		`INSERT INTO capacity_listing (profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at)
@@ -179,6 +180,14 @@ func seedListing(t *testing.T, h *harness, name string) (pgtype.UUID, pgtype.UUI
 		`INSERT INTO listing_product (listing_id, item_id) VALUES ($1, $2)`,
 		listingID, h.productID); err != nil {
 		t.Fatalf("seed listing_product: %v", err)
+	}
+	for w := weekNow; !w.After(horizon); w = w.AddDate(0, 0, 7) {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO availability_period (listing_id, week_start, total_capacity, used_capacity, created_at, updated_at)
+			 VALUES ($1, $2, 100, 0, $3, $3)`,
+			listingID, w, baseTime); err != nil {
+			t.Fatalf("seed period %s: %v", w.Format(dateFmt), err)
+		}
 	}
 	return listingID, prof
 }

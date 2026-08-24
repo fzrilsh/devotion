@@ -1691,6 +1691,7 @@ components:
             - CANCELLATION_AFTER_PRODUCTION
             - WORK_ORDER_NOT_COMPLETED
             - REVIEW_ALREADY_SUBMITTED
+            - READINESS_AFTER_DEADLINE
         detail:
           type: string
           description: Penjelasan bahasa Indonesia yang dapat dikutip pengguna.

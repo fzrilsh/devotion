@@ -34,3 +34,16 @@ type validationError struct {
 }
 
 func (e *validationError) Error() string { return "quota: masukan tidak sah" }
+
+// metaError is a conflict-style rejection that also carries structured context
+// for the client under problem "meta". FR-035 uses it so the INSUFFICIENT_CAPACITY
+// body states the remaining capacity number and the until-week both as a quotable
+// Indonesian detail and as machine fields.
+type metaError struct {
+	code   httpx.Code
+	detail string
+	meta   map[string]any
+}
+
+func (e *metaError) Error() string { return e.detail }
+
