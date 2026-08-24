@@ -348,7 +348,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T027, T028
   **Hati-hati**: **tidak ada pembobotan dan tidak ada normalisasi skor.** Rating, tingkat penyelesaian, verifikasi, kebaruan kalender, jarak, dan tanggal pendaftaran tidak boleh mempengaruhi urutan (FR-024), termasuk kebaruan kalender, meski dokumen sumber justru menyarankan penalti penurunan skor pencarian bagi yang tidak update kalender [1]. `listing_id` sebagai pemecah seri terakhir wajib ada; tanpanya urutan bisa bertukar antar permintaan. Pencarian tetap operasi baca: perpanjangan horizon jangan diletakkan di dalam kueri, karena itu akan memicu penulisan pada setiap permintaan.
 
-- [ ] T036 [P] [US2] [BE] Test determinisme dan rentang kapasitas
+- [x] T036 [P] [US2] [BE] Test determinisme dan rentang kapasitas
   **Modul**: `backend/internal/search/`
   **FR**: FR-023, FR-024, FR-025, FR-080, FR-087, FR-088, SC-013, SC-019, SC-020, SC-021
   **Kemampuan**:

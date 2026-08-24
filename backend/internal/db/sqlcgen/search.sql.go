@@ -105,9 +105,21 @@ SELECT
     capacity_enough,
     score
 FROM ranked
-WHERE (score, remaining_capacity, -readiness_lead_days, business_name, listing_id)
-      < ($1::int, $2::bigint, $3::int,
-         $4::text, $5::uuid)
+WHERE score < $1::int
+   OR (score = $1::int
+       AND remaining_capacity < $2::bigint)
+   OR (score = $1::int
+       AND remaining_capacity = $2::bigint
+       AND -readiness_lead_days < $3::int)
+   OR (score = $1::int
+       AND remaining_capacity = $2::bigint
+       AND -readiness_lead_days = $3::int
+       AND business_name > $4::text)
+   OR (score = $1::int
+       AND remaining_capacity = $2::bigint
+       AND -readiness_lead_days = $3::int
+       AND business_name = $4::text
+       AND listing_id > $5::uuid)
 ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
          business_name ASC, listing_id ASC
 LIMIT $6::int
@@ -157,6 +169,14 @@ type SearchCandidatesRow struct {
 // product/machine/lead filter counts as satisfied (FR-023, decision C-4) so the
 // score stays 0..4 with no weighting or normalization (FR-024). The keyset tuple
 // ends in listing_id to make the order total and repeatable across pages.
+// Keyset "after the cursor" expanded as an explicit lexicographic OR chain
+// because the sort mixes directions: score and remaining_capacity descend while
+// lead, business_name, and listing_id ascend. A single row-value "<" comparison
+// cannot express mixed directions, so each tier compares in its own direction
+// (DESC via "<", ASC via ">") after the higher tiers tie. listing_id is the
+// final ASC tiebreaker that makes the order total and repeatable (FR-025). The
+// first page passes a score sentinel of 5, above the 0..4 maximum, so the first
+// clause admits every row.
 func (q *Queries) SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, searchCandidates,
 		arg.CursorScore,
