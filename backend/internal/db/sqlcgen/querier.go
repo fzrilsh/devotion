@@ -296,6 +296,14 @@ type Querier interface {
 	// product/machine/lead filter counts as satisfied (FR-023, decision C-4) so the
 	// score stays 0..4 with no weighting or normalization (FR-024). The keyset tuple
 	// ends in listing_id to make the order total and repeatable across pages.
+	// Keyset "after the cursor" expanded as an explicit lexicographic OR chain
+	// because the sort mixes directions: score and remaining_capacity descend while
+	// lead, business_name, and listing_id ascend. A single row-value "<" comparison
+	// cannot express mixed directions, so each tier compares in its own direction
+	// (DESC via "<", ASC via ">") after the higher tiers tie. listing_id is the
+	// final ASC tiebreaker that makes the order total and repeatable (FR-025). The
+	// first page passes a score sentinel of 5, above the 0..4 maximum, so the first
+	// clause admits every row.
 	SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error)
 	// SetEmailVerified marks the email verified after a valid code is consumed.
 	SetEmailVerified(ctx context.Context, arg SetEmailVerifiedParams) error

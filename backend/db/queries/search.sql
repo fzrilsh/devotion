@@ -103,9 +103,29 @@ SELECT
     capacity_enough,
     score
 FROM ranked
-WHERE (score, remaining_capacity, -readiness_lead_days, business_name, listing_id)
-      < (@cursor_score::int, @cursor_remaining::bigint, @cursor_neg_lead::int,
-         @cursor_name::text, @cursor_listing::uuid)
+-- Keyset "after the cursor" expanded as an explicit lexicographic OR chain
+-- because the sort mixes directions: score and remaining_capacity descend while
+-- lead, business_name, and listing_id ascend. A single row-value "<" comparison
+-- cannot express mixed directions, so each tier compares in its own direction
+-- (DESC via "<", ASC via ">") after the higher tiers tie. listing_id is the
+-- final ASC tiebreaker that makes the order total and repeatable (FR-025). The
+-- first page passes a score sentinel of 5, above the 0..4 maximum, so the first
+-- clause admits every row.
+WHERE score < @cursor_score::int
+   OR (score = @cursor_score::int
+       AND remaining_capacity < @cursor_remaining::bigint)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days < @cursor_neg_lead::int)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days = @cursor_neg_lead::int
+       AND business_name > @cursor_name::text)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days = @cursor_neg_lead::int
+       AND business_name = @cursor_name::text
+       AND listing_id > @cursor_listing::uuid)
 ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
          business_name ASC, listing_id ASC
 LIMIT @page_size::int;

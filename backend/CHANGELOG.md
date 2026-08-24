@@ -402,8 +402,26 @@ perubahannya.
   hasil kosong di tingkat nasional (FR-028), dan perpanjangan horizon kandidat
   lolos di transaksi tersendiri di luar kueri baca (FR-088). Skor tidak
   terpengaruh reputasi, verifikasi, kebaruan kalender, maupun jarak (FR-024).
+- Uji determinisme dan rentang kapasitas mesin pencarian (T036) di
+  `internal/search`: urutan identik pada pengulangan dan stabil antar halaman
+  meski ada listing baru disisipkan di tengah penelusuran (SC-013, FR-025); skor
+  tak berubah saat rating, verifikasi, dan kebaruan kalender diubah (FR-024);
+  3.000 potong pada 500/minggu lolos di deadline 8 minggu dan gagal di 4 minggu
+  (SC-019); jeda kesiapan 14 hari membuang dua minggu pertama sehingga totalnya
+  di bawah kandidat jeda nol (SC-020); minggu kesiapan yang melampaui deadline
+  menghasilkan kapasitas nol dan kriteria (d) tak terpenuhi (SC-020); kapasitas
+  di luar horizon awal tetap dihitung penuh sampai deadline lalu periodenya
+  benar-benar dimaterialisasi (SC-021, FR-088); filter mesin kosong membuat
+  kriterianya terpenuhi dan dilaporkan tidak dievaluasi (FR-023, FR-026).
 
 ### Diperbaiki
+- Keyset pagination mesin pencarian (T036): klausa `WHERE` kursor yang memakai
+  satu perbandingan row-value `<` untuk kelima kolom urut diganti rantai OR
+  leksikografis eksplisit. Perbandingan row-value tunggal keliru karena urutan
+  mencampur arah (skor dan sisa kapasitas menurun, sedangkan jeda, nama, dan
+  `listing_id` menaik), sehingga kandidat berskor sama bisa muncul dua kali
+  antar halaman. Tiap tingkat kini dibandingkan pada arahnya sendiri setelah
+  tingkat di atasnya seri (SC-013, FR-025).
 - CI: `GO_VERSION` diselaraskan dengan directive `go` di `backend/go.mod`
   (1.25.0), sehingga runner tak lagi mengunduh toolchain terpisah tiap run.
   `actions/setup-go` diberi `cache-dependency-path: backend/go.sum` supaya cache
