@@ -135,7 +135,7 @@ Setelah langkah B6, uji bahwa origin benar-benar tertutup dari luar Cloudflare:
 
 ```bash
 curl -sk --max-time 5 https://<IP_VPS>/api/health    # harus timeout atau tertolak
-curl -s https://devotion.cloud/api/health                  # harus 200
+curl -s https://devotion.web.id/api/health                  # harus 200
 ```
 
 Bila perintah pertama berhasil, lapisan tepi bisa dilewati begitu saja beserta seluruh
@@ -180,11 +180,11 @@ sudo chmod 644 /opt/devotion/tls/origin.pem /opt/devotion/tls/cf-client-ca.pem
 ### B7. Struktur direktori dan volume
 
 ```bash
-sudo mkdir -p /opt/devotion/{tls,unggahan,cadangan}
+sudo mkdir -p /opt/devotion/{tls,uploads,backups}
 sudo chown -R devotion:devotion /opt/devotion
 ```
 
-`unggahan` adalah volume terpisah dari image, agar penerapan versi baru tidak menghapus
+`uploads` adalah volume terpisah dari image, agar penerapan versi baru tidak menghapus
 berkas yang sudah diunggah.
 
 ### B8. Variabel lingkungan
@@ -202,7 +202,7 @@ ini:
 
 ```text
 APP_ENV=production
-APP_BASE_URL=https://devotion.cloud
+APP_BASE_URL=https://devotion.web.id
 TLS_CERT_PATH=/opt/devotion/tls/origin.pem
 TLS_KEY_PATH=/opt/devotion/tls/origin.key
 CF_CLIENT_CA_PATH=/opt/devotion/tls/cf-client-ca.pem
@@ -214,14 +214,14 @@ DATABASE_URL=
 
 MAILJET_API_KEY=
 MAILJET_SECRET_KEY=
-MAIL_FROM=noreply@devotion.cloud
+MAIL_FROM=noreply@devotion.web.id
 
 WHATSAPP_NUMBER=
 SENTRY_DSN=
 
-UPLOAD_PATH=/opt/devotion/unggahan
-UPLOAD_TOTAL_LIMIT_MB=500
-UPLOAD_FILE_LIMIT_MB=5
+UPLOAD_PATH=/opt/devotion/uploads
+UPLOAD_MAX_TOTAL_MB=500
+UPLOAD_MAX_FILE_MB=5
 ```
 
 `.env` tidak pernah masuk repository. `.env.example` hanya memuat nama kunci tanpa nilai.
@@ -293,8 +293,9 @@ services:
     ports:
       - "443:443"
     volumes:
-      - /opt/devotion/tls:/tls:ro
-      - /opt/devotion/unggahan:/unggahan
+      # Path di dalam container sengaja dibuat cermin dengan path host agar .env tidak perlu dua versi.
+      - /opt/devotion/tls:/opt/devotion/tls:ro
+      - /opt/devotion/uploads:/opt/devotion/uploads
     healthcheck:
       test: ["CMD", "/devotion", "health:check"]
       interval: 30s
@@ -355,7 +356,7 @@ docker compose exec backend /devotion seed:master-data
 
 # Admin pertama. Kata sandi diminta lewat prompt, tidak lewat argumen,
 # agar tidak tersimpan di riwayat shell.
-docker compose exec -it backend /devotion admin:create --email admin@devotion.cloud
+docker compose exec -it backend /devotion admin:create --email admin@devotion.web.id
 ```
 
 Ketiganya idempoten: menjalankan dua kali tidak menduplikasi data.
@@ -385,7 +386,7 @@ senyap saat pencarian.
 
 ### B13. Menyambungkan WhatsApp
 
-Buka `https://devotion.cloud/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
+Buka `https://devotion.web.id/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
 
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
@@ -403,11 +404,12 @@ docker compose exec backend /devotion user:verify --phone 62xxxxxxxxxx
 ### B14. Health check dan pemantau uptime
 
 ```bash
-curl -s https://devotion.cloud/api/health | jq
+curl -s https://devotion.web.id/api/health | jq
 ```
 
-Yang diharapkan: `status: sehat`, basis data sehat, WhatsApp tersambung, penyimpanan
-berkas sehat dengan `terpakai_mb` jauh di bawah 500.
+Yang diharapkan: `status: ok`, `dependencies.database: ok`, `dependencies.whatsapp:
+connected`, dan `dependencies.storage.status: ok` dengan `used_mb` jauh di bawah `limit_mb`.
+Bila ada ketergantungan gagal, respons berkode 503 dengan `status: degraded`.
 
 Daftarkan URL itu ke layanan pemantau uptime gratis dengan interval 5 menit. Layanannya
 berada di luar server sehingga tidak dihitung dalam batas dua layanan, dan wajib dicatat
@@ -420,22 +422,22 @@ ketika aplikasi sedang mati atau rusak, justru saat itulah cadangan paling dibut
 Penyimpangan ini tercatat di Complexity Tracking `plan.md`.
 
 ```bash
-cat > /opt/devotion/cadangan.sh <<'EOF'
+cat > /opt/devotion/backup.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
 cd /opt/devotion
 set -a; . ./.env; set +a
 STAMP=$(date +%Y%m%d-%H%M)
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" devotion \
-  | gzip > "/opt/devotion/cadangan/devotion-$STAMP.sql.gz"
-ls -1t /opt/devotion/cadangan/devotion-*.sql.gz | tail -n +4 | xargs -r rm --
+  | gzip > "/opt/devotion/backups/devotion-$STAMP.sql.gz"
+ls -1t /opt/devotion/backups/devotion-*.sql.gz | tail -n +4 | xargs -r rm --
 EOF
 
-chmod +x /opt/devotion/cadangan.sh
-/opt/devotion/cadangan.sh        # uji sekarang, jangan tunggu besok
-ls -lh /opt/devotion/cadangan/
+chmod +x /opt/devotion/backup.sh
+/opt/devotion/backup.sh        # uji sekarang, jangan tunggu besok
+ls -lh /opt/devotion/backups/
 
-( crontab -l 2>/dev/null; echo "15 2 * * * /opt/devotion/cadangan.sh >> /opt/devotion/cadangan/cron.log 2>&1" ) | crontab -
+( crontab -l 2>/dev/null; echo "15 2 * * * /opt/devotion/backup.sh >> /opt/devotion/backups/cron.log 2>&1" ) | crontab -
 ```
 
 Disalurkan langsung ke gzip agar tidak menulis berkas mentah besar, dan hanya tiga salinan
@@ -445,7 +447,7 @@ terakhir disimpan.
 itu sendiri yang bermasalah. Dari mesin lokal:
 
 ```bash
-rsync -avz devotion@devotion.cloud:/opt/devotion/cadangan/ ./cadangan-devotion/
+rsync -avz devotion@devotion.web.id:/opt/devotion/backups/ ./backups-devotion/
 ```
 
 ### B16. Snapshot VPS
@@ -770,7 +772,7 @@ diterima sebagai utang dengan alasannya.
 | Kode verifikasi email tidak sampai | SPF/DKIM belum benar, atau masuk spam | Dasbor Mailjet; periksa folder spam |
 | Kode WhatsApp tidak sampai | Sesi lepas atau nomor terblokir | `/admin/whatsapp`; jalur darurat `user:verify` |
 | Aplikasi mati mendadak | Memori habis, atau disk penuh | `free -h`, `df -h`, `docker stats`, `dmesg \| grep -i oom` |
-| Postgres berhenti menerima tulisan | Disk penuh | `df -h`; periksa ukuran log dan direktori unggahan |
+| Postgres berhenti menerima tulisan | Disk penuh | `df -h`; periksa ukuran log dan direktori uploads |
 | Halaman dalam menghasilkan 404 saat disegarkan | Fallback SPA tidak aktif | Perutean statis di backend |
 | Hasil pencarian menampilkan kapasitas basi | Cloudflare meng-cache `/api/*` | Cache Rules; pastikan bypass |
 
@@ -786,7 +788,7 @@ docker compose logs backend | grep '<request_id>'
 ## H. Sebelum Penjurian
 
 ```text
-[ ] Cadangan manual: /opt/devotion/cadangan.sh dijalankan, hasilnya disalin keluar VPS
+[ ] Cadangan manual: /opt/devotion/backup.sh dijalankan, hasilnya disalin keluar VPS
 [ ] Snapshot VPS terbaru diambil
 [ ] Sesi WhatsApp tersambung; /admin/whatsapp menunjukkan tersambung
 [ ] Satu email uji sampai ke kotak masuk, bukan spam

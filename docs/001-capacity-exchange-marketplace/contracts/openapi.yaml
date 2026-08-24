@@ -1566,6 +1566,12 @@ paths:
       security: []
       responses:
         '200':
+          description: Seluruh ketergantungan sehat
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Setidaknya satu ketergantungan gagal; status degraded
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
@@ -2305,7 +2311,21 @@ components:
 
     Health:
       type: object
-      required: [status]
+      required: [status, time, dependencies]
       properties:
-        status: { type: string, enum: [ok] }
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
         time: { type: string, format: date-time }
+        dependencies:
+          type: object
+          required: [database, whatsapp, storage]
+          properties:
+            database: { type: string, enum: [ok, fail] }
+            whatsapp: { type: string, enum: [connected, disconnected] }
+            storage:
+              type: object
+              required: [status, used_mb, limit_mb]
+              properties:
+                status: { type: string, enum: [ok, near_full, full] }
+                used_mb: { type: integer }
+                limit_mb: { type: integer }

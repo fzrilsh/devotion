@@ -18,7 +18,7 @@ Pendekatan teknis: satu biner Go yang menyajikan frontend React hasil build, men
 
 ## Technical Context
 
-**Language/Version**: Go 1.23.4 (backend; router `net/http` menuntut minimal 1.22, toolchain dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip IV, tidak ada rentang terbuka.
+**Language/Version**: Go 1.25.0 (backend; router `net/http` menuntut minimal 1.22, direktif `go` dipatok tepat di `go.mod`), TypeScript 5.7.2 pada React 18.3.1 (frontend). Versi patok ini menjadi acuan `go.mod` dan `package.json` saat kode terbit; sesuai konstitusi Prinsip IV, tidak ada rentang terbuka. Direktif `go` naik dari patokan awal ke 1.25.0 karena dituntut graf modul (`pgx/v5` lalu `whatsmeow`); riwayat pergeserannya dicatat di `docs/dependencies.md`.
 
 **Primary Dependencies**:
 
@@ -38,7 +38,7 @@ Frontend: Vite, React 18, TanStack Query, Zod + React Hook Form, Tailwind CSS, L
 
 **Constraints**: 2GB RAM dan 50GB disk pada satu server; maksimal 2 layanan runtime; dilarang memproses dana pihak mana pun; dilarang membangun artefak di server; ukuran log kontainer dan total unggahan wajib dibatasi.
 
-**Scale/Scope**: 91 functional requirement, 7 user story, 16 entitas domain pada 25 tabel, 21 success criteria, 63 operasi API, 81 task. Data demo sekitar 50 usaha; SC-003 menargetkan 200 usaha aktif pada bulan ketiga sebagai sasaran bisnis, mengikuti proyeksi sekitar 1.500 UMKM aktif dengan transaksi rata-rata Rp 64 juta per UMKM per tahun pada tahun ketiga [1].
+**Scale/Scope**: 91 functional requirement, 7 user story, 16 entitas domain (jumlah tabel di `data-model.md`), 21 success criteria, operasi API sesuai `contracts/README.md`, 81 task. Data demo sekitar 50 usaha; SC-003 menargetkan 200 usaha aktif pada bulan ketiga sebagai sasaran bisnis, mengikuti proyeksi sekitar 1.500 UMKM aktif dengan transaksi rata-rata Rp 64 juta per UMKM per tahun pada tahun ketiga [1].
 
 **Anggaran memori pada 2GB** (perkiraan, wajib diverifikasi dengan `docker stats` setelah penyiapan):
 
@@ -58,7 +58,7 @@ Empat pertentangan antar artefak yang ditemukan `/analyze` dan diselesaikan pada
 |-----|-----------|--------|
 | Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `jeda_kesiapan_hari`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `pesanan.minggu_kesiapan_mulai` + trigger; kueri pencarian |
 | Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `capacity_listing.horizon_until` |
-| Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh 25 tabel; menegakkan Prinsip V pada tingkat data |
+| Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh tabel; menegakkan Prinsip V pada tingkat data |
 | Kriteria mesin tidak terdefinisi ketika filternya dikosongkan | Kriteria yang filternya tidak diisi dihitung **terpenuhi**; respons menyebut kriteria mana yang dievaluasi. Skor tetap 0–4, tanpa normalisasi | FR-023, FR-026 |
 
 Dua temuan WARNING yang juga sudah ditutup: FR-089 (propagasi perubahan kapasitas mingguan ke periode mendatang tanpa alokasi) dan FR-091 (penggolongan notifikasi transaksional versus non-transaksional, dengan kolom `notifikasi.transaksional`).
@@ -110,7 +110,7 @@ Turunan yang mengikat urutan: pengisian daftar baku dan wilayah adalah prasyarat
 |--------|-------|--------|
 | Setiap task menunjuk FR atau user story | `tasks.md`: 66 dari 81 task punya baris **FR** | LOLOS bersyarat |
 | Setiap pengujian menyebut FR | Pola nama disepakati di `CLAUDE.md` | LOLOS |
-| Setiap endpoint dipetakan ke FR | `contracts/README.md`: peta 63 operasi + 10 FR yang memang bukan endpoint | LOLOS |
+| Setiap endpoint dipetakan ke FR | `contracts/README.md`: peta seluruh operasi + FR yang memang bukan endpoint | LOLOS |
 | Skenario penguji menunjuk Acceptance Scenario | `quickstart.md` §F: setiap blok menyebut nomor scenario | LOLOS |
 
 **Bersyarat**: 15 task pada fase Setup dan Polish tidak menunjuk FR karena melayani gerbang konstitusi, bukan requirement produk: T001, T003–T007, T009, T011, T020, T075–T081. Ini dicatat sebagai pengecualian di Complexity Tracking, bukan diabaikan.
@@ -183,11 +183,11 @@ docs/
     ├── spec.md                             # 91 FR, revisi 2026-08-22
     ├── plan.md                             # berkas ini
     ├── research.md                         # R-01 sampai R-10
-    ├── data-model.md                       # 25 tabel, revisi 2026-08-22
+    ├── data-model.md                       # skema tabel, revisi 2026-08-22
     ├── quickstart.md                       # runbook VPS + 83 langkah uji manual
     ├── tasks.md                            # 81 task, tingkat modul
     ├── contracts/
-    │   ├── openapi.yaml                    # 63 operasi, 28 kode galat
+    │   ├── openapi.yaml                    # operasi API + kode galat
     │   └── README.md                       # peta endpoint → FR
     └── checklists/
         └── requirements.md                 # 16 butir
@@ -222,7 +222,7 @@ devotion/
 │   │   ├── reputation/             # ulasan, tingkat penyelesaian
 │   │   ├── notification/           # antrean, pengirim, percobaan ulang
 │   │   └── admin/                  # verifikasi, moderasi, mediasi
-│   ├── db/migrations/              # 14 migrasi berurutan
+│   ├── db/migrations/              # migrasi berurutan sesuai data-model.md §12
 │   ├── db/queries/                 # sumber SQL untuk sqlc
 │   ├── webdist/                    # hasil build frontend, disematkan embed.FS
 │   └── go.mod
@@ -276,7 +276,7 @@ Keempatnya tercatat lengkap beserta konsekuensinya di bagian Assumptions `spec.m
 
 **Phase 0 → `research.md`**: sepuluh keputusan. R-01 penolakan koneksi non-Cloudflare (tiga lapisan), R-02 sumber data wilayah (bersyarat), R-03 penyetelan PostgreSQL untuk 2GB (angka konkret), R-04 penguncian baris alokasi lintas periode, R-05 keyset pagination, R-06 penyematan frontend dan fallback SPA, R-07 penjadwal dua lapisan, R-08 ketahanan sesi whatsmeow, R-09 email lewat Mailjet dan penyiapan DNS, R-10 sesi, kata sandi, dan pembatasan laju.
 
-**Phase 1 → `data-model.md`, `contracts/`, `quickstart.md`**: 16 entitas pada 25 tabel dengan seluruh constraint dan indeks, tiga trigger untuk aturan yang melintasi tabel, 63 operasi API dengan 28 kode galat berbahasa Indonesia, dan runbook VPS 16 langkah plus 83 langkah verifikasi manual.
+**Phase 1 → `data-model.md`, `contracts/`, `quickstart.md`**: 16 entitas domain dengan seluruh constraint dan indeks (jumlah tabel di `data-model.md`), tiga trigger untuk aturan yang melintasi tabel, operasi API dengan kode galat berbahasa Indonesia sesuai `contracts/README.md`, dan runbook VPS 16 langkah plus 83 langkah verifikasi manual.
 
 **Phase 2 → `tasks.md`**: 81 task tingkat modul, dihasilkan `/tasks`.
 

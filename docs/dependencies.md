@@ -67,6 +67,16 @@ whatsmeow juga menaikkan `golang.org/x/crypto` ke v0.54.0, `golang.org/x/term`
 ke v0.45.0, dan menarik `google.golang.org/protobuf` (v1.36.11) sebagai
 dependency langsung untuk membangun payload pesan (`waE2E.Message`). (T024a)
 
+### sqlc (perkakas build, bukan dependency runtime)
+
+Generator kode dari SQL. Query ditulis tangan di `db/queries/`, sqlc
+menghasilkan kode Go bertipe darinya. Dipakai karena query pencarian dan skor
+kecocokan adalah bagian paling penting di project ini: keduanya harus eksplisit
+dan deterministik, dan generator menjaga SQL tetap terlihat alih-alih tersembunyi
+di balik ORM. Dijalankan saat pengembangan (`sqlc generate`), tidak ikut ke
+dalam biner maupun image, jadi ia tidak menambah layanan runtime dan tidak
+menyentuh batas dua proses Gate I. Tercantum di Primary Dependencies plan.md. (T011)
+
 ### github.com/getsentry/sentry-go (v0.35.3)
 
 Pelapor galat. Satu-satunya penampung eksternal untuk panic dan galat tak
@@ -79,5 +89,14 @@ kegagalannya adalah data dokumen identitas atau nomor layanan (FR-082) bocor ke
 pihak ketiga, jadi default amannya harus "buang", bukan "teruskan". Sudah
 tercantum di Primary Dependencies plan.md. Jalan dalam proses `serve`, bukan
 layanan kedua, jadi Gate I tetap dua. (T025)
+
+### google.golang.org/protobuf (v1.36.11)
+
+Transitif dari `whatsmeow`, kini dependency langsung. whatsmeow membangun
+payload pesan sebagai struct protobuf (`waE2E.Message`), jadi kode yang
+menyusun kode verifikasi dan notifikasi menyentuh paket ini secara langsung dan
+`go mod tidy` menaikkannya dari `// indirect`. Bukan pilihan tersendiri, ia
+mengikut satu-satunya jalur pengiriman WhatsApp; tidak ada library protobuf
+kedua. Di luar Primary Dependencies plan.md, dicatat di sini sesuai Prinsip IV. (T024a)
 
 

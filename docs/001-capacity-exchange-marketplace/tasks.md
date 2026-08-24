@@ -2,7 +2,7 @@
 
 **Input**: `docs/001-capacity-exchange-marketplace/`
 **Last Revised**: 2026-08-22
-**Prerequisites**: `spec.md` (91 FR), `plan.md`, `research.md`, `data-model.md` (25 tabel), `contracts/openapi.yaml` (63 operasi), `quickstart.md`, `docs/memory/constitution.md` v2.1.0
+**Prerequisites**: `spec.md` (91 FR), `plan.md`, `research.md`, `data-model.md`, `contracts/openapi.yaml` (operasi lihat `contracts/README.md`), `quickstart.md`, `docs/memory/constitution.md` v2.1.0
 
 **Tests**: DIWAJIBKAN. Konstitusi v2.1.0 menetapkan pengujian otomatis sebagai gerbang mutu, bukan pilihan.
 
@@ -123,7 +123,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [x] T010 [BE] Migrasi basis data
   **Modul**: `backend/db/migrations/` (path dipatok)
   **FR**: seluruh entitas
-  **Kemampuan**: 14 migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
+  **Kemampuan**: migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
   **Dependency**: `golang-migrate` (versi dipatok); prasyarat T007, T009
   **Selesai bila**: `docker compose up` menjalankan migrasi sampai versi terakhir; `schema_migrations.dirty = false`; menjalankan dua kali tidak menimbulkan galat
   **Hati-hati**: seluruh constraint, indeks, dan **tiga trigger** wajib ikut: `used_capacity_within_total`, `week_start_is_monday`, `readiness_not_past_deadline`, `city_belongs_to_province`, trigger jenis item, trigger cegah request ke diri sendiri, trigger cegah alokasi sebelum kesiapan. Constraint itu bukan hiasan: ia yang menahan kerusakan data ketika logika aplikasi keliru. **Tidak ada `DEFAULT now()` di satu pun tabel.**
@@ -138,7 +138,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 - [x] T012 [P] [BE] Lapisan HTTP dan format galat
   **Modul**: `backend/internal/platform/httpx/`
   **FR**: seluruh endpoint
-  **Kemampuan**: router `net/http`, middleware request ID, pemulihan panic, `application/problem+json` dengan 28 kode galat dari `openapi.yaml`, log `slog` JSON dengan request ID di setiap baris
+  **Kemampuan**: router `net/http`, middleware request ID, pemulihan panic, `application/problem+json` dengan kode galat dari `openapi.yaml` (jumlah di `contracts/README.md`), log `slog` JSON dengan request ID di setiap baris
   **Dependency**: tidak ada, `net/http` dan `log/slog` standard library; prasyarat T007, T009
   **Selesai bila**: galat validasi mengembalikan bentuk `ProblemValidasi` beserta daftar field; setiap baris log memuat request ID
   **Hati-hati**: `/api/*` yang tidak dikenali mengembalikan 404 JSON, **bukan** `index.html`. Kalau HTML, kesalahan penulisan alamat endpoint jadi menyesatkan saat diagnosis.
