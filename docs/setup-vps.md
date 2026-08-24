@@ -32,8 +32,8 @@ Enam belas langkah berurutan; jangan melompat.
 6. **Cloudflare dasbor.** DNS `A` proxied, SSL Full (strict), Origin Certificate,
    Authenticated Origin Pulls, Always Use HTTPS, bypass cache untuk `/api/*`.
    Simpan sertifikat di `/opt/devotion/tls` dengan izin ketat.
-7. **Struktur direktori dan volume.** `/opt/devotion/{tls,unggahan,cadangan}`.
-   `unggahan` terpisah dari image agar penerapan baru tidak menghapus unggahan.
+7. **Struktur direktori dan volume.** `/opt/devotion/{tls,uploads,backups}`.
+   `uploads` terpisah dari image agar penerapan baru tidak menghapus unggahan.
 8. **Variabel lingkungan.** Ambil `.env.example`, salin ke `.env`, isi nilainya,
    `chmod 600`. Nilai tidak ada di dokumen mana pun. `.env` tidak pernah di-commit.
 9. **Konfigurasi email di Cloudflare DNS.** SPF, DKIM, DMARC `p=none`. Lakukan

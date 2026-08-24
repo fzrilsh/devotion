@@ -5,6 +5,8 @@
 **Last Revised**: 2026-08-22
 **Input**: `spec.md` (91 FR, 16 entitas), `research.md` (R-03, R-04, R-05), `docs/memory/constitution.md` v2.1.0
 
+16 entitas domain diwujudkan pada 26 tabel. Angka ini adalah sumber tunggal jumlah tabel; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
+
 ## Aturan yang Berlaku di Seluruh Model
 
 | Aturan | Penerapan | Sumber |
@@ -1043,7 +1045,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 
 ## 12. Urutan Migrasi
 
-Mengikuti arah ketergantungan kunci asing:
+15 migrasi berurutan, mengikuti arah ketergantungan kunci asing. Daftar ini adalah sumber tunggal jumlah migrasi; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
 
 ```text
 001_extensions            citext, pgcrypto

@@ -1,8 +1,23 @@
 # Layanan Luar
 
-Lima layanan berjalan di luar server dan tidak dihitung sebagai proses runtime
+Enam layanan berjalan di luar server dan tidak dihitung sebagai proses runtime
 (Gate I tetap dua layanan). Masing-masing dicatat di sini beserta akibat bila
 mati, karena kegagalannya tidak akan tampak sebagai container yang berhenti.
+
+## WhatsApp (lewat whatsmeow)
+
+Infrastruktur WhatsApp yang menyalurkan kode verifikasi nomor HP dan sebagian
+notifikasi. whatsmeow sendiri adalah library yang jalan sebagai goroutine di
+dalam proses `serve` (bukan layanan kedua, lihat `docs/dependencies.md`); yang
+tergolong layanan luar di sini adalah server WhatsApp Web multidevice yang
+disambunginya, bukan library-nya.
+
+**Bila mati:** nomor layanan terblokir atau sesi lepas berarti verifikasi nomor
+HP tidak jalan. FR-002 menjadikan verifikasi ini gerbang: tanpa nomor terverifikasi,
+akun tidak bisa mempublikasikan listing maupun mengirim request kuota, jadi
+kegagalannya menghentikan alur inti, bukan sekadar satu kanal notifikasi.
+Mitigasinya: halaman admin QR untuk menyambung ulang sesi, subcommand
+`user:verify` untuk memverifikasi manual, dan email (Mailjet) sebagai kanal kedua.
 
 ## Cloudflare
 

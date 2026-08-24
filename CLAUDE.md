@@ -275,8 +275,8 @@ saat masih dikerjakan.
   ditulis di dalam transaksi kejadiannya; pengiriman ke email dan WhatsApp
   berjalan setelahnya, maksimal 3 percobaan.
 - **Galat** memakai `application/problem+json` dengan `code` mesin yang stabil
-  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar 28 kode ada di
-  `openapi.yaml`.
+  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar lengkap kode ada
+  di `openapi.yaml`, jumlahnya dicatat di `contracts/README.md`.
 - **Log** memakai `log/slog` format JSON dengan request ID di setiap baris.
 - **Berkas unggahan** tidak pernah dilayani lewat path statis. Selalu lewat
   handler yang memeriksa peran. Nama berkas dibuat sistem (UUID), tipe divalidasi
