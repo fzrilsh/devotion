@@ -35,9 +35,9 @@
 
 | Nama | Peran | GitHub |
 |---|---|---|
-| **TrygerZ** | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
+| **Juan Kevin Utomo** | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
 | **Fazril Syaveral Hillaby** | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
-| **ChikoID** | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
+| **Chiko Maulana Ahmad** | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
 
 ---
 
