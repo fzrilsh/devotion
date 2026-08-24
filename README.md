@@ -8,7 +8,7 @@
 
 **Submission ITECHNO CUP 2026, Web Development**
 
-**Tim: [Isi nama tim sebelum submission]**
+**Tim: Indonesia Emas 74 Kg**
 
 </div>
 
@@ -25,8 +25,16 @@
 - [Penggunaan](#penggunaan)
 - [Dokumentasi API](#dokumentasi-api)
 - [Testing](#testing)
-- [Tim pengembang](#tim-pengembang)
+- [Tim developer](#tim-developer)
 - [Lisensi](#lisensi)
+
+## Tim developer
+
+| Nama | Peran | GitHub |
+|---|---|---|
+| **TrygerZ** | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
+| **Fazril Syaveral Hillaby** | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
+| **ChikoID** | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
 
 ---
 
@@ -85,15 +93,20 @@ Devotion tidak menahan atau menyalurkan dana pengguna. Pembayaran dilakukan lang
 
 ### Status implementasi saat ini
 
-Implementasi saat ini berada pada branch `origin/develop/backend` dan `origin/develop/frontend`. README ini berada pada branch `docs/README`. Status yang dapat diverifikasi dari implementasi tersebut:
+Progress berikut diverifikasi dari source pada branch `origin/develop/backend` dan `origin/develop/frontend`. README ini berada pada branch `docs/README`.
 
 | Area | Status |
 |---|---|
-| Landing page dan layout responsif | Tersedia di frontend |
-| Halaman login, registrasi, verifikasi, dan pemulihan akun | Tampilan tersedia; penyambungan seluruh form ke API masih berjalan |
-| API akun, profil, master data, listing, kalender, pencarian, request kuota, notifikasi, dan health check | Tersedia di backend |
-| Dashboard bisnis dan halaman alur matching di frontend | Masih dalam pengembangan |
-| Penawaran, pesanan, ulasan, dan panel moderasi admin | Ada di kontrak produk, belum tersedia sebagai endpoint atau service lengkap pada branch develop saat ini |
+| Landing page dan layout responsif | Tersedia di frontend. |
+| Halaman auth: login, registrasi, verifikasi email, verifikasi telepon, lupa kata sandi, dan reset kata sandi | UI tersedia. API client dasar untuk `login`, `logout`, dan `getMe` serta guest/protected route sudah ada. Form auth belum seluruhnya terhubung ke backend. |
+| Akun, peran, profil usaha, sesi, dan pemulihan akun | Route, service, dan test tersedia di backend. |
+| Listing kapasitas dan kalender | Enam route backend tersedia untuk membuat, membaca, memperbarui listing, mengatur visibilitas, serta mengelola periode kapasitas. Horizon kalender dan validasi kapasitas sudah diuji. |
+| Master data, wilayah, dan usulan item baru | Endpoint katalog, wilayah, dan pembuatan usulan tersedia. Keputusan usulan melalui panel admin belum tersedia sebagai alur HTTP lengkap. |
+| Pencarian dan matching | `GET /api/search` tersedia di backend dengan filter, skor kriteria keras, keyset pagination, dan pengurutan deterministik. UI pencarian belum tersedia di frontend. |
+| Request kuota multi-kandidat | `POST` dan `GET /api/quota-requests` tersedia. Satu request dapat memuat beberapa kandidat, dengan status per kandidat dan batas balasan 72 jam. UI belum tersedia di frontend. |
+| Notifikasi, rate limiting, health check, dan status WhatsApp admin | Service dan endpoint backend tersedia. Panel admin frontend belum tersedia. |
+| Dashboard bisnis dan alur matching di frontend | Route `/dashboard` masih memakai halaman home. Dashboard bisnis, listing, pencarian, dan request kuota masih dalam pengembangan. |
+| Work order, allocation, dan reputation | Struktur database dan migration sudah ada, tetapi service serta endpoint lengkap belum tersedia. |
 
 ---
 
@@ -495,25 +508,38 @@ Kontrak OpenAPI 3.1 tersedia di [docs/001-capacity-exchange-marketplace/contract
 
 ## Testing
 
-### Perintah pengujian
+### Running Tests
 
 ```bash
-# Backend
+# Backend unit and integration tests
 cd backend
-go vet ./...
 go test ./...
 
-# Frontend
+# Backend static analysis
+go vet ./...
+
+# Frontend lint and build checks
 cd ../frontend
 npm run lint
 npm run build
 ```
 
-Pengujian integrasi backend memakai skema terpisah pada PostgreSQL yang sama. Beberapa pengujian akan dilewati jika `DATABASE_URL_TEST` belum menunjuk ke database yang dapat dijangkau.
+Pengujian integrasi backend memakai skema terpisah pada PostgreSQL yang sama. Beberapa pengujian akan dilewati jika `DATABASE_URL_TEST` belum menunjuk ke database yang dapat dijangkau. CI backend menjalankan `go vet ./...` dan `go test ./...` dengan PostgreSQL 16 sebagai service pengujian.
 
-Frontend saat ini memiliki lint dan build check. Script `npm test` belum tersedia pada `frontend/package.json`, sehingga coverage frontend belum diklaim di README ini.
+### Test Coverage
 
-### Cakupan yang diuji pada backend
+Coverage belum diukur di repository. Angka berikut akan diisi setelah coverage tool ditambahkan ke CI.
+
+```
+Statements   : Belum diukur
+Branches     : Belum diukur
+Functions    : Belum diukur
+Lines        : Belum diukur
+```
+
+Frontend saat ini belum memiliki script `npm run test`, `npm run test:integration`, `npm run test:e2e`, atau `npm run test:coverage`.
+
+Cakupan pengujian backend saat ini:
 
 - Autentikasi, peran, sesi, dan rate limiting.
 - Validasi profil, listing, dan periode kapasitas.
@@ -524,17 +550,6 @@ Frontend saat ini memiliki lint dan build check. Script `npm test` belum tersedi
 - Notifikasi dan percobaan pengiriman kanal.
 - Migrasi dan constraint PostgreSQL.
 - Validasi file, batas ukuran, kuota storage, dan penghapusan metadata gambar.
-
----
-
-## Tim pengembang
-
-Nama tim resmi belum dicantumkan di repository. Isi bagian ini sebelum mengirim submission.
-
-| Nama | Peran | GitHub |
-|---|---|---|
-| **Fazril Syaveral Hillaby** | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
-| **ChikoID** | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
 
 ---
 
