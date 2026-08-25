@@ -107,13 +107,13 @@ func Load(getenv func(string) string) (Config, error) {
 		require("SENTRY_DSN", cfg.SentryDSN)
 	}
 
-	total, err := parseLimit(get("UPLOAD_TOTAL_LIMIT_MB"), defaultUploadTotalLimitMB)
+	total, err := parseLimit(get("UPLOAD_MAX_TOTAL_MB"), defaultUploadTotalLimitMB)
 	if err != nil {
-		return Config{}, fmt.Errorf("UPLOAD_TOTAL_LIMIT_MB: %w", err)
+		return Config{}, fmt.Errorf("UPLOAD_MAX_TOTAL_MB: %w", err)
 	}
-	file, err := parseLimit(get("UPLOAD_FILE_LIMIT_MB"), defaultUploadFileLimitMB)
+	file, err := parseLimit(get("UPLOAD_MAX_FILE_MB"), defaultUploadFileLimitMB)
 	if err != nil {
-		return Config{}, fmt.Errorf("UPLOAD_FILE_LIMIT_MB: %w", err)
+		return Config{}, fmt.Errorf("UPLOAD_MAX_FILE_MB: %w", err)
 	}
 	cfg.UploadTotalLimitMB = total
 	cfg.UploadFileLimitMB = file
