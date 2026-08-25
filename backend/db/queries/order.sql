@@ -131,3 +131,37 @@ WHERE request_id = $1 AND id <> $2 AND status NOT IN ('rejected', 'expired', 'ag
 INSERT INTO work_order_status_history (
     work_order_id, old_status, new_status, changed_by, by_system, note, created_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7);
+
+-- name: LockWorkOrderForReversal :one
+-- Takes a row lock on the work order whose allocation is being reversed, so the
+-- reversal runs under a lock in the same spirit as formation locking the listing.
+SELECT * FROM work_order WHERE id = $1 FOR UPDATE;
+
+-- name: ListActiveAllocationsForReversal :many
+-- Locks the order's still-active allocation rows together with their periods,
+-- ordered ascending by week_start. The order mirrors the formation lock order of
+-- R-04 (LockPeriodsInRange), the deadlock preventer: two transactions touching
+-- the same periods always take them in the same order. Already reversed rows are
+-- left out, so a repeat reversal refunds nothing rather than double-crediting.
+SELECT a.id AS allocation_id, a.period_id, a.quantity, p.week_start
+FROM capacity_allocation a
+JOIN availability_period p ON p.id = a.period_id
+WHERE a.work_order_id = $1 AND a.reversed_at IS NULL
+ORDER BY p.week_start
+FOR UPDATE OF a, p;
+
+-- name: LowerUsedCapacity :one
+-- Returns a period's used_capacity to its pre-order value by subtracting the
+-- reversed amount. The inverse of RaiseUsedCapacity; the quantity comes from the
+-- allocation row being reversed, so used_capacity never drops below zero.
+UPDATE availability_period
+SET used_capacity = used_capacity - $2, updated_at = $3
+WHERE id = $1
+RETURNING *;
+
+-- name: MarkAllocationReversed :exec
+-- Marks one allocation row reversed without deleting it (FR-020), keeping the
+-- audit trail. The reversed_at guard makes the write idempotent under a repeat.
+UPDATE capacity_allocation
+SET reversed_at = $2
+WHERE id = $1 AND reversed_at IS NULL;

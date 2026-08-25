@@ -289,6 +289,52 @@ func (q *Queries) InsertWorkOrder(ctx context.Context, arg InsertWorkOrderParams
 	return i, err
 }
 
+const listActiveAllocationsForReversal = `-- name: ListActiveAllocationsForReversal :many
+SELECT a.id AS allocation_id, a.period_id, a.quantity, p.week_start
+FROM capacity_allocation a
+JOIN availability_period p ON p.id = a.period_id
+WHERE a.work_order_id = $1 AND a.reversed_at IS NULL
+ORDER BY p.week_start
+FOR UPDATE OF a, p
+`
+
+type ListActiveAllocationsForReversalRow struct {
+	AllocationID pgtype.UUID
+	PeriodID     pgtype.UUID
+	Quantity     int32
+	WeekStart    pgtype.Date
+}
+
+// Locks the order's still-active allocation rows together with their periods,
+// ordered ascending by week_start. The order mirrors the formation lock order of
+// R-04 (LockPeriodsInRange), the deadlock preventer: two transactions touching
+// the same periods always take them in the same order. Already reversed rows are
+// left out, so a repeat reversal refunds nothing rather than double-crediting.
+func (q *Queries) ListActiveAllocationsForReversal(ctx context.Context, workOrderID pgtype.UUID) ([]ListActiveAllocationsForReversalRow, error) {
+	rows, err := q.db.Query(ctx, listActiveAllocationsForReversal, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveAllocationsForReversalRow{}
+	for rows.Next() {
+		var i ListActiveAllocationsForReversalRow
+		if err := rows.Scan(
+			&i.AllocationID,
+			&i.PeriodID,
+			&i.Quantity,
+			&i.WeekStart,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOtherCandidatesToNotify = `-- name: ListOtherCandidatesToNotify :many
 SELECT c.id AS candidate_id, sub.account_id AS subcontractor_account
 FROM request_candidate c
@@ -395,6 +441,87 @@ func (q *Queries) LockPeriodsInRange(ctx context.Context, arg LockPeriodsInRange
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockWorkOrderForReversal = `-- name: LockWorkOrderForReversal :one
+SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at FROM work_order WHERE id = $1 FOR UPDATE
+`
+
+// Takes a row lock on the work order whose allocation is being reversed, so the
+// reversal runs under a lock in the same spirit as formation locking the listing.
+func (q *Queries) LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, lockWorkOrderForReversal, id)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const lowerUsedCapacity = `-- name: LowerUsedCapacity :one
+UPDATE availability_period
+SET used_capacity = used_capacity - $2, updated_at = $3
+WHERE id = $1
+RETURNING id, listing_id, week_start, total_capacity, used_capacity, marked_full, created_at, updated_at
+`
+
+type LowerUsedCapacityParams struct {
+	ID           pgtype.UUID
+	UsedCapacity int32
+	UpdatedAt    pgtype.Timestamptz
+}
+
+// Returns a period's used_capacity to its pre-order value by subtracting the
+// reversed amount. The inverse of RaiseUsedCapacity; the quantity comes from the
+// allocation row being reversed, so used_capacity never drops below zero.
+func (q *Queries) LowerUsedCapacity(ctx context.Context, arg LowerUsedCapacityParams) (AvailabilityPeriod, error) {
+	row := q.db.QueryRow(ctx, lowerUsedCapacity, arg.ID, arg.UsedCapacity, arg.UpdatedAt)
+	var i AvailabilityPeriod
+	err := row.Scan(
+		&i.ID,
+		&i.ListingID,
+		&i.WeekStart,
+		&i.TotalCapacity,
+		&i.UsedCapacity,
+		&i.MarkedFull,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markAllocationReversed = `-- name: MarkAllocationReversed :exec
+UPDATE capacity_allocation
+SET reversed_at = $2
+WHERE id = $1 AND reversed_at IS NULL
+`
+
+type MarkAllocationReversedParams struct {
+	ID         pgtype.UUID
+	ReversedAt pgtype.Timestamptz
+}
+
+// Marks one allocation row reversed without deleting it (FR-020), keeping the
+// audit trail. The reversed_at guard makes the write idempotent under a repeat.
+func (q *Queries) MarkAllocationReversed(ctx context.Context, arg MarkAllocationReversedParams) error {
+	_, err := q.db.Exec(ctx, markAllocationReversed, arg.ID, arg.ReversedAt)
+	return err
 }
 
 const raiseUsedCapacity = `-- name: RaiseUsedCapacity :one

@@ -466,7 +466,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: konfirmasi pesanan besar, pastikan kapasitas berkurang dari minggu terawal di dalam rentang; batalkan sebelum produksi, pastikan seluruhnya kembali.
 
-- [ ] T047 [US4] [BE] Pengelolaan kalender
+- [x] T047 [US4] [BE] Pengelolaan kalender
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-019, FR-021, FR-089
   **Kemampuan**: baca dan perbarui beberapa periode sekaligus, tandai penuh, penanda kalender basi lebih dari 7 hari; **propagasi perubahan kapasitas mingguan**, yakni ketika `weekly_capacity` listing diubah, perbarui `total_capacity` seluruh periode mendatang yang **belum memiliki alokasi aktif**, dan biarkan periode yang sudah memiliki alokasi tetap seperti semula
@@ -474,14 +474,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T028, T041
   **Hati-hati**: `calendar_updated_at` terpisah dari `updated_at`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
 
-- [ ] T048 [US4] [BE] Pembalikan alokasi
+- [x] T048 [US4] [BE] Pembalikan alokasi
   **Modul**: `backend/internal/order/`
   **FR**: FR-020
   **Kemampuan**: membalik seluruh baris alokasi sebuah pesanan dalam satu transaksi, dengan pola penguncian yang sama seperti pembentukan
   **Selesai bila**: kapasitas setiap periode kembali ke angka sebelum pesanan terbentuk; baris alokasi ditandai `reversed_at`, tidak dihapus
   **Dependency**: prasyarat T041
 
-- [ ] T049 [US4] [BE] Penolakan yang bertabrakan dengan alokasi berjalan
+- [x] T049 [US4] [BE] Penolakan yang bertabrakan dengan alokasi berjalan
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-089
   **Kemampuan**: menolak penurunan kapasitas periode di bawah yang sudah terpakai dan penandaan penuh atas periode yang sudah teralokasi, dengan pesan yang menyebut minggu mana beserta jumlahnya
@@ -489,7 +489,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T041, T047
   **Hati-hati**: constraint akan menolak dengan sendirinya. Tugas task ini menerjemahkannya menjadi pesan yang dapat dibaca pengguna sebelum constraint tersentuh.
 
-- [ ] T050 [P] [US4] [BE] Test alokasi, pembalikan, dan minggu kesiapan
+- [x] T050 [P] [US4] [BE] Test alokasi, pembalikan, dan minggu kesiapan
   **Modul**: `backend/internal/{listing,order}/`
   **FR**: FR-018, FR-020, FR-078, FR-087, FR-089, SC-020
   **Kemampuan**:

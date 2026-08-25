@@ -264,6 +264,12 @@ type Querier interface {
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
 	InvalidateVerificationCodes(ctx context.Context, arg InvalidateVerificationCodesParams) error
+	// Locks the order's still-active allocation rows together with their periods,
+	// ordered ascending by week_start. The order mirrors the formation lock order of
+	// R-04 (LockPeriodsInRange), the deadlock preventer: two transactions touching
+	// the same periods always take them in the same order. Already reversed rows are
+	// left out, so a repeat reversal refunds nothing rather than double-crediting.
+	ListActiveAllocationsForReversal(ctx context.Context, workOrderID pgtype.UUID) ([]ListActiveAllocationsForReversalRow, error)
 	// ListActiveCatalogItems returns the active items of one type ordered for
 	// display, for GET /master/products and /master/machines.
 	ListActiveCatalogItems(ctx context.Context, type_ ItemType) ([]ListActiveCatalogItemsRow, error)
@@ -338,6 +344,16 @@ type Querier interface {
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
 	LockRateLimitKey(ctx context.Context, pgAdvisoryXactLock int64) error
+	// Takes a row lock on the work order whose allocation is being reversed, so the
+	// reversal runs under a lock in the same spirit as formation locking the listing.
+	LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) (WorkOrder, error)
+	// Returns a period's used_capacity to its pre-order value by subtracting the
+	// reversed amount. The inverse of RaiseUsedCapacity; the quantity comes from the
+	// allocation row being reversed, so used_capacity never drops below zero.
+	LowerUsedCapacity(ctx context.Context, arg LowerUsedCapacityParams) (AvailabilityPeriod, error)
+	// Marks one allocation row reversed without deleting it (FR-020), keeping the
+	// audit trail. The reversed_at guard makes the write idempotent under a repeat.
+	MarkAllocationReversed(ctx context.Context, arg MarkAllocationReversedParams) error
 	// MarkChannelFailed records a failed attempt: attempts bumped, last_error and
 	// attempted_at stamped. The third failure (attempts reaching 3) flips status to
 	// failed_permanent (FR-085); earlier failures stay pending for the next tick.
