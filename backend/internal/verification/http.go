@@ -41,15 +41,25 @@ func New(pool *pgxpool.Pool, clock platform.Clock, store *storage.Service) *Serv
 
 func (s *Service) queries() *sqlcgen.Queries { return sqlcgen.New(s.pool) }
 
-// Register mounts the four applicant routes behind the business-role gate.
-// Admin is excluded on purpose: these are applicant actions, and an admin has no
-// business_profile to attach a file or a submission to. Literal paths are
-// registered before the {fileId} pattern so the router matches them first.
+// Register mounts the four applicant routes. Three of them (uploading a file,
+// submitting a request, reading one's own submissions) are applicant actions
+// gated to the two business roles: an admin has no business_profile to attach a
+// file or a submission to, so admin is refused at the router before a handler
+// would resolve a non-existent profile and 500.
+//
+// GET /api/files/{fileId} also admits admin. SC-012 requires that a stored
+// identity document or location photo be reachable by its owner and by an admin,
+// and no one else. Without admin here, the Fase 7 verification queue could never
+// open a submitted document. The owner-or-admin decision itself lives in
+// storage.Open; this gate only widens the door to the two roles that may knock.
+// Literal paths are registered before the {fileId} pattern so the router matches
+// them first.
 func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	business := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer)
+	businessOrAdmin := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer, httpx.RoleAdmin)
 
 	r.Gated("POST /api/files", business, s.uploadFile)
-	r.Gated("GET /api/files/{fileId}", business, s.getFile)
+	r.Gated("GET /api/files/{fileId}", businessOrAdmin, s.getFile)
 	r.Gated("POST /api/verification", business, s.submit)
 	r.Gated("GET /api/verification", business, s.list)
 }

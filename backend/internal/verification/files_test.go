@@ -121,6 +121,34 @@ func TestGetFile_StrangerForbidden_FR009(t *testing.T) {
 	}
 }
 
+// TestGetFile_AdminReads_SC012 is the positive half of SC-012: an admin, who
+// owns no business_profile, can still stream a submitted identity document. The
+// Fase 7 verification queue depends on this; without it an admin could never
+// open a document to decide on it. The negative half is
+// TestGetFile_StrangerForbidden_FR009.
+func TestGetFile_AdminReads_SC012(t *testing.T) {
+	h := newHarness(t, "verif_getfile_admin")
+
+	// Owner (the harness buyer) uploads a document.
+	up := decodeUpload(t, h.uploadMultipart(t, "identity_document", jpegBytes(t)))
+
+	// An admin, holding no business role, reads it back.
+	adminAcc := seedAdmin(t, h.pool, "admin@contoh.test")
+	h.asPrincipal(&httpx.Principal{
+		Roles:   httpx.RoleAdmin,
+		Account: sqlcgen.UserAccount{ID: adminAcc},
+	})
+
+	rec := h.do("GET", "/api/files/"+up.FileID)
+	mustStatus(t, rec, http.StatusOK)
+	if ct := rec.Header().Get("Content-Type"); ct != "application/octet-stream" {
+		t.Fatalf("content-type %q, mau application/octet-stream", ct)
+	}
+	if rec.Body.Len() == 0 {
+		t.Fatal("body kosong, admin harus dapat byte berkas")
+	}
+}
+
 // TestGetFile_MalformedID_FR009 proves a non-UUID path segment is a validation
 // error, not a 404, so a typo is distinguishable from a missing file.
 func TestGetFile_MalformedID_FR009(t *testing.T) {
