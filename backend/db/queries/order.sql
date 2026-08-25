@@ -165,3 +165,112 @@ RETURNING *;
 UPDATE capacity_allocation
 SET reversed_at = $2
 WHERE id = $1 AND reversed_at IS NULL;
+
+-- name: GetWorkOrderForView :one
+-- Loads one work order with the fields WorkOrderDetail needs beyond the row
+-- itself: both parties' account ids (for the party guard), the request's product
+-- item, and the offer's readiness lead. Keyed on the work order id; the caller
+-- checks the account ids against the principal so a non-party sees a 404.
+SELECT
+    wo.id,
+    wo.candidate_id,
+    wo.offer_id,
+    wo.buyer_id,
+    wo.subcontractor_id,
+    wo.quantity,
+    wo.total_price,
+    wo.deadline,
+    wo.readiness_week_start,
+    wo.status,
+    wo.shipped_at,
+    wo.confirmed_at,
+    wo.auto_confirmed,
+    wo.cancelled_by_id,
+    wo.cancellation_reason,
+    wo.cancelled_at,
+    wo.created_at,
+    buyer.account_id AS buyer_account,
+    sub.account_id   AS subcontractor_account,
+    r.product_item_id,
+    o.readiness_lead_days
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+JOIN request_candidate c    ON c.id = wo.candidate_id
+JOIN quota_request r        ON r.id = c.request_id
+JOIN offer o                ON o.id = wo.offer_id
+WHERE wo.id = $1;
+
+-- name: LockWorkOrderForStatusChange :one
+-- Row-locks a work order before a status transition so a concurrent status
+-- change or cancellation on the same order serializes, matching the reversal
+-- lock spirit (R-04).
+SELECT * FROM work_order WHERE id = $1 FOR UPDATE;
+
+-- name: ListWorkOrderStatusHistory :many
+-- The status trail of one work order, oldest first, for WorkOrderDetail. Rides
+-- idx_status_history_order (work_order_id, created_at) so it stays ordered
+-- without a sort.
+SELECT new_status, created_at, note
+FROM work_order_status_history
+WHERE work_order_id = $1
+ORDER BY created_at, id;
+
+-- name: ListWorkOrderAllocations :many
+-- The still-active allocation periods of one work order with the period figures
+-- WorkOrderDetail renders, ordered ascending by week_start. Reversed rows are
+-- left out so a cancelled order shows no live allocation.
+SELECT p.week_start, p.total_capacity, p.used_capacity, p.marked_full
+FROM capacity_allocation a
+JOIN availability_period p ON p.id = a.period_id
+WHERE a.work_order_id = $1 AND a.reversed_at IS NULL
+ORDER BY p.week_start;
+
+-- name: UpdateWorkOrderStatus :one
+-- Advances a work order to its next forward status. shipped_at is stamped only
+-- on the move into 'shipped' and left untouched otherwise, so it records the
+-- moment shipment was declared (the auto-confirm clock start, FR-068).
+UPDATE work_order
+SET status = $2,
+    shipped_at = CASE WHEN $2 = 'shipped'::work_order_status THEN $3 ELSE shipped_at END
+WHERE id = $1
+RETURNING *;
+
+-- name: CancelWorkOrder :one
+-- Records a pre-production self-cancellation on the order itself (FR-065): the
+-- cancelling party's profile id, the reason, and the moment, moving status to
+-- 'cancelled'. Together the four columns satisfy the cancellation_complete
+-- CHECK. The allocation reversal (FR-020) runs separately under the same tx.
+UPDATE work_order
+SET status = 'cancelled',
+    cancelled_by_id = $2,
+    cancellation_reason = $3,
+    cancelled_at = $4
+WHERE id = $1
+RETURNING *;
+
+-- name: ListWorkOrdersForParty :many
+-- One party's work orders newest first, keyset paginated on (created_at, id) so
+-- the order is stable across pages (FR-038). role_filter selects the side:
+-- 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
+-- profile, any other value matches either. An empty status_filter array means no
+-- status restriction; otherwise only the listed statuses pass. A null
+-- before_created is the first page.
+SELECT *
+FROM work_order wo
+WHERE (
+        (sqlc.arg(role_filter)::text = 'as_buyer' AND wo.buyer_id = sqlc.arg(profile_id)::uuid)
+        OR (sqlc.arg(role_filter)::text = 'as_subcontractor' AND wo.subcontractor_id = sqlc.arg(profile_id)::uuid)
+        OR (sqlc.arg(role_filter)::text NOT IN ('as_buyer', 'as_subcontractor')
+            AND (wo.buyer_id = sqlc.arg(profile_id)::uuid OR wo.subcontractor_id = sqlc.arg(profile_id)::uuid))
+    )
+  AND (
+        cardinality(sqlc.arg(status_filter)::work_order_status[]) = 0
+        OR wo.status = ANY(sqlc.arg(status_filter)::work_order_status[])
+    )
+  AND (
+        sqlc.narg(before_created)::timestamptz IS NULL
+        OR (wo.created_at, wo.id) < (sqlc.narg(before_created)::timestamptz, sqlc.narg(before_id)::uuid)
+    )
+ORDER BY wo.created_at DESC, wo.id DESC
+LIMIT sqlc.arg(page_limit)::int;
