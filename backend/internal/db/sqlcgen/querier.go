@@ -88,6 +88,13 @@ type Querier interface {
 	// given account and purpose. The plaintext code is delivered out of band (email
 	// or WhatsApp) and never persisted, so a database read cannot reveal it.
 	CreateVerificationCode(ctx context.Context, arg CreateVerificationCodeParams) (VerificationCode, error)
+	// CreateVerificationRequest records one pending verification submission for a
+	// profile. status defaults to 'pending' in the schema, so it is not set here;
+	// decided_by, decided_at and admin_note stay NULL until an admin decides. The
+	// idx_one_pending_verification partial unique index rejects a second pending row
+	// for the same profile with a 23505, which the handler turns into a 409
+	// (FR-011: re-submission is allowed only after a rejection).
+	CreateVerificationRequest(ctx context.Context, arg CreateVerificationRequestParams) (VerificationRequest, error)
 	// DecideItemProposal applies an admin decision to a still-pending proposal
 	// (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
 	// and the resulting item_id (non-null only on approval), guarding on the current
@@ -304,6 +311,11 @@ type Querier interface {
 	// across pages (FR-030, FR-080). The cursor tuple admits every row on the first
 	// page via sentinels above the maxima.
 	ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaRequestsByBuyerParams) ([]QuotaRequest, error)
+	// ListVerificationRequestsByProfile returns every submission a profile has made,
+	// newest first, joined to business_profile for the business_name the contract's
+	// VerificationRequest carries (the verification_request table has no such
+	// column). The caller sees only their own submissions (FR-006).
+	ListVerificationRequestsByProfile(ctx context.Context, profileID pgtype.UUID) ([]ListVerificationRequestsByProfileRow, error)
 	// Takes a row lock on a listing by its own id, so the accept path can extend the
 	// calendar horizon (FR-088) under the same lock the listing owner's edits take.
 	LockListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
