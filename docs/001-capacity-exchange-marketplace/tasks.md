@@ -429,7 +429,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: kedua test lulus; test constraint benar-benar membuktikan penolakan di tingkat penyimpanan data
   **Dependency**: prasyarat T041
 
-- [ ] T043 [P] [US3] [BE] Test request kuota
+- [x] T043 [P] [US3] [BE] Test request kuota
   **Modul**: `backend/internal/quota/`
   **FR**: FR-029, FR-035, FR-082, FR-083, FR-090
   **Kemampuan**: jalur berhasil, penolakan peran, masukan tidak sah, request ke diri sendiri, kapasitas kurang beserta angkanya, kesiapan melampaui deadline, request kedaluwarsa dengan `Clock` digantikan

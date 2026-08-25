@@ -89,3 +89,28 @@ func TestIncoming_RejectsNonSubcontractor_FR030(t *testing.T) {
 	rec := h.do(http.MethodGet, "/api/quota-requests/incoming")
 	mustStatus(t, rec, http.StatusForbidden)
 }
+
+// TestIncoming_RejectsInvalidQuery_FR031 proves the query params are validated as
+// user input: an unknown status filter and an out-of-range size are each a 422
+// with the VALIDATION_FAILED code. FR-031 governs the status filter; no separate
+// FR pins query validation, so what is enforced here is the 422 contract response
+// for a malformed incoming query.
+func TestIncoming_RejectsInvalidQuery_FR031(t *testing.T) {
+	h := newHarness(t, "incoming_badquery")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	h.asSubcontractor(f.subconAcc)
+
+	cases := map[string]string{
+		"bad status": "/api/quota-requests/incoming?status=ngawur",
+		"size zero":  "/api/quota-requests/incoming?size=0",
+	}
+	for name, path := range cases {
+		t.Run(name, func(t *testing.T) {
+			rec := h.do(http.MethodGet, path)
+			mustStatus(t, rec, http.StatusUnprocessableEntity)
+			if p := decodeProblem(t, rec); p.Code != "VALIDATION_FAILED" {
+				t.Fatalf("code %q, mau VALIDATION_FAILED", p.Code)
+			}
+		})
+	}
+}

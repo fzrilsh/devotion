@@ -170,3 +170,18 @@ func TestDetail_RejectsNonBuyer_FR030(t *testing.T) {
 	rec := h.do(http.MethodGet, "/api/quota-requests/"+uuidString(f.requestID))
 	mustStatus(t, rec, http.StatusForbidden)
 }
+
+// TestDetail_RejectsMalformedRequestID_FR032 proves a requestId path param that
+// is not a UUID is rejected as invalid input (422 VALIDATION_FAILED), distinct
+// from the 404 a valid-but-foreign id gets. FR-032 governs the endpoint; the
+// path param is user input, so what is enforced here is the 422 contract
+// response for a malformed id.
+func TestDetail_RejectsMalformedRequestID_FR032(t *testing.T) {
+	h := newHarness(t, "detail_badid")
+
+	rec := h.do(http.MethodGet, "/api/quota-requests/bukan-uuid")
+	mustStatus(t, rec, http.StatusUnprocessableEntity)
+	if p := decodeProblem(t, rec); p.Code != "VALIDATION_FAILED" {
+		t.Fatalf("code %q, mau VALIDATION_FAILED", p.Code)
+	}
+}

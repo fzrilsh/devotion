@@ -29,6 +29,31 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Uji penolakan masukan tidak sah untuk parameter query dan path pada rute baca
+  request kuota, melengkapi uji T043 yang sebelumnya hanya mencakup jalur berhasil
+  dan penolakan peran. `TestQuotaRequest_ListRejectsInvalidQuery_FR030` menutup
+  `GET /api/quota-requests` dengan `size=0`, `size=51`, dan `cursor=busuk` (422
+  `VALIDATION_FAILED`); `TestDetail_RejectsMalformedRequestID_FR032` menutup
+  `requestId` bukan UUID pada detail (422, dibedakan dari 404 milik id sah tapi
+  bukan milik pemanggil); `TestIncoming_RejectsInvalidQuery_FR031` menutup
+  `status=ngawur` dan `size=0` pada incoming. Ditambah pula
+  `TestQuotaRequest_ListRejectsNonBuyer_FR030` yang membuktikan gerbang peran
+  `GET /api/quota-requests` benar-benar menolak subkontraktor dengan 403; uji
+  cakupan rute yang ada hanya memastikan keputusan peran terpasang, bukan menguji
+  penolakannya secara fungsional. (FR-030, FR-031, FR-032)
+- T043 (test request kuota) ditutup: ketujuh skenario yang didaftarkan task sudah
+  tercakup uji tingkat router yang ada di `internal/quota/`, jadi tidak ditulis uji
+  duplikat. Pemetaan skenario ke uji, supaya keterlacakannya tidak hilang:
+  jalur berhasil `TestQuotaRequest_HappyPath_SendsToSeveralCandidates_FR029_FR030`
+  (`quota_test.go`); penolakan peran `TestQuotaRequest_RejectsNonBuyer_FR029`
+  (`quota_test.go`); masukan tidak sah `TestQuotaRequest_RejectsInvalidInput_FR029`
+  (`quota_test.go`); request ke listing sendiri
+  `TestQuotaRequest_RejectsSelfListing_FR083` (`quota_test.go`); kapasitas kurang
+  beserta angka `remaining_capacity`/`quantity_requested`/`until_week`
+  `TestOffer_RejectsQuantityBeyondCapacity_FR035` (`offer_test.go`); kesiapan
+  melampaui deadline `TestOffer_RejectsReadinessAfterDeadline_FR090`
+  (`offer_test.go`); request kedaluwarsa lewat `Clock` yang digeser 73 jam
+  `TestOffer_RejectsAfterReplyWindow_FR082` (`offer_test.go`). (T043)
 - Swagger UI di `GET /docs`, hanya saat `APP_ENV=development`, agar jalur
   frontend membaca kontrak tanpa membuka YAML mentah. Aset Swagger UI ditarik
   dari CDN jsdelivr dipatok `swagger-ui-dist@5.17.14` dengan Subresource
