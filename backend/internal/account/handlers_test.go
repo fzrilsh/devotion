@@ -5,10 +5,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,23 +26,49 @@ import (
 // baseTime is a fixed Monday so any clock-derived expiry is deterministic.
 var baseTime = time.Date(2026, 8, 24, 10, 3, 0, 0, time.UTC)
 
-// captureDelivery records the last plaintext code handed to each channel so a
-// test can drive verification without a real out-of-band send.
+// captureDelivery records the plaintext code handed to each channel so a test
+// can drive verification without a real out-of-band send. Since delivery now
+// runs in a goroutine (R-09), each channel is a buffered chan the test reads
+// with waitEmail/waitPhone/waitRecovery so it blocks for the send instead of
+// racing it.
 type captureDelivery struct {
-	email, phone, recovery string
+	emailCh, phoneCh, recoveryCh chan string
+}
+
+func newCaptureDelivery() *captureDelivery {
+	return &captureDelivery{
+		emailCh:    make(chan string, 4),
+		phoneCh:    make(chan string, 4),
+		recoveryCh: make(chan string, 4),
+	}
 }
 
 func (c *captureDelivery) SendEmailCode(_ context.Context, _, code string) error {
-	c.email = code
+	c.emailCh <- code
 	return nil
 }
 func (c *captureDelivery) SendPhoneCode(_ context.Context, _, code string) error {
-	c.phone = code
+	c.phoneCh <- code
 	return nil
 }
 func (c *captureDelivery) SendRecoveryCode(_ context.Context, _, code string) error {
-	c.recovery = code
+	c.recoveryCh <- code
 	return nil
+}
+
+// waitEmail blocks for the next emailed code, failing the test if none arrives.
+func (c *captureDelivery) waitEmail(t *testing.T) string { return waitCode(t, c.emailCh, "email") }
+func (c *captureDelivery) waitPhone(t *testing.T) string { return waitCode(t, c.phoneCh, "phone") }
+
+func waitCode(t *testing.T, ch chan string, which string) string {
+	t.Helper()
+	select {
+	case code := <-ch:
+		return code
+	case <-time.After(2 * time.Second):
+		t.Fatalf("kode %s tidak terkirim dalam batas waktu", which)
+		return ""
+	}
 }
 
 // harness wires a Service against an isolated test schema and returns the router
@@ -59,8 +87,8 @@ func newHarness(t *testing.T, name string) *harness {
 	clock := platform.NewTestClock(baseTime)
 	sessions := session.New(pool, clock, false)
 	limiter := ratelimit.New(pool, clock)
-	delivery := &captureDelivery{}
-	svc := New(pool, clock, sessions, limiter, delivery)
+	delivery := newCaptureDelivery()
+	svc := New(pool, clock, sessions, limiter, delivery, quietLogger(), false)
 
 	// The profile born with every account keys a city, so registration needs a
 	// city row to point at. Seed one province and one city the tests reuse.
@@ -196,6 +224,100 @@ func TestGetMe_NoSession_Unauthorized(t *testing.T) {
 	}
 }
 
+// failingDelivery reports every send as failed so a test can prove a broken
+// email or WhatsApp channel never rolls back a registration that already
+// committed. It records that it was called so the test can assert both channels
+// were attempted.
+type failingDelivery struct {
+	mu               sync.Mutex
+	emailCalls       int
+	phoneCalls       int
+	emailTo, phoneTo string
+}
+
+func (d *failingDelivery) SendEmailCode(_ context.Context, to, _ string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.emailCalls++
+	d.emailTo = to
+	return errors.New("email channel down")
+}
+
+func (d *failingDelivery) SendPhoneCode(_ context.Context, to, _ string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.phoneCalls++
+	d.phoneTo = to
+	return errors.New("whatsapp channel down")
+}
+
+func (d *failingDelivery) SendRecoveryCode(_ context.Context, _, _ string) error {
+	return errors.New("email channel down")
+}
+
+func (d *failingDelivery) snapshot() (int, int, string, string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.emailCalls, d.phoneCalls, d.emailTo, d.phoneTo
+}
+
+// TestRegister_SendsBothCodes_AndSurvivesDeliveryFailure_FR001_FR002 proves
+// registration hands the email code to SendEmailCode and the phone code to
+// SendPhoneCode (the FR-002 gate needs both channels to receive a code), and
+// that a delivery failure on either channel does not cancel the registration:
+// the account is created, GET /me works, and the codes are still resendable.
+// FR-001, FR-002, R-09.
+func TestRegister_SendsBothCodes_AndSurvivesDeliveryFailure_FR001_FR002(t *testing.T) {
+	pool := testdb.New(t, "register_delivery_fail")
+	clock := platform.NewTestClock(baseTime)
+	sessions := session.New(pool, clock, false)
+	limiter := ratelimit.New(pool, clock)
+	delivery := &failingDelivery{}
+	svc := New(pool, clock, sessions, limiter, delivery, quietLogger(), false)
+	seedCity(t, pool)
+
+	r := httpx.NewRouter(quietLogger())
+	svc.Register(r)
+	h := &harness{svc: svc, handler: r.Handler(), pool: pool, clock: clock}
+
+	rec := h.do("POST", "/api/auth/register", map[string]any{
+		"email": "gagal@example.com", "phone": "+6281311112222", "password": "rahasia123",
+		"business_name": "Konveksi Contoh",
+		"city_code":     testCityCode,
+		"roles":         map[string]any{"buyer": true},
+	}, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: status %d, body %s (kegagalan kirim tidak boleh membatalkan registrasi)", rec.Code, rec.Body.String())
+	}
+
+	// The sends run in goroutines (R-09), so poll briefly for both attempts.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		emailCalls, phoneCalls, emailTo, phoneTo := delivery.snapshot()
+		if emailCalls >= 1 && phoneCalls >= 1 {
+			if emailTo != "gagal@example.com" {
+				t.Fatalf("email dikirim ke %q, mau gagal@example.com", emailTo)
+			}
+			if phoneTo != "+6281311112222" {
+				t.Fatalf("kode HP dikirim ke %q", phoneTo)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("registrasi tidak memicu kedua kanal: email=%d phone=%d", emailCalls, phoneCalls)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// The account survived the failed sends: login and GET /me work.
+	rec = h.do("POST", "/api/auth/login", map[string]any{
+		"email": "gagal@example.com", "password": "rahasia123",
+	}, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login setelah kirim gagal: status %d, body %s", rec.Code, rec.Body.String())
+	}
+}
+
 // TestRegister_InvalidInput_Validation proves malformed input is refused before
 // any account is created. FR: T014 input validation.
 func TestRegister_InvalidInput_Validation(t *testing.T) {
@@ -255,7 +377,7 @@ func TestVerifyEmail_HappyPath(t *testing.T) {
 	h := newHarness(t, "account_verify")
 	cookie := h.registerAndLogin(t, "verify@example.com", "+6281233334444", "rahasia123")
 
-	code := h.delivery.email
+	code := h.delivery.waitEmail(t)
 	if !codeRe.MatchString(code) {
 		t.Fatalf("kode email = %q, mau enam digit", code)
 	}
@@ -277,7 +399,7 @@ func TestVerifyEmail_HappyPath(t *testing.T) {
 func TestVerifyEmail_ExpiredCode_Gone(t *testing.T) {
 	h := newHarness(t, "account_verify_expired")
 	cookie := h.registerAndLogin(t, "expire@example.com", "+6281255556666", "rahasia123")
-	code := h.delivery.email
+	code := h.delivery.waitEmail(t)
 
 	h.clock.Advance(codeTTL + time.Minute)
 

@@ -93,6 +93,6 @@ func newAccountService(ctx context.Context) (*account.Service, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	svc := account.New(pool, platform.SystemClock{}, nil, nil, nil)
+	svc := account.New(pool, platform.SystemClock{}, nil, nil, nil, nil, false)
 	return svc, pool.Close, nil
 }
