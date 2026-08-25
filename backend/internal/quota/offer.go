@@ -24,12 +24,14 @@ type offerInput struct {
 }
 
 // offerView is the Offer response body. party is the proposing side
-// (subcontractor or buyer); note is nullable.
+// (subcontractor or buyer); sequence is the round number starting at 1; note is
+// nullable.
 type offerView struct {
 	OfferID           string    `json:"offer_id"`
 	Party             string    `json:"party"`
 	TotalPrice        int64     `json:"total_price"`
 	ReadinessLeadDays int32     `json:"readiness_lead_days"`
+	Sequence          int32     `json:"sequence"`
 	Note              *string   `json:"note"`
 	CreatedAt         time.Time `json:"created_at"`
 }
@@ -178,6 +180,7 @@ func offerViewOf(o sqlcgen.Offer) offerView {
 		Party:             string(o.ProposedBy),
 		TotalPrice:        o.TotalPrice,
 		ReadinessLeadDays: o.ReadinessLeadDays,
+		Sequence:          o.Sequence,
 		Note:              note,
 		CreatedAt:         o.CreatedAt.Time,
 	}

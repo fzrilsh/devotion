@@ -73,16 +73,19 @@ func validCandidateStatus(raw string) bool {
 }
 
 // detailCandidateView is one candidate on the request-detail and incoming views:
-// the shared candidate fields plus the latest offer in its chain, so the buyer
-// compares every candidate's newest round side by side (FR-032). latest_offer is
-// omitted when the candidate has no reply yet.
+// the shared candidate fields, the whole offer chain ordered by round, and the
+// latest offer in that chain. The buyer sees every round side by side (FR-032)
+// and compares each candidate's newest offer. offers is the full sequence-asc
+// chain; latest_offer is its last element, omitted when the candidate has no
+// reply yet. offers is omitted on the incoming list, which carries no chain.
 type detailCandidateView struct {
-	CandidateID  string     `json:"candidate_id"`
-	ListingID    string     `json:"listing_id"`
-	ProfileID    string     `json:"profile_id"`
-	BusinessName string     `json:"business_name"`
-	Status       string     `json:"status"`
-	LatestOffer  *offerView `json:"latest_offer,omitempty"`
+	CandidateID  string      `json:"candidate_id"`
+	ListingID    string      `json:"listing_id"`
+	ProfileID    string      `json:"profile_id"`
+	BusinessName string      `json:"business_name"`
+	Status       string      `json:"status"`
+	Offers       []offerView `json:"offers,omitempty"`
+	LatestOffer  *offerView  `json:"latest_offer,omitempty"`
 }
 
 // detailView is the QuotaRequestDetail response: the request fields plus every
@@ -131,11 +134,13 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 		return detailView{}, err
 	}
 
-	// Offers arrive ordered by candidate then sequence ascending, so the last
-	// row seen for each candidate is its latest round.
-	latestByCandidate := map[string]sqlcgen.Offer{}
+	// Offers arrive ordered by candidate then sequence ascending. Group the whole
+	// chain per candidate so the buyer sees every round (FR-032); the last row of
+	// each chain is that candidate's latest round.
+	chainByCandidate := map[string][]offerView{}
 	for _, o := range offers {
-		latestByCandidate[uuidString(o.CandidateID)] = o
+		key := uuidString(o.CandidateID)
+		chainByCandidate[key] = append(chainByCandidate[key], offerViewOf(o))
 	}
 
 	candidates := make([]detailCandidateView, 0, len(candRows))
@@ -147,9 +152,10 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 			BusinessName: c.BusinessName,
 			Status:       string(c.Status),
 		}
-		if o, ok := latestByCandidate[uuidString(c.CandidateID)]; ok {
-			ov := offerViewOf(o)
-			view.LatestOffer = &ov
+		if chain, ok := chainByCandidate[uuidString(c.CandidateID)]; ok && len(chain) > 0 {
+			view.Offers = chain
+			last := chain[len(chain)-1]
+			view.LatestOffer = &last
 		}
 		candidates = append(candidates, view)
 	}

@@ -2119,10 +2119,14 @@ components:
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
         latest_offer: { $ref: '#/components/schemas/Offer' }
+        offers:
+          type: array
+          description: Seluruh rantai penawaran kandidat terurut sequence naik, sehingga riwayat ronde sebelumnya tetap terlihat setelah counter-offer (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          items: { $ref: '#/components/schemas/Offer' }
 
     Offer:
       type: object
-      required: [offer_id, party, total_price, readiness_lead_days, created_at]
+      required: [offer_id, party, total_price, readiness_lead_days, sequence, created_at]
       properties:
         offer_id: { type: string, format: uuid }
         party:
@@ -2134,6 +2138,9 @@ components:
           format: int64
           description: Rupiah bilangan bulat penuh (FR-018). Tanpa pecahan.
         readiness_lead_days: { type: integer }
+        sequence:
+          type: integer
+          description: Nomor ronde penawaran mulai 1, naik tiap counter-offer, sehingga klien menampilkan ronde berurut tanpa bergantung pada urutan array.
         note: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
 
