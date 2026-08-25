@@ -39,7 +39,7 @@
 
 Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya berarti salah mengimplementasikan pencarian dan alokasi:
 
-- **Minggu kesiapan mulai** = periode mingguan yang memuat tanggal acuan + `jeda_kesiapan_hari`. Tanggal acuan: tanggal kesepakatan pada pesanan, tanggal pencarian pada perhitungan kandidat. Ini periode paling awal yang boleh dihitung maupun dialokasikan.
+- **Minggu kesiapan mulai** = periode mingguan yang memuat tanggal acuan + `readiness_lead_days`. Tanggal acuan: tanggal kesepakatan pada pesanan, tanggal pencarian pada perhitungan kandidat. Ini periode paling awal yang boleh dihitung maupun dialokasikan.
 - **Rentang kapasitas** = periode mingguan dari minggu kesiapan mulai sampai periode yang memuat deadline, inklusif. Seluruh penjumlahan dan alokasi memakai rentang ini, **bukan** dari minggu berjalan.
 
 ---
@@ -78,7 +78,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 - [ ] T005 [P] [OPS] Compose dua layanan
   **Modul**: `docker-compose.yml` (path dipatok)
-  **Kemampuan**: tepat dua layanan `backend` dan `postgres`, penyetelan Postgres untuk 2GB sesuai `research.md` R-03, batas log `max-size 10m` `max-file 3` pada keduanya, volume `pgdata` dan bind `/opt/devotion/unggahan`
+  **Kemampuan**: tepat dua layanan `backend` dan `postgres`, penyetelan Postgres untuk 2GB sesuai `research.md` R-03, batas log `max-size 10m` `max-file 3` pada keduanya, volume `pgdata` dan bind `/opt/devotion/uploads`
   **Dependency**: tidak ada; prasyarat T001
   **Selesai bila**: `docker compose config` valid; jumlah entri di bawah `services:` tepat dua
   **Hati-hati**: batas log bukan kebersihan. Log tanpa batas mengisi 50GB, lalu Postgres berhenti menulis dan aplikasi mati total.
@@ -339,7 +339,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Modul**: `backend/internal/search/`
   **FR**: FR-022 sampai FR-028, FR-063, FR-080, FR-081, FR-087, FR-088
   **Kemampuan**:
-  - Hitung **minggu kesiapan mulai** per kandidat = Senin dari (tanggal pencarian + `jeda_kesiapan_hari` listing). Ini batas awal **rentang kapasitas**; batas akhirnya periode yang memuat deadline.
+  - Hitung **minggu kesiapan mulai** per kandidat = Senin dari (tanggal pencarian + `readiness_lead_days` listing). Ini batas awal **rentang kapasitas**; batas akhirnya periode yang memuat deadline.
   - Jumlahkan kapasitas tersisa hanya di dalam rentang itu. Kandidat yang minggu kesiapannya melampaui minggu deadline memiliki rentang kosong sehingga kapasitasnya nol.
   - Perpanjang horizon: bila `horizon_until < minggu_deadline`, hitung minggu yang belum dibuat sebagai berkapasitas penuh, lalu panggil fungsi perpanjangan T028 untuk kandidat yang lolos, di dalam transaksi tersendiri, **di luar** kueri pencarian.
   - Empat kriteria keras sebagai empat nilai boolean yang dijumlahkan; **kriteria yang filternya tidak diisi dihitung terpenuhi** dan responsnya menyebutkan kriteria mana yang tidak dievaluasi.
@@ -371,6 +371,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: kursor diteruskan apa adanya; tidak ada kandidat ganda saat berpindah halaman
   **Dependency**: prasyarat T021, T035
   **Hati-hati**: kursor bersifat opaque. Jangan diurai, jangan diubah jadi `?page=2`, karena itu langsung melanggar jaminan urutan stabil. Tampilkan juga kriteria yang tidak dievaluasi, jangan hanya yang gagal, supaya pengguna paham kenapa banyak kandidat berskor sama.
+  **Hati-hati (tipe basi)**: tipe TypeScript hasil T004 sudah usang terhadap `openapi.yaml` dan **wajib** di-generate ulang sebelum task ini mulai. Kontrak berubah dua gelombang sejak itu: (1) `Health` (`checks` menjadi `dependencies`, plus `version` dan `storage` kini objek); (2) `SearchCandidate` bertambah seluruh atribut keputusan FR-027 plus `criteria` per kandidat. Membangun kartu hasil dari tipe lama akan diam-diam menyimpang dari respons backend.
 
 - [ ] T038 [US2] [OPS] Skenario uji manual US2
   **Modul**: `docs/skenario-uji-manual.md`
@@ -403,18 +404,18 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T035, T039
   **Hati-hati**: harga `int64` rupiah bulat. Setiap counter-offer adalah baris baru, bukan pembaruan baris lama. Rentang kapasitas di sini dihitung dari tanggal penawaran, bukan dari tanggal request, pastikan konsisten dengan T035.
 
-- [ ] T041 [US3] [BE] Pembentukan kesepakatan dan alokasi kapasitas
+- [x] T041 [US3] [BE] Pembentukan kesepakatan dan alokasi kapasitas
   **Modul**: `backend/internal/order/`
   **FR**: FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087
   **Kemampuan**:
-  - Hitung dan simpan `minggu_kesiapan_mulai` pesanan = Senin dari (tanggal kesepakatan + `jeda_kesiapan_hari` listing saat itu). Disimpan, bukan dihitung ulang, karena jeda pada listing dapat berubah kemudian sementara alokasi tidak boleh bergeser.
+  - Hitung dan simpan `readiness_week_start` pesanan = Senin dari (tanggal kesepakatan + `readiness_lead_days` listing saat itu). Disimpan, bukan dihitung ulang, karena jeda pada listing dapat berubah kemudian sementara alokasi tidak boleh bergeser.
   - Satu transaksi mencakup pembentukan pesanan dan seluruh baris alokasi; penguncian baris periode terurut menaik menurut `week_start`.
   - Alokasi mengisi periode paling awal **di dalam rentang kapasitas** lebih dulu, melewati yang penuh atau habis; kandidat lain ditutup dengan notifikasi.
-  **Selesai bila**: pola transaksi mengikuti `research.md` R-04; kegagalan pada salah satu periode membatalkan seluruh pembentukan; tidak ada baris alokasi pada periode sebelum `minggu_kesiapan_mulai`
+  **Selesai bila**: pola transaksi mengikuti `research.md` R-04; kegagalan pada salah satu periode membatalkan seluruh pembentukan; tidak ada baris alokasi pada periode sebelum `readiness_week_start`
   **Dependency**: prasyarat T008, T027, T040
   **Hati-hati**: alokasi yang naif akan mulai dari minggu berjalan, dan itu berarti menjadwalkan pekerjaan pada minggu yang menurut pernyataan subkontraktor sendiri belum dapat dipakai. Trigger `cegah_alokasi_sebelum_kesiapan` akan menolaknya, tetapi jangan bergantung pada trigger untuk logika normal; ia jaring pengaman. Pengurutan penguncian adalah pencegah deadlock, bukan kerapian.
 
-- [ ] T042 [P] [US3] [BE] Test balapan alokasi
+- [x] T042 [P] [US3] [BE] Test balapan alokasi
   **Modul**: `backend/internal/order/`
   **FR**: FR-036, FR-079, FR-084, SC-018
   **Kemampuan**: dua kesepakatan berbarengan atas periode yang sama, hanya satu berhasil, yang gagal menerima alasan; constraint basis data menolak kapasitas terpakai melebihi total meski logika aplikasi dibuat keliru dengan sengaja
@@ -434,6 +435,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Kemampuan**: pilih kandidat dari hasil pencarian, form request, daftar request terkirim dengan status per kandidat, perbandingan penawaran berdampingan, aksi counter-offer dan terima
   **Selesai bila**: batas 72 jam terlihat sebagai informasi, bukan kolom masukan
   **Dependency**: prasyarat T037, T039, T041
+  **Hati-hati (tipe basi)**: tipe TypeScript hasil T004 sudah usang terhadap `openapi.yaml` dan **wajib** di-generate ulang sebelum task ini mulai. Perbandingan berdampingan bergantung pada gelombang kontrak ketiga: `RequestCandidate` bertambah `offers` (rantai penawaran terurut `sequence` naik) dan `Offer` bertambah `sequence`. Render riwayat ronde dari `offers`; ambil ronde terakhir sebagai elemen terakhir array (`latest_offer` = elemen terakhir), jangan hitung "terbaru" sendiri di React.
 
 - [ ] T045 [US3] [FE] Frontend: request masuk untuk subkontraktor
   **Modul**: `frontend/src/pages/request/`
@@ -463,13 +465,13 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Kemampuan**: baca dan perbarui beberapa periode sekaligus, tandai penuh, penanda kalender basi lebih dari 7 hari; **propagasi perubahan kapasitas mingguan**, yakni ketika `weekly_capacity` listing diubah, perbarui `total_capacity` seluruh periode mendatang yang **belum memiliki alokasi aktif**, dan biarkan periode yang sudah memiliki alokasi tetap seperti semula
   **Selesai bila**: `/listing/me/periods` sesuai kontrak; penanda basi tidak mengubah urutan pencarian; mengubah kapasitas listing benar-benar mengubah periode tanpa alokasi dan tidak menyentuh yang punya alokasi
   **Dependency**: prasyarat T028, T041
-  **Hati-hati**: `kalender_diperbarui_pada` terpisah dari `diperbarui_pada`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
+  **Hati-hati**: `calendar_updated_at` terpisah dari `updated_at`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
 
 - [ ] T048 [US4] [BE] Pembalikan alokasi
   **Modul**: `backend/internal/order/`
   **FR**: FR-020
   **Kemampuan**: membalik seluruh baris alokasi sebuah pesanan dalam satu transaksi, dengan pola penguncian yang sama seperti pembentukan
-  **Selesai bila**: kapasitas setiap periode kembali ke angka sebelum pesanan terbentuk; baris alokasi ditandai `dibalik_pada`, tidak dihapus
+  **Selesai bila**: kapasitas setiap periode kembali ke angka sebelum pesanan terbentuk; baris alokasi ditandai `reversed_at`, tidak dihapus
   **Dependency**: prasyarat T041
 
 - [ ] T049 [US4] [BE] Penolakan yang bertabrakan dengan alokasi berjalan
@@ -489,7 +491,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   - Periode yang ditandai penuh dilewati, alokasi berpindah ke minggu berikutnya di dalam rentang.
   - Pembalikan memulihkan seluruh periode ke angka semula.
   - Mengubah kapasitas listing memperbarui periode tanpa alokasi dan tidak mengubah periode yang punya alokasi (FR-089).
-  - Trigger menolak upaya menyisipkan alokasi pada periode sebelum `minggu_kesiapan_mulai`.
+  - Trigger menolak upaya menyisipkan alokasi pada periode sebelum `readiness_week_start`.
   **Selesai bila**: seluruh test lulus dan namanya menyebut FR atau SC
   **Dependency**: prasyarat T047, T048
 - [ ] T051 [US4] [FE] Frontend: kalender
@@ -544,6 +546,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T053
   **Selesai bila**: tidak ada satu pun kolom jumlah uang maupun integrasi pembayaran
   **Hati-hati**: Batas Keuangan konstitusi. Dokumen sumber menempatkan escrow wajib sebagai mitigasi gagal bayar dan penipuan [1], sekaligus sebagai alat tawar dalam sengketa kualitas produk [1]. Keduanya sengaja tidak dibangun di versi ini, dan konsekuensinya tercatat di Assumptions spec. Jangan menambahkannya kembali tanpa mengubah spec lebih dulu.
+  **Hati-hati (payments sudah ada di kontrak)**: `WorkOrderDetail` sudah punya field `payments`, dan jalur accept (T041) sudah mengisinya sebagai array kosong supaya kontrak dihormati. Task ini yang mengisinya sungguhan (FR-041..FR-043). Pastikan setiap jalur yang mengembalikan `WorkOrderDetail` menyertakan `payments` dari data, bukan lagi array kosong.
 
 - [ ] T057 [P] [US5] [BE] Pelaporan sengketa
   **Modul**: `backend/internal/order/`
@@ -603,6 +606,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T054, T062
   **Selesai bila**: kueri mengikuti `data-model.md` §8; kedua angka penyusun selalu dikirim
   **Hati-hati**: dihitung saat dibaca, **bukan** disimpan sebagai kolom. Kolom yang harus diperbarui setiap kali ulasan disembunyikan atau pesanan dibatalkan adalah sumber ketidaksesuaian yang paling sering muncul.
+  **Hati-hati**: `SearchReputation` di `db/queries/search.sql` sudah menghitung `completed`/`divisor` dengan aturan FR-072 `FILTER (WHERE status <> 'cancelled' OR cancelled_by_id = pr.id)`. T063 wajib memakai kueri yang sama, jangan menulis kueri baru. Kalau ditulis ulang, profil publik dan hasil pencarian akan menampilkan angka berbeda untuk usaha yang sama tanpa gejala. Lihat catatan BERISIKO di `docs/utang-teknis.md`.
 
 - [ ] T064 [P] [US6] [BE] Test reputasi
   **Modul**: `backend/internal/reputation/`
@@ -756,7 +760,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 | Task | Bergantung pada | Alasan |
 |------|-----------------|--------|
 | T035 | T028 | Memanggil fungsi perpanjangan horizon (FR-088) |
-| T041 | T027 | Membaca `jeda_kesiapan_hari` untuk menghitung `minggu_kesiapan_mulai` |
+| T041 | T027 | Membaca `readiness_lead_days` untuk menghitung `readiness_week_start` |
 | T040 | T035 | Rentang kapasitas harus dihitung dengan cara yang sama |
 | T047 | T041 | Propagasi FR-089 harus tahu periode mana punya alokasi aktif |
 | T050 | T041, T047 | Menguji alokasi dan propagasi bersama |

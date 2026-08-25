@@ -62,3 +62,55 @@ Diseragamkan saat masing-masing story dikerjakan.
 respons validasi. Kunci `'400'` yang tersisa (mis. pada `/auth/login`,
 `/auth/recover/*`, path search dan order) tidak cocok dengan status 422 yang
 sebenarnya dikembalikan backend sampai path itu digarap.
+
+## BERISIKO: tingkat penyelesaian dihitung di dua tempat kelak
+
+Perhitungan tingkat penyelesaian (FR-071, FR-072) saat ini hanya ada di satu
+tempat, `SearchReputation` pada `db/queries/search.sql`, dengan aturan pembagi
+FR-072 `FILTER (WHERE status <> 'cancelled' OR cancelled_by_id = pr.id)`. Sisi
+profil publik di `internal/account/profile_http.go` masih memakai
+`emptyReputation()` bawaan US1 dan belum punya kueri sungguhan.
+
+**Alasan:** ketika halaman profil publik digarap, ia butuh angka yang sama.
+Menyalin logika ke kueri kedua membuka celah divergensi: pembagi bisa keliru
+memasukkan pembatalan pihak lawan, sehingga profil dan hasil pencarian
+menampilkan persentase berbeda untuk usaha yang sama.
+
+**Akibat:** belum ada duplikasi hari ini, jadi belum ada bug. Risikonya muncul
+saat kueri kedua ditulis. Usul: satukan ke satu kueri bernama (mis.
+`ProfileReputation` yang menerima satu atau banyak `profile_id`) yang dipakai
+sisi pencarian dan sisi profil, agar aturan FR-072 hidup di satu tempat saja.
+
+## Tipe TypeScript frontend basi terhadap `openapi.yaml`
+
+Revisi kontrak pada sesi ini mengubah beberapa skema yang dipakai frontend,
+sementara tipe hasil generate T004 belum ikut diperbarui. Tiga gelombang
+perubahan: `Health` (`checks` menjadi `dependencies`, plus `version` dan
+`storage` kini objek); `SearchCandidate` bertambah seluruh atribut keputusan
+FR-027 plus `criteria` per kandidat; `RequestCandidate` bertambah `offers` dan
+`Offer` bertambah `sequence`.
+
+**Alasan:** frontend dikerjakan di branch terpisah (`develop/frontend`), jadi
+regenerasi tipe dan penyesuaian komponen menunggu jalur [FE]. Menyentuhnya dari
+sisi backend berisiko konflik lintas branch.
+
+**Akibat:** sampai tipe di-generate ulang dari `openapi.yaml`, komponen yang
+memakai tipe lama akan menyimpang diam-diam dari respons backend. Peringatan
+regenerasi sudah dicatat di `tasks.md` pada T037 dan T044 supaya jalur [FE]
+melakukannya sebelum task itu mulai.
+
+## `checkStorage` menyusuri direktori unggahan tiap health check
+
+`checkStorage` memanggil `filepath.WalkDir` atas direktori unggahan pada setiap
+permintaan health check. Endpoint itu dipukul healthcheck Docker tiap 30 detik
+plus monitor uptime tiap 5 menit, jadi direktori disusuri berkali-kali per menit.
+
+**Alasan:** total unggahan dibatasi 500MB dengan 5MB per berkas, dan target demo
+sekitar 50 usaha, jadi jumlah berkas kecil dan penyusuran murah. Konstitusi
+menunda optimasi sampai terbukti perlu, jadi ini dicatat, bukan diperbaiki.
+
+**Akibat:** tidak ada masalah pada skala demo. Bila volume unggahan tumbuh
+sampai penyusuran terasa, kandidat perbaikannya cache pendek atas hasil
+`checkStorage` (mis. beberapa detik) supaya health check tidak menyusuri disk
+tiap kali dipanggil.
+
