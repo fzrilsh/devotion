@@ -14,6 +14,7 @@ import (
 	"time"
 
 	web "github.com/fzrilsh/devotion/backend"
+	"github.com/fzrilsh/devotion/backend/apidocs"
 	"github.com/fzrilsh/devotion/backend/internal/account"
 	"github.com/fzrilsh/devotion/backend/internal/admin"
 	"github.com/fzrilsh/devotion/backend/internal/db"
@@ -150,6 +151,15 @@ func runServe(ctx context.Context, args []string) error {
 	// (security:[] in the contract).
 	health.New(pool, wa, clock, cfg.UploadPath, buildVersion, cfg.UploadTotalLimitMB).Register(router)
 
+	// Swagger UI at /docs is a development-only aid for the frontend lane to read
+	// the contract without opening raw YAML. The routes are registered only in
+	// development, so in production they are absent and fall to the existing 404
+	// (T082). Registration is gated here, in one place, rather than registering
+	// then rejecting: a rejected route still leaks that the endpoint exists.
+	if cfg.IsDevelopment() {
+		apidocs.Register(router)
+	}
+
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
 		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))
 	}
@@ -165,7 +175,7 @@ func runServe(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	static, err := httpx.NewStatic(dist, router.Handler())
+	static, err := httpx.NewStatic(dist, router.Mux(), router.Handler())
 	if err != nil {
 		return err
 	}

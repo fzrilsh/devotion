@@ -58,5 +58,15 @@ Sumber data wilayah (provinsi dan kota) untuk `seed:regions --refresh`. Salinan
 JSON di-commit di `docs/master-data/regions.json` (R-02), sehingga seed default
 tidak menyentuh jaringan.
 
-**Bila mati:** hanya `--refresh` yang gagal. Seed dari salinan JSON ter-commit
-tetap jalan, jadi ini bukan ketergantungan runtime.
+## CDN jsdelivr (hanya pengembangan)
+
+Aset Swagger UI (`swagger-ui-dist@5.17.14`) ditarik dari `cdn.jsdelivr.net` oleh
+halaman `/docs`. Halaman itu hanya didaftarkan saat `APP_ENV=development`, jadi
+CDN ini tidak dipakai di produksi dan tidak termasuk enam layanan di atas. Tiap
+aset dipatok dengan Subresource Integrity (sha384), jadi CDN yang disusupi tidak
+bisa menyuntik kode: browser menolak aset yang byte-nya tak cocok.
+
+**Bila mati:** halaman `/docs` gagal memuat UI di mesin pengembang. Tidak ada
+akibat di produksi karena rute `/docs` absen di sana. Kontrak mentahnya tetap
+tersedia di `/docs/openapi.yaml` dari salinan yang disematkan.
+

@@ -7,6 +7,18 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Swagger UI di `GET /docs`, hanya saat `APP_ENV=development`, agar jalur
+  frontend membaca kontrak tanpa membuka YAML mentah. Aset Swagger UI ditarik
+  dari CDN jsdelivr dipatok `swagger-ui-dist@5.17.14` dengan Subresource
+  Integrity (sha384) dan `crossorigin="anonymous"`, jadi CDN yang disusupi tidak
+  bisa menyuntik kode. Kontrak disajikan di `GET /docs/openapi.yaml` dari salinan
+  `apidocs/openapi.yaml` yang disematkan `embed.FS`, disegel byte-identik dengan
+  `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` lewat uji
+  (bukan hash, pembandingan isi dengan pesan gagal yang menyebut lokasi
+  menyimpang) dan gerbang drift di CI (`apidocs-sync.sh` lalu `git diff
+  --exit-code`). Rute didaftarkan hanya di pengembangan, jadi di produksi absen
+  dan jatuh ke 404 yang sudah ada; tidak ada layanan runtime baru (Gate I tetap
+  dua), tidak ada dependency Go baru. (T082)
 - Modul Go `github.com/fzrilsh/devotion/backend` dengan toolchain dipatok
   `go 1.25.0`.
 - Dispatcher subcommand di `cmd/devotion` dengan delapan perintah terdaftar:
@@ -499,7 +511,17 @@ perubahannya.
   ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
-- `EstimateCapacityInRange` (T041): klausa `GROUP BY` di `db/queries/order.sql`
+- Perutean statis (T022, T025): `Static.ServeHTTP` kini mengonsultasi mux untuk
+  setiap path sebelum jatuh ke berkas statis lalu fallback `index.html`,
+  memakai `ServeMux.Handler` untuk mendeteksi rute terdaftar. Sebelumnya hanya
+  path berawalan `/api/` yang diarahkan ke mux, sehingga rute yang terdaftar di
+  luar `/api/` ditelan fallback SPA dan mengembalikan 200 HTML. Rute health
+  dipindah dari `GET /health` ke `GET /api/health` agar selaras dengan prefiks
+  `servers` `/api` di `openapi.yaml` dan referensi quickstart (B4, B14, checklist),
+  dan `health:check` kini mengurai body serta mensyaratkan `status` `"ok"` supaya
+  200 dengan body HTML (shell SPA) tidak lagi dilaporkan sehat. Uji regresi di
+  `httpx` membuktikan rute non-`/api/` benar-benar terjangkau, path tak terdaftar
+  tetap jatuh ke shell SPA, dan `/api` tak dikenal tetap 404 problem+json.
   ditambahi `p.readiness_week, p.deadline_week`, kolom `param` yang muncul di
   `SELECT` lewat `uncreated_remaining` tapi tak teragregasi. Tanpa keduanya
   Postgres menolak kueri saat runtime dengan SQLSTATE 42803 (grouping error).

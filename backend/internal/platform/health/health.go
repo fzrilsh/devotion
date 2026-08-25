@@ -1,4 +1,4 @@
-// Package health serves GET /health, the liveness probe the container
+// Package health serves GET /api/health, the liveness probe the container
 // healthcheck and any external uptime monitor read. It checks the three
 // dependencies a running serve process cannot work without: the database, the
 // WhatsApp link, and the upload volume. Any failing check makes the response
@@ -91,11 +91,14 @@ type response struct {
 	Dependencies dependencies `json:"dependencies"`
 }
 
-// Register wires GET /health as a public route (security:[] in the contract).
-// It sits outside /api/, so it is exempt from the uncovered-route check, but
-// registering it through Public states the no-auth decision explicitly.
+// Register wires GET /api/health as a public route (security:[] in the
+// contract). The contract's servers url carries the /api prefix, so the /health
+// path there resolves to /api/health; registering it under /api/ keeps it in the
+// same namespace the SPA never claims. It is exempt from the uncovered-route
+// check because Public states the no-auth decision explicitly rather than
+// leaving the gate undeclared.
 func (c *Checker) Register(r *httpx.Router) {
-	r.Public("GET /health", c.handle)
+	r.Public("GET /api/health", c.handle)
 }
 
 // handle probes every dependency and reports 200 when all pass, 503 when any

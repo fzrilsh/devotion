@@ -249,6 +249,13 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: `sentry-go`; prasyarat T011, T012, T024a
   **Selesai bila**: health mengembalikan 503 bila ada ketergantungan gagal; test membuktikan kata sandi, token, nomor telepon, dan hal terkait dokumen identitas tidak terkirim ke Sentry
 
+- [x] T082 [P] [BE] Swagger UI untuk kontrak API
+  **Modul**: `backend/internal/platform/httpx/` + `backend/apidocs/`
+  **Kemampuan**: sajikan `GET /docs` (halaman Swagger UI) dan `GET /docs/openapi.yaml` (spesifikasi mentah) HANYA ketika `APP_ENV=development`, supaya lane [FE] dapat membaca kontrak tanpa membuka YAML mentah; `openapi.yaml` disematkan lewat `embed.FS` dari `backend/apidocs/` karena direktif `embed` tidak dapat menjangkau path di atas direktori modul; rute tidak didaftarkan sama sekali di luar development sehingga jatuh ke perilaku 404 yang sudah berlaku
+  **Dependency**: prasyarat T009 (config `APP_ENV`), T012 (router dan format galat), T022 (urutan perutean statis dan fallback SPA)
+  **Selesai bila**: `GET /docs` pada development mengembalikan 200 HTML; `GET /docs/openapi.yaml` pada development mengembalikan 200 YAML yang dapat diurai; `GET /docs` pada production mengembalikan 404 dengan bentuk galat rute tak dikenal; spesifikasi yang disajikan identik byte-per-byte dengan `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml`; `docs/menjalankan.md` memuat cara lane [FE] membukanya beserta catatan bahwa `/docs` tidak ada di production; jumlah layanan `docker-compose.yml` tetap dua
+  **Hati-hati**: task ini tidak melayani FR, melainkan kewajiban dokumentasi konstitusi (docs harus memuat cara menjalankan sistem), sama seperti task scaffolding tanpa rujukan FR di Complexity Tracking `plan.md`. Jangan daftarkan rute lalu tolak di handler: rute yang terdaftar tapi menolak tetap membocorkan keberadaan endpoint docs, jadi kondisi pendaftaran dibaca dari config di satu tempat. `/docs` bukan `/api/docs`, dan pastikan `/docs` tidak jatuh ke fallback SPA `index.html`. Test identitas spesifikasi adalah yang paling penting: bila langkah salin CI terlewat, yang disajikan basi tanpa gejala.
+
 **Checkpoint**: fondasi siap. Seluruh user story boleh dimulai, dan bila ada dua pelaksana, boleh paralel.
 
 ---
