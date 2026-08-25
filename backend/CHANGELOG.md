@@ -29,6 +29,19 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- T043 (test request kuota) ditutup: ketujuh skenario yang didaftarkan task sudah
+  tercakup uji tingkat router yang ada di `internal/quota/`, jadi tidak ditulis uji
+  duplikat. Pemetaan skenario ke uji, supaya keterlacakannya tidak hilang:
+  jalur berhasil `TestQuotaRequest_HappyPath_SendsToSeveralCandidates_FR029_FR030`
+  (`quota_test.go`); penolakan peran `TestQuotaRequest_RejectsNonBuyer_FR029`
+  (`quota_test.go`); masukan tidak sah `TestQuotaRequest_RejectsInvalidInput_FR029`
+  (`quota_test.go`); request ke listing sendiri
+  `TestQuotaRequest_RejectsSelfListing_FR083` (`quota_test.go`); kapasitas kurang
+  beserta angka `remaining_capacity`/`quantity_requested`/`until_week`
+  `TestOffer_RejectsQuantityBeyondCapacity_FR035` (`offer_test.go`); kesiapan
+  melampaui deadline `TestOffer_RejectsReadinessAfterDeadline_FR090`
+  (`offer_test.go`); request kedaluwarsa lewat `Clock` yang digeser 73 jam
+  `TestOffer_RejectsAfterReplyWindow_FR082` (`offer_test.go`). (T043)
 - Swagger UI di `GET /docs`, hanya saat `APP_ENV=development`, agar jalur
   frontend membaca kontrak tanpa membuka YAML mentah. Aset Swagger UI ditarik
   dari CDN jsdelivr dipatok `swagger-ui-dist@5.17.14` dengan Subresource
