@@ -29,6 +29,24 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Pembalikan alokasi kapasitas satu pesanan dalam satu transaksi (`ReverseAllocation`
+  di `internal/order`, FR-020). Setiap periode dikembalikan ke `used_capacity`
+  sebelum pesanan terbentuk dengan mengurangi kuantitas baris alokasinya, dan
+  baris alokasi ditandai `reversed_at` tanpa dihapus sehingga jejak audit tetap
+  ada. Pola penguncian meniru pembentukan (R-04): kunci `work_order` lebih dulu,
+  lalu baris alokasi aktif beserta periodenya menaik menurut `week_start` (pencegah
+  deadlock). Baris yang sudah dibalik dilewati lewat penjaga `reversed_at IS NULL`,
+  jadi pemanggilan ulang tidak mengembalikan kapasitas dua kali. Endpoint HTTP
+  pembatalan (kedua pihak, alasan, CANCELLATION_AFTER_PRODUCTION) menyusul di T054.
+  Query: `LockWorkOrderForReversal`, `ListActiveAllocationsForReversal`,
+  `LowerUsedCapacity`, `MarkAllocationReversed`. (FR-020)
+- Uji alokasi kalender dan pembalikan di `internal/order`: pengisian minggu paling
+  awal lebih dulu dengan plafon per minggu (1.200 di 500/minggu jatuh 500/500/200,
+  FR-018/FR-078), jeda kesiapan 14 hari melewati dua minggu pertama (SC-020/FR-087),
+  periode ditandai penuh dilewati, pembalikan mengembalikan seluruh periode dan
+  menandai baris (FR-020), propagasi FR-089 hanya menyentuh periode belum
+  teralokasi, dan trigger `trg_reject_allocation_before_readiness` menolak alokasi
+  sebelum minggu kesiapan (FR-087). (FR-018, FR-020, FR-078, FR-087, FR-089, SC-020)
 - Handler HTTP dan pendaftaran rute untuk empat endpoint sisi pemohon verifikasi,
   paket `internal/verification`: `POST /api/files` (unggah berkas identitas atau
   foto lokasi), `GET /api/files/{fileId}` (unduh berkas milik sendiri),
