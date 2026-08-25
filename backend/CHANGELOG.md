@@ -499,7 +499,17 @@ perubahannya.
   ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
-- `EstimateCapacityInRange` (T041): klausa `GROUP BY` di `db/queries/order.sql`
+- Perutean statis (T022, T025): `Static.ServeHTTP` kini mengonsultasi mux untuk
+  setiap path sebelum jatuh ke berkas statis lalu fallback `index.html`,
+  memakai `ServeMux.Handler` untuk mendeteksi rute terdaftar. Sebelumnya hanya
+  path berawalan `/api/` yang diarahkan ke mux, sehingga rute yang terdaftar di
+  luar `/api/` ditelan fallback SPA dan mengembalikan 200 HTML. Rute health
+  dipindah dari `GET /health` ke `GET /api/health` agar selaras dengan prefiks
+  `servers` `/api` di `openapi.yaml` dan referensi quickstart (B4, B14, checklist),
+  dan `health:check` kini mengurai body serta mensyaratkan `status` `"ok"` supaya
+  200 dengan body HTML (shell SPA) tidak lagi dilaporkan sehat. Uji regresi di
+  `httpx` membuktikan rute non-`/api/` benar-benar terjangkau, path tak terdaftar
+  tetap jatuh ke shell SPA, dan `/api` tak dikenal tetap 404 problem+json.
   ditambahi `p.readiness_week, p.deadline_week`, kolom `param` yang muncul di
   `SELECT` lewat `uncreated_remaining` tapi tak teragregasi. Tanpa keduanya
   Postgres menolak kueri saat runtime dengan SQLSTATE 42803 (grouping error).

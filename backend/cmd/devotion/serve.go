@@ -165,7 +165,7 @@ func runServe(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	static, err := httpx.NewStatic(dist, router.Handler())
+	static, err := httpx.NewStatic(dist, router.Mux(), router.Handler())
 	if err != nil {
 		return err
 	}

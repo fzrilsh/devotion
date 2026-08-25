@@ -53,7 +53,7 @@ func doHealth(t *testing.T, c *Checker) (int, response) {
 	t.Helper()
 	r := quietLogger(t)
 	c.Register(r)
-	req := httptest.NewRequest("GET", "/health", nil)
+	req := httptest.NewRequest("GET", "/api/health", nil)
 	rec := httptest.NewRecorder()
 	r.Handler().ServeHTTP(rec, req)
 	var body response
