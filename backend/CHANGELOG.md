@@ -6,6 +6,18 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diperbaiki
+- `POST /api/auth/register` sekarang benar-benar mengirim kode verifikasi email
+  dan nomor. Sebelumnya `account.New` dipasang dengan `delivery` nil di
+  `serve.go`, jadi kode dibuat dan di-hash tapi tidak pernah diserahkan ke
+  transport mana pun, sehingga email lewat Mailjet tidak keluar meski kredensial
+  sudah diatur. Ditambahkan adapter `notification.CodeDelivery` yang memakai
+  transport email (SMTP Mailjet) dan WhatsApp yang sama dengan job notifikasi,
+  tapi di luar antrean (kode sekali pakai tidak menulis baris notifikasi in-app).
+  Pengiriman tetap best effort: transport nil atau gagal kirim tidak menggagalkan
+  registrasi yang sudah tersimpan. Manajer WhatsApp dan sender email kini dibangun
+  sebelum `account.New` agar bisa dibagi. (FR-001)
+
 ### Ditambahkan
 - Swagger UI di `GET /docs`, hanya saat `APP_ENV=development`, agar jalur
   frontend membaca kontrak tanpa membuka YAML mentah. Aset Swagger UI ditarik
