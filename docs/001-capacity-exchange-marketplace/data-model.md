@@ -1005,7 +1005,7 @@ Lima hal yang perlu diperhatikan tentang kueri ini.
 
 **`uncreated_remaining` adalah perkiraan optimis** atas periode yang belum ada: setiap minggu di luar `horizon_until` dihitung berkapasitas penuh, karena periode baru memang dibuat dengan `weekly_capacity` sebagai kapasitas total (FR-088). Ini yang mencegah kandidat dinilai tidak memenuhi kriteria hanya karena periodenya belum pernah dibuat.
 
-**Periode benar-benar dibuat sebagai efek samping pencarian**, bukan di dalam kueri ini. Aplikasi memeriksa `horizon_until < deadline_week` pada kandidat yang lolos, lalu membuat periode yang kurang di dalam transaksi tersendiri sebelum mengembalikan hasil. Menempatkannya di luar kueri pencarian membuat pencarian tetap operasi baca dan tidak memicu penulisan pada setiap permintaan.
+**Periode benar-benar dibuat saat kesepakatan terbentuk**, bukan di dalam kueri ini. Ketika sebuah penawaran diterima (`/offers/{offerId}/accept`), aplikasi memeriksa `horizon_until < deadline_week` lalu membuat periode yang kurang di dalam transaksi kesepakatan itu (FR-088). Menempatkannya di sana, bukan di jalur pencarian, membuat pencarian tetap operasi baca dan tidak memicu penulisan pada setiap permintaan.
 
 **Kriteria yang filternya `NULL` dihitung terpenuhi** (FR-023, keputusan C-4). Skor tetap 0–4 tanpa normalisasi, sehingga kriteria yang tidak dievaluasi menaikkan skor semua kandidat secara seragam dan tidak membedakan siapa pun. Respons menyertakan nilai per kriteria agar klien dapat menyebutkan mana yang tidak dievaluasi (FR-026).
 
@@ -1022,7 +1022,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 | Kapasitas terpakai ≤ total (FR-079, SC-018) | `CHECK` | Penguncian baris terurut (R-04) |
 | Alokasi tidak mendahului minggu kesiapan (FR-087, SC-020) | Trigger | Perhitungan minggu kesiapan dari `Clock` |
 | Kesiapan tidak melewati deadline (FR-090) | `CHECK` | Penolakan penawaran beserta penjelasan |
-| Horizon diperpanjang sampai deadline (FR-088, SC-021) | Tidak ada | Pembuatan periode sebagai efek samping pencarian |
+| Horizon diperpanjang sampai deadline (FR-088, SC-021) | Tidak ada | Pembuatan periode saat kesepakatan terbentuk |
 | Propagasi perubahan kapasitas (FR-089) | Tidak ada | Menyaring periode tanpa alokasi aktif |
 | Satu kesepakatan per request (FR-034) | Indeks unik parsial | Penutupan kandidat lain |
 | Larangan request ke diri sendiri (FR-081, FR-083) | Trigger + `two_distinct_parties` | Penyaringan pencarian, pesan pengguna |
