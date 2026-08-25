@@ -2023,14 +2023,36 @@ components:
       description: |
         Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
         jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
-        mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-030).
+        mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
+        Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
+        memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
+        kapasitas tersisa sampai deadline, jeda kesiapan mulai, serta reputasi (rating
+        rata-rata, jumlah pekerjaan selesai, tingkat penyelesaian) yang dihitung saat
+        dibaca, tidak disimpan sebagai kolom. Tingkat penyelesaian tunduk pada ambang
+        cukup-data reputation.enough_data (FR-073). stale_calendar menandai kalender yang
+        tidak diperbarui lebih dari 7 hari; penanda ini informatif dan tidak mengubah
+        urutan (FR-021).
       required: [listing_id, profile_id, business_name, score, criteria]
       properties:
         listing_id: { type: string, format: uuid }
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         score: { type: integer }
+        city_code: { type: string, nullable: true }
+        city_name: { type: string, nullable: true }
+        machine_types:
+          type: array
+          description: Nama jenis mesin yang dimiliki listing (FR-027).
+          items: { type: string }
+        weekly_capacity: { type: integer, description: Kapasitas mingguan listing (FR-027). }
+        readiness_week: { type: string, format: date, description: Minggu kesiapan mulai, Senin WIB. }
+        readiness_lead_days: { type: integer, description: Jeda kesiapan mulai dalam hari (FR-027). }
         total_capacity_until_deadline: { type: integer }
+        completed_jobs: { type: integer, description: Jumlah pekerjaan selesai (FR-048). }
+        reputation: { $ref: '#/components/schemas/Reputation' }
+        stale_calendar:
+          type: boolean
+          description: Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan.
         distance_km: { type: number, format: double, nullable: true }
         identity_verified: { type: boolean }
         criteria:

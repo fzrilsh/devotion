@@ -49,16 +49,46 @@ type criterion struct {
 	Detail *string `json:"detail"`
 }
 
-// candidateView is one SearchCandidate. Field names follow the contract.
+// reputationView is the Reputation schema as carried on a search candidate. It
+// is computed at read time from SearchReputation, never materialized to a column
+// (data-model.md section 19). completion_rate is nil until enough_data is true
+// (FR-073), so the client never shows a raw percentage below the threshold.
+type reputationView struct {
+	EnoughData     bool     `json:"enough_data"`
+	CompletionRate *int     `json:"completion_rate"`
+	AverageRating  *float64 `json:"average_rating"`
+	ReviewCount    int      `json:"review_count"`
+}
+
+// pageReputation bundles a profile's read-time reputation block with its
+// completed-jobs count, which sits on the candidate itself (FR-048) rather than
+// inside the Reputation schema.
+type pageReputation struct {
+	Reputation    reputationView
+	CompletedJobs int64
+}
+
+// candidateView is one SearchCandidate. Field names follow the contract. The
+// reputation block, completed_jobs, and stale_calendar are informative and do
+// not influence the score (FR-034); stale_calendar and distance never reorder.
 type candidateView struct {
-	ListingID                  string      `json:"listing_id"`
-	ProfileID                  string      `json:"profile_id"`
-	BusinessName               string      `json:"business_name"`
-	Score                      int32       `json:"score"`
-	TotalCapacityUntilDeadline int64       `json:"total_capacity_until_deadline"`
-	DistanceKm                 *float64    `json:"distance_km"`
-	IdentityVerified           bool        `json:"identity_verified"`
-	Criteria                   []criterion `json:"criteria"`
+	ListingID                  string         `json:"listing_id"`
+	ProfileID                  string         `json:"profile_id"`
+	BusinessName               string         `json:"business_name"`
+	Score                      int32          `json:"score"`
+	CityCode                   *string        `json:"city_code"`
+	CityName                   *string        `json:"city_name"`
+	MachineTypes               []string       `json:"machine_types"`
+	WeeklyCapacity             int32          `json:"weekly_capacity"`
+	ReadinessWeek              string         `json:"readiness_week"`
+	ReadinessLeadDays          int32          `json:"readiness_lead_days"`
+	TotalCapacityUntilDeadline int64          `json:"total_capacity_until_deadline"`
+	CompletedJobs              int64          `json:"completed_jobs"`
+	Reputation                 reputationView `json:"reputation"`
+	StaleCalendar              bool           `json:"stale_calendar"`
+	DistanceKm                 *float64       `json:"distance_km"`
+	IdentityVerified           bool           `json:"identity_verified"`
+	Criteria                   []criterion    `json:"criteria"`
 }
 
 // pagination is the keyset page marker. next_cursor is opaque and nil when there
@@ -155,9 +185,18 @@ func (s *Service) search(ctx context.Context, accountID pgtype.UUID, q searchQue
 		rows = rows[:q.size]
 	}
 
+	// Reputation is read at query time over the page's profiles, never stored as
+	// a column (data-model.md section 19). One query for the whole page avoids an
+	// N+1; a failure here does not fail the search, the block just stays empty.
+	repByProfile := s.reputationForPage(ctx, rows)
+
+	// staleBefore is the cutoff for FR-021: a calendar not touched in seven days
+	// is marked stale. Derived from the injected Clock, never time.Now (Rule 5).
+	staleBefore := s.clock.Now().AddDate(0, 0, -7)
+
 	items := make([]candidateView, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, s.viewOf(row, q))
+		items = append(items, s.viewOf(row, q, repByProfile[uuidString(row.ProfileID)], staleBefore))
 	}
 
 	res := searchResult{
@@ -193,11 +232,14 @@ func (s *Service) search(ctx context.Context, accountID pgtype.UUID, q searchQue
 	return res, nil
 }
 
-// viewOf maps one row to a candidate, building the four-criterion explanation.
-// A filter that was not supplied is reported met with a "tidak dinilai" detail
-// (FR-023 C-4, FR-026): the score already counts it satisfied, and the buyer is
-// told it was skipped rather than judged.
-func (s *Service) viewOf(row sqlcgen.SearchCandidatesRow, q searchQuery) candidateView {
+// viewOf maps one row to a candidate, building the four-criterion explanation
+// and the informative attributes (FR-027): city, machine types, weekly and
+// remaining capacity, readiness, reputation, and the stale-calendar marker
+// (FR-021). rep is the read-time reputation for this profile, already thresholded
+// by FR-073. A filter that was not supplied is reported met with a "tidak
+// dinilai" detail (FR-023 C-4, FR-026): the score already counts it satisfied,
+// and the buyer is told it was skipped rather than judged.
+func (s *Service) viewOf(row sqlcgen.SearchCandidatesRow, q searchQuery, rep pageReputation, staleBefore time.Time) candidateView {
 	notEvaluated := "Tidak dinilai karena filter ini tidak diisi."
 	crit := make([]criterion, 0, 4)
 
@@ -206,12 +248,30 @@ func (s *Service) viewOf(row sqlcgen.SearchCandidatesRow, q searchQuery) candida
 	crit = append(crit, matchCriterion("Waktu ancang-ancang memenuhi", row.LeadMatch == 1, q.maxLead != nil, notEvaluated))
 	crit = append(crit, matchCriterion("Kapasitas mencukupi", row.CapacityEnough == 1, true, notEvaluated))
 
+	machineTypes := row.MachineTypes
+	if machineTypes == nil {
+		machineTypes = []string{}
+	}
+
+	// FR-021: a calendar not updated within seven days is flagged stale. The
+	// marker is informative and never reorders results.
+	stale := row.CalendarUpdatedAt.Valid && row.CalendarUpdatedAt.Time.Before(staleBefore)
+
 	return candidateView{
 		ListingID:                  uuidString(row.ListingID),
 		ProfileID:                  uuidString(row.ProfileID),
 		BusinessName:               row.BusinessName,
 		Score:                      row.Score,
+		CityCode:                   strPtrText(row.CityCode),
+		CityName:                   pgTextPtr(row.CityName),
+		MachineTypes:               machineTypes,
+		WeeklyCapacity:             row.WeeklyCapacity,
+		ReadinessWeek:              dateString(row.ReadinessWeek),
+		ReadinessLeadDays:          row.ReadinessLeadDays,
 		TotalCapacityUntilDeadline: row.RemainingCapacity,
+		CompletedJobs:              rep.CompletedJobs,
+		Reputation:                 rep.Reputation,
+		StaleCalendar:              stale,
 		IdentityVerified:           row.Verified,
 		Criteria:                   crit,
 	}
@@ -226,6 +286,49 @@ func matchCriterion(name string, met, evaluated bool, notEvaluated string) crite
 		return criterion{Name: name, Met: true, Detail: &d}
 	}
 	return criterion{Name: name, Met: met}
+}
+
+// reputationForPage computes the read-time reputation for every profile on one
+// page in a single query (data-model.md section 19, FR-071), keyed by profile id
+// text. It applies the FR-073 threshold here in the service: a completion
+// percentage is only filled once the divisor reaches three agreed orders,
+// otherwise enough_data stays false and completion_rate is nil, mirroring the
+// public Reputation schema. A query error yields an empty map so the search
+// still answers with empty reputation blocks rather than failing.
+func (s *Service) reputationForPage(ctx context.Context, rows []sqlcgen.SearchCandidatesRow) map[string]pageReputation {
+	out := make(map[string]pageReputation, len(rows))
+	if len(rows) == 0 {
+		return out
+	}
+	ids := make([]pgtype.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ProfileID)
+	}
+	reps, err := s.queries().SearchReputation(ctx, ids)
+	if err != nil {
+		return out
+	}
+	for _, rep := range reps {
+		body := reputationView{
+			ReviewCount: int(rep.ReviewCount),
+		}
+		if rep.ReviewCount > 0 {
+			body.AverageRating = floatFromNumeric(rep.AverageRating)
+		}
+		// FR-073: hold the completion percentage until at least three agreed
+		// orders (the divisor). Below the threshold the client shows a "belum
+		// cukup data" note, not a raw ratio, so completion_rate stays nil.
+		if rep.CompletionDivisor >= 3 {
+			body.EnoughData = true
+			pct := int((rep.CompletionCompleted*100 + rep.CompletionDivisor/2) / rep.CompletionDivisor)
+			body.CompletionRate = &pct
+		}
+		out[uuidString(rep.ProfileID)] = pageReputation{
+			Reputation:    body,
+			CompletedJobs: rep.CompletedJobs,
+		}
+	}
+	return out
 }
 
 // relaxationOf picks the most restrictive filter to relax and a concrete

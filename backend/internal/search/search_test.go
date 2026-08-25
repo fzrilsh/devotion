@@ -241,13 +241,27 @@ func mustStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 }
 
 type candidateResp struct {
-	ListingID                  string `json:"listing_id"`
-	ProfileID                  string `json:"profile_id"`
-	BusinessName               string `json:"business_name"`
-	Score                      int    `json:"score"`
-	TotalCapacityUntilDeadline int64  `json:"total_capacity_until_deadline"`
-	IdentityVerified           bool   `json:"identity_verified"`
-	Criteria                   []struct {
+	ListingID                  string   `json:"listing_id"`
+	ProfileID                  string   `json:"profile_id"`
+	BusinessName               string   `json:"business_name"`
+	Score                      int      `json:"score"`
+	CityCode                   *string  `json:"city_code"`
+	CityName                   *string  `json:"city_name"`
+	MachineTypes               []string `json:"machine_types"`
+	WeeklyCapacity             int32    `json:"weekly_capacity"`
+	ReadinessWeek              string   `json:"readiness_week"`
+	ReadinessLeadDays          int32    `json:"readiness_lead_days"`
+	TotalCapacityUntilDeadline int64    `json:"total_capacity_until_deadline"`
+	CompletedJobs              int64    `json:"completed_jobs"`
+	Reputation                 struct {
+		EnoughData     bool     `json:"enough_data"`
+		CompletionRate *int     `json:"completion_rate"`
+		AverageRating  *float64 `json:"average_rating"`
+		ReviewCount    int      `json:"review_count"`
+	} `json:"reputation"`
+	StaleCalendar    bool `json:"stale_calendar"`
+	IdentityVerified bool `json:"identity_verified"`
+	Criteria         []struct {
 		Name   string  `json:"name"`
 		Met    bool    `json:"met"`
 		Detail *string `json:"detail"`
@@ -309,6 +323,170 @@ func (h *harness) searchPath(quantity, weeks int) string {
 	v.Set("region_level", "city")
 	v.Set("city_code", "3273")
 	return "/api/search?" + v.Encode()
+}
+
+// seedAgreedOrder builds the request -> candidate -> offer -> work_order chain
+// for one subcontractor profile with the given work_order status, so a test can
+// drive the completion-rate divisor and numerator (FR-071/FR-072). It mirrors
+// the seedReview chain in determinism_test.go but leaves the status to the
+// caller. It returns the work_order id.
+func seedAgreedOrder(t *testing.T, h *harness, listingID, subconProfile pgtype.UUID, status string) pgtype.UUID {
+	t.Helper()
+	ctx := context.Background()
+	weekNow := platform.WeekStart(baseTime)
+	deadline := weekNow.AddDate(0, 0, 7*4)
+
+	var requestID pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO quota_request (buyer_id, product_item_id, quantity, material, deadline, reply_due_at, created_at)
+		 VALUES ($1, $2, 100, 'katun', $3, $4, $5) RETURNING id`,
+		h.buyerProf, h.productID, deadline, baseTime.Add(48*time.Hour), baseTime).Scan(&requestID); err != nil {
+		t.Fatalf("seed quota_request: %v", err)
+	}
+
+	var candidateID pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO request_candidate (request_id, listing_id, subcontractor_id, status, updated_at)
+		 VALUES ($1, $2, $3, 'agreed', $4) RETURNING id`,
+		requestID, listingID, subconProfile, baseTime).Scan(&candidateID); err != nil {
+		t.Fatalf("seed request_candidate: %v", err)
+	}
+
+	var offerID pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO offer (candidate_id, sequence, proposed_by, total_price, readiness_lead_days, created_at)
+		 VALUES ($1, 1, 'subcontractor', 100000, 7, $2) RETURNING id`,
+		candidateID, baseTime).Scan(&offerID); err != nil {
+		t.Fatalf("seed offer: %v", err)
+	}
+
+	var orderID pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO work_order (candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price,
+		     deadline, readiness_week_start, status, created_at)
+		 VALUES ($1, $2, $3, $4, 100, 100000, $5, $6, $7, $8) RETURNING id`,
+		candidateID, offerID, h.buyerProf, subconProfile, deadline, weekNow, status, baseTime).Scan(&orderID); err != nil {
+		t.Fatalf("seed work_order: %v", err)
+	}
+	return orderID
+}
+
+// TestSearch_CandidateCarriesFR027Attributes_FR027_FR026 seeds one matching
+// listing and asserts every informative attribute FR-027 requires is present in
+// the serialized candidate: city, machine types, weekly and total capacity,
+// readiness, and the reputation block. FR-026 requires the four criteria to be
+// reported per candidate, so the criteria array is checked too.
+func TestSearch_CandidateCarriesFR027Attributes_FR027_FR026(t *testing.T) {
+	h := newHarness(t, "search_fr027")
+	listingID := seedListing(t, h, "konveksi-bandung", 120, 14, 8)
+
+	// Manual step 2.6 compares a verified against an unverified candidate, so the
+	// badge must round-trip. Mark this listing's owner verified.
+	prof := profileOfListing(t, h, listingID)
+	if _, err := h.pool.Exec(context.Background(),
+		`UPDATE business_profile SET verified = true WHERE id = $1`, prof); err != nil {
+		t.Fatalf("set verified: %v", err)
+	}
+
+	res := decodeResult(t, h.do(http.MethodGet, h.searchPath(50, 8)))
+	if len(res.Items) != 1 {
+		t.Fatalf("mau 1 kandidat, dapat %d", len(res.Items))
+	}
+	got := itemByListing(t, res, listingID)
+
+	if !got.IdentityVerified {
+		t.Fatalf("identity_verified mau true untuk profil terverifikasi")
+	}
+	if got.CityCode == nil || *got.CityCode != "3273" {
+		t.Fatalf("city_code %v, mau 3273", got.CityCode)
+	}
+	if got.CityName == nil || *got.CityName != "Kota Bandung" {
+		t.Fatalf("city_name %v, mau Kota Bandung", got.CityName)
+	}
+	if len(got.MachineTypes) != 1 || got.MachineTypes[0] != "Mesin Jahit Lurus" {
+		t.Fatalf("machine_types %v, mau [Mesin Jahit Lurus]", got.MachineTypes)
+	}
+	if got.WeeklyCapacity != 120 {
+		t.Fatalf("weekly_capacity %d, mau 120", got.WeeklyCapacity)
+	}
+	if got.ReadinessLeadDays != 14 {
+		t.Fatalf("readiness_lead_days %d, mau 14", got.ReadinessLeadDays)
+	}
+	// 14-day lead from the Monday base lands readiness on the Monday two weeks
+	// out, so readiness_week is that date in YYYY-MM-DD form.
+	wantWeek := platform.WeekStart(baseTime).AddDate(0, 0, 14).Format(dateFmt)
+	if got.ReadinessWeek != wantWeek {
+		t.Fatalf("readiness_week %q, mau %q", got.ReadinessWeek, wantWeek)
+	}
+	// weeks 2..8 inclusive at 120 = 7*120 = 840.
+	if got.TotalCapacityUntilDeadline != 7*120 {
+		t.Fatalf("total_capacity_until_deadline %d, mau 840", got.TotalCapacityUntilDeadline)
+	}
+	if len(got.Criteria) != 4 {
+		t.Fatalf("mau 4 criteria, dapat %d", len(got.Criteria))
+	}
+	// A brand-new subcontractor has no orders, so reputation is below the FR-073
+	// threshold: no percentage, no rating, no reviews.
+	if got.Reputation.EnoughData {
+		t.Fatalf("enough_data mau false untuk subkon baru")
+	}
+	if got.Reputation.CompletionRate != nil {
+		t.Fatalf("completion_rate mau nil di bawah ambang, dapat %d", *got.Reputation.CompletionRate)
+	}
+	if got.Reputation.ReviewCount != 0 {
+		t.Fatalf("review_count mau 0, dapat %d", got.Reputation.ReviewCount)
+	}
+	if got.CompletedJobs != 0 {
+		t.Fatalf("completed_jobs mau 0, dapat %d", got.CompletedJobs)
+	}
+}
+
+// TestSearch_CompletionRateRespectsEnoughDataThreshold_FR073 proves the search
+// result honors the FR-073 cutoff: a subcontractor below three agreed orders
+// reports enough_data false with a nil completion_rate, while one at or above
+// three reports enough_data true and a concrete percentage. Reputation is read
+// at query time, never materialized, so seeding orders alone changes the result.
+func TestSearch_CompletionRateRespectsEnoughDataThreshold_FR073(t *testing.T) {
+	h := newHarness(t, "search_fr073")
+	below := seedListing(t, h, "belum-cukup", 100, 7, 8)
+	above := seedListing(t, h, "cukup-data", 100, 7, 8)
+
+	belowProf := profileOfListing(t, h, below)
+	aboveProf := profileOfListing(t, h, above)
+
+	// Below the threshold: two confirmed orders, divisor 2 < 3.
+	seedAgreedOrder(t, h, below, belowProf, "confirmed")
+	seedAgreedOrder(t, h, below, belowProf, "confirmed")
+
+	// At the threshold: three orders, all confirmed, divisor 3 -> 100 percent.
+	seedAgreedOrder(t, h, above, aboveProf, "confirmed")
+	seedAgreedOrder(t, h, above, aboveProf, "confirmed")
+	seedAgreedOrder(t, h, above, aboveProf, "confirmed")
+
+	res := decodeResult(t, h.do(http.MethodGet, h.searchPath(50, 4)))
+
+	belowCand := itemByListing(t, res, below)
+	if belowCand.Reputation.EnoughData {
+		t.Fatalf("enough_data mau false untuk 2 pesanan")
+	}
+	if belowCand.Reputation.CompletionRate != nil {
+		t.Fatalf("completion_rate mau nil di bawah ambang, dapat %d", *belowCand.Reputation.CompletionRate)
+	}
+
+	aboveCand := itemByListing(t, res, above)
+	if !aboveCand.Reputation.EnoughData {
+		t.Fatalf("enough_data mau true untuk 3 pesanan")
+	}
+	if aboveCand.Reputation.CompletionRate == nil {
+		t.Fatalf("completion_rate mau terisi di atas ambang, dapat nil")
+	}
+	if *aboveCand.Reputation.CompletionRate != 100 {
+		t.Fatalf("completion_rate %d, mau 100", *aboveCand.Reputation.CompletionRate)
+	}
+	// completed_jobs counts confirmed orders where the profile is subcontractor.
+	if aboveCand.CompletedJobs != 3 {
+		t.Fatalf("completed_jobs %d, mau 3", aboveCand.CompletedJobs)
+	}
 }
 
 // TestSearch_HappyPath_ReturnsScoredCandidate_FR022_FR023 seeds one matching

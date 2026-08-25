@@ -113,3 +113,45 @@ func atoiDefault(s string, def int) (int, bool) {
 	}
 	return n, true
 }
+
+// strPtrText renders a plain string column as an optional string, nil when
+// empty so an unset city_code serializes to null rather than "".
+func strPtrText(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// pgTextPtr renders a pgtype.Text as an optional string: NULL becomes nil so a
+// city with no name join serializes to null.
+func pgTextPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.String
+	return &s
+}
+
+// dateString renders a pgtype.Date as YYYY-MM-DD, empty when NULL.
+func dateString(d pgtype.Date) string {
+	if !d.Valid {
+		return ""
+	}
+	return d.Time.Format("2006-01-02")
+}
+
+// floatFromNumeric renders a pgtype.Numeric as an optional float64, nil for a
+// NULL or unrepresentable value so average_rating serializes to null when there
+// are no reviews to average.
+func floatFromNumeric(n pgtype.Numeric) *float64 {
+	if !n.Valid {
+		return nil
+	}
+	v, err := n.Float64Value()
+	if err != nil || !v.Valid {
+		return nil
+	}
+	f := v.Float64
+	return &f
+}
