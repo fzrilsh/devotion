@@ -1,19 +1,21 @@
-// Package health serves GET /api/health, the liveness probe the container
-// healthcheck and any external uptime monitor read. It checks the three
-// dependencies a running serve process cannot work without: the database, the
-// WhatsApp link, and the upload volume. Any failing check makes the response
-// 503 so a degraded instance is pulled out of rotation, and the body reports
-// each dependency's state so an operator sees which one broke without shelling
-// into the box.
+// Package health serves GET /api/health, the liveness and readiness probe the
+// container healthcheck and any external uptime monitor read. It checks three
+// dependencies: the database, the upload volume, and the WhatsApp link. A
+// database failure or a full volume is a readiness failure and makes the
+// response 503 so the instance is pulled out of rotation. A dropped WhatsApp
+// link only moves the body status to degraded on a 200, since recovery needs a
+// manual QR scan and a 503 there would restart-loop the container (see R-08).
+// The body reports each dependency's state so an operator sees which one broke
+// without shelling into the box.
 //
 // The response carries no secrets by construction: dependency states are fixed
-// enums, never an error string, connection URL, or the WhatsApp service number
-// (FR-082).
+// enums, never an error string, connection URL, or the WhatsApp service number.
 package health
 
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,8 +33,7 @@ type Pinger interface {
 }
 
 // WhatsAppLink is the WhatsApp dependency, satisfied by *admin.Manager. Only the
-// connected bit is read; the service number never crosses this boundary
-// (FR-082).
+// connected bit is read; the service number never crosses this boundary.
 type WhatsAppLink interface {
 	Connected() bool
 }
@@ -101,9 +102,17 @@ func (c *Checker) Register(r *httpx.Router) {
 	r.Public("GET /api/health", c.handle)
 }
 
-// handle probes every dependency and reports 200 when all pass, 503 when any
-// fails. Every check always runs so the body reflects the full state, not just
-// the first failure.
+// handle probes every dependency and reports 200 when the readiness
+// dependencies pass, 503 when one fails. Readiness is the database and the
+// upload volume: a failure there means the instance cannot serve and should be
+// pulled from rotation. The WhatsApp link is reported but does not drive the
+// code: a dropped whatsmeow session recovers only by a manual QR scan, so a 503
+// there would make the container healthcheck restart-loop the whole site while
+// the database and web are fine (see R-08). WhatsApp down therefore yields a
+// 200 with status "degraded", still visible in dependencies.whatsapp so an
+// uptime monitor doing body keyword matching can alert without a restart. Every
+// check always runs so the body reflects the full state, not just the first
+// failure.
 func (c *Checker) handle(w http.ResponseWriter, r *http.Request) {
 	deps := dependencies{
 		Database: c.checkDB(r.Context()),
@@ -111,9 +120,11 @@ func (c *Checker) handle(w http.ResponseWriter, r *http.Request) {
 		Storage:  c.checkStorage(),
 	}
 
-	healthy := deps.Database == "ok" &&
-		deps.WhatsApp == "connected" &&
-		deps.Storage.Status != "full"
+	// Readiness: database and storage only. WhatsApp is excluded on purpose (see
+	// the method doc and R-08); it still moves status to degraded below.
+	ready := deps.Database == "ok" && deps.Storage.Status != "full"
+	healthy := ready &&
+		deps.WhatsApp == "connected"
 
 	body := response{Version: c.version, Time: c.clock.Now(), Dependencies: deps}
 	code := http.StatusOK
@@ -121,6 +132,8 @@ func (c *Checker) handle(w http.ResponseWriter, r *http.Request) {
 		body.Status = "ok"
 	} else {
 		body.Status = "degraded"
+	}
+	if !ready {
 		code = http.StatusServiceUnavailable
 	}
 
@@ -141,8 +154,10 @@ func (c *Checker) checkDB(ctx context.Context) string {
 }
 
 // checkWhatsApp reports the link state. A down link does not stop the platform
-// from serving, but it stops codes and notifications from going out, so it
-// counts toward health.
+// from serving, so it never affects the HTTP status code (never drives 503);
+// it only moves the body's status to degraded, since codes and notifications
+// cannot go out while it is down. Recovery needs a manual QR scan, so a 503 here
+// would restart-loop the container (see R-08 and handle).
 func (c *Checker) checkWhatsApp() string {
 	if c.wa != nil && c.wa.Connected() {
 		return "connected"
@@ -152,10 +167,15 @@ func (c *Checker) checkWhatsApp() string {
 
 // checkStorage reports how full the upload volume is against its quota. A path
 // that cannot be read is reported full and drives 503, since a new upload would
-// fail there just the same.
+// fail there just the same. The read error is logged rather than surfaced in the
+// body: the body carries fixed enums only and must never leak a filesystem path,
+// but an operator still needs the path and error to diagnose why the volume
+// looks full at used_mb 0.
 func (c *Checker) checkStorage() storageState {
 	used, err := dirSize(c.uploadPath)
 	if err != nil {
+		slog.Error("health: gagal membaca direktori unggahan, dilaporkan penuh",
+			"path", c.uploadPath, "error", err)
 		return storageState{Status: "full", UsedMB: 0, LimitMB: c.limitBytes / (1024 * 1024)}
 	}
 	s := storageState{

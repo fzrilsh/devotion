@@ -409,7 +409,22 @@ curl -s https://devotion.web.id/api/health | jq
 
 Yang diharapkan: `status: ok`, `dependencies.database: ok`, `dependencies.whatsapp:
 connected`, dan `dependencies.storage.status: ok` dengan `used_mb` jauh di bawah `limit_mb`.
-Bila ada ketergantungan gagal, respons berkode 503 dengan `status: degraded`.
+
+Kode responsnya dibedakan per dependency, bukan disamakan:
+
+- Basis data gagal (`database: fail`) atau penyimpanan penuh (`storage.status: full`)
+  menghasilkan **503** dengan `status: degraded`. Instance memang tidak dapat melayani,
+  jadi layak di-restart atau ditarik dari rotasi.
+- WhatsApp terputus (`whatsapp: disconnected`) menghasilkan **200** dengan `status:
+  degraded`, bukan 503. Pemantau uptime tetap dapat memberi alert dari isi body, tetapi
+  healthcheck kontainer tidak me-restart proses: pemulihan sesi menuntut pemindaian QR
+  manual lewat halaman admin, jadi restart hanya akan memicu restart loop (lihat R-08).
+
+Karena WhatsApp terputus kini berkode 200, pemantau uptime yang hanya melihat kode
+status akan menganggapnya hijau dan sinyalnya hilang sama sekali. Konfigurasikan pemantau
+dengan pencocokan kata kunci pada isi respons: cari `"whatsapp":"connected"` dan picu
+alert bila tidak ditemukan. Tanpa ini, keputusan memindahkan WhatsApp dari 503 ke
+200-degraded menukar alert palsu dengan tidak ada alert.
 
 Daftarkan URL itu ke layanan pemantau uptime gratis dengan interval 5 menit. Layanannya
 berada di luar server sehingga tidak dihitung dalam batas dua layanan, dan wajib dicatat
