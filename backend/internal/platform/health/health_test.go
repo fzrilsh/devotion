@@ -114,19 +114,29 @@ func TestHealth_DBDown_503(t *testing.T) {
 	}
 }
 
-// TestHealth_WhatsAppDown_503 reports 503 when the link is down. The body never
-// carries the service number (FR-082): the enum has no room for it.
-func TestHealth_WhatsAppDown_503_FR082(t *testing.T) {
+// TestHealth_WhatsAppDown_200Degraded reports 200 with status degraded when the
+// link is down while the database and storage are healthy: WhatsApp is not a
+// readiness dependency, so a dropped session must not drive 503 and the
+// container restart loop it would cause (R-08). The disconnected state stays
+// visible in the body so an uptime monitor doing keyword matching can alert. The
+// body never carries the service number: the enum has no room for it.
+func TestHealth_WhatsAppDown_200Degraded_R08(t *testing.T) {
 	c := New(fakePinger{}, fakeLink{up: false}, platform.NewTestClock(baseTime), t.TempDir(), "v-test", 500)
 	code, body := doHealth(t, c)
-	if code != http.StatusServiceUnavailable {
-		t.Fatalf("status %d, mau 503", code)
+	if code != http.StatusOK {
+		t.Fatalf("status %d, mau 200", code)
 	}
 	if body.Status != "degraded" {
 		t.Fatalf("status %q, mau degraded", body.Status)
 	}
 	if body.Dependencies.WhatsApp != "disconnected" {
 		t.Fatalf("whatsapp %q, mau disconnected", body.Dependencies.WhatsApp)
+	}
+	if body.Dependencies.Database != "ok" {
+		t.Fatalf("database %q, mau ok", body.Dependencies.Database)
+	}
+	if body.Dependencies.Storage.Status != "ok" {
+		t.Fatalf("storage %q, mau ok", body.Dependencies.Storage.Status)
 	}
 }
 

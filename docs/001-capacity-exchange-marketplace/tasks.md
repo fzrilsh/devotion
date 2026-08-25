@@ -245,9 +245,9 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 - [x] T025 [P] [BE] Health check dan Sentry
   **Modul**: `backend/internal/platform/`
-  **Kemampuan**: `GET /health` memeriksa basis data, WhatsApp, dan kuota penyimpanan; Sentry dengan pembersihan data sensitif
+  **Kemampuan**: `GET /api/health` memeriksa basis data, WhatsApp, dan kuota penyimpanan; Sentry dengan pembersihan data sensitif
   **Dependency**: `sentry-go`; prasyarat T011, T012, T024a
-  **Selesai bila**: health mengembalikan 503 bila ada ketergantungan gagal; test membuktikan kata sandi, token, nomor telepon, dan hal terkait dokumen identitas tidak terkirim ke Sentry
+  **Selesai bila**: health mengembalikan 503 hanya bila basis data gagal atau penyimpanan penuh (instance tidak dapat melayani, layak di-restart); WhatsApp terputus dilaporkan di `dependencies.whatsapp` dengan `status: degraded` pada 200, tidak menggerakkan 503 (lihat R-08, restart tidak menyambungkan sesi yang butuh QR manual); test membuktikan kata sandi, token, nomor telepon, dan hal terkait dokumen identitas tidak terkirim ke Sentry
 
 - [x] T082 [P] [BE] Swagger UI untuk kontrak API
   **Modul**: `backend/internal/platform/httpx/` + `backend/apidocs/`

@@ -511,6 +511,27 @@ perubahannya.
   ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
+- `GET /api/health` memisahkan liveness dari readiness: hanya basis data gagal
+  (`database: fail`) atau penyimpanan penuh (`storage.status: full`) yang
+  menggerakkan 503, sedangkan WhatsApp terputus kini menghasilkan 200 dengan
+  `status: degraded` dan tetap terlihat di `dependencies.whatsapp`. Alasannya
+  restart loop: `docker-compose.yml` memakai `restart: unless-stopped` bersama
+  healthcheck yang memanggil `devotion health:check`, jadi bila WhatsApp
+  terputus mengembalikan 503, container ditandai tidak sehat dan di-restart,
+  padahal pemulihan sesi whatsmeow menuntut pemindaian QR manual lewat halaman
+  admin. Restart tidak menyambungkan apa pun dan hanya menjatuhkan seluruh situs
+  yang basis data dan web-nya sehat. `health:check` diselaraskan agar menilai
+  kode status HTTP saja (200 hidup, 503 mati), bukan lagi mengurai body dan
+  mensyaratkan `status` `"ok"`, supaya body `degraded` tidak ikut memicu restart
+  loop; rute sudah terdaftar sehingga 200 pasti dari handler health, bukan shell
+  SPA. `checkStorage` mencatat `slog.Error` yang menamai path dan galat saat
+  direktori unggahan tak terbaca, karena body hanya membawa enum tetap dan tidak
+  boleh membocorkan path. Pemantau uptime wajib dikonfigurasi mencocokkan
+  `"whatsapp":"connected"` pada isi respons agar terputusnya tetap ter-alert
+  tanpa restart. Uji lewat router membuktikan keempat keadaan (WhatsApp terputus
+  200 degraded, DB gagal 503, storage penuh 503, semua sehat 200 ok), dan uji
+  `health:check` mengunci bahwa body `degraded` pada 200 tetap berhasil.
+  (R-08, T025)
 - Perutean statis (T022, T025): `Static.ServeHTTP` kini mengonsultasi mux untuk
   setiap path sebelum jatuh ke berkas statis lalu fallback `index.html`,
   memakai `ServeMux.Handler` untuk mendeteksi rute terdaftar. Sebelumnya hanya

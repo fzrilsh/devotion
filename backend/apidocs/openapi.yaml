@@ -1566,12 +1566,22 @@ paths:
       security: []
       responses:
         '200':
-          description: Seluruh ketergantungan sehat
+          description: |
+            Instance dapat melayani. status "ok" bila seluruh ketergantungan sehat.
+            status "degraded" bila WhatsApp terputus (whatsapp: disconnected): kanal
+            kode dan notifikasi terganggu, tetapi platform tetap melayani. Ini tidak
+            menghasilkan 503 karena pemulihan sesi WhatsApp menuntut pemindaian QR
+            manual lewat halaman admin, jadi me-restart container tidak menolong dan
+            hanya akan memicu restart loop. Pemantau uptime tetap dapat memberi alert
+            dari isi dependencies.whatsapp.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
         '503':
-          description: Setidaknya satu ketergantungan gagal; status degraded
+          description: |
+            Instance tidak dapat melayani dan layak di-restart atau ditarik dari
+            rotasi; status degraded. Hanya dipicu oleh basis data gagal
+            (database: fail) atau penyimpanan penuh (storage.status: full).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
