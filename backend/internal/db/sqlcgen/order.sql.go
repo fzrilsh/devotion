@@ -11,6 +11,57 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelWorkOrder = `-- name: CancelWorkOrder :one
+UPDATE work_order
+SET status = 'cancelled',
+    cancelled_by_id = $2,
+    cancellation_reason = $3,
+    cancelled_at = $4
+WHERE id = $1
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+`
+
+type CancelWorkOrderParams struct {
+	ID                 pgtype.UUID
+	CancelledByID      pgtype.UUID
+	CancellationReason pgtype.Text
+	CancelledAt        pgtype.Timestamptz
+}
+
+// Records a pre-production self-cancellation on the order itself (FR-065): the
+// cancelling party's profile id, the reason, and the moment, moving status to
+// 'cancelled'. Together the four columns satisfy the cancellation_complete
+// CHECK. The allocation reversal (FR-020) runs separately under the same tx.
+func (q *Queries) CancelWorkOrder(ctx context.Context, arg CancelWorkOrderParams) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, cancelWorkOrder,
+		arg.ID,
+		arg.CancelledByID,
+		arg.CancellationReason,
+		arg.CancelledAt,
+	)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const closeOtherCandidates = `-- name: CloseOtherCandidates :exec
 UPDATE request_candidate
 SET status = 'not_continued', updated_at = $3
@@ -165,6 +216,95 @@ func (q *Queries) GetOfferForAccept(ctx context.Context, id pgtype.UUID) (GetOff
 		&i.WeeklyCapacity,
 		&i.HorizonUntil,
 		&i.RequestHasAgreement,
+	)
+	return i, err
+}
+
+const getWorkOrderForView = `-- name: GetWorkOrderForView :one
+SELECT
+    wo.id,
+    wo.candidate_id,
+    wo.offer_id,
+    wo.buyer_id,
+    wo.subcontractor_id,
+    wo.quantity,
+    wo.total_price,
+    wo.deadline,
+    wo.readiness_week_start,
+    wo.status,
+    wo.shipped_at,
+    wo.confirmed_at,
+    wo.auto_confirmed,
+    wo.cancelled_by_id,
+    wo.cancellation_reason,
+    wo.cancelled_at,
+    wo.created_at,
+    buyer.account_id AS buyer_account,
+    sub.account_id   AS subcontractor_account,
+    r.product_item_id,
+    o.readiness_lead_days
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+JOIN request_candidate c    ON c.id = wo.candidate_id
+JOIN quota_request r        ON r.id = c.request_id
+JOIN offer o                ON o.id = wo.offer_id
+WHERE wo.id = $1
+`
+
+type GetWorkOrderForViewRow struct {
+	ID                   pgtype.UUID
+	CandidateID          pgtype.UUID
+	OfferID              pgtype.UUID
+	BuyerID              pgtype.UUID
+	SubcontractorID      pgtype.UUID
+	Quantity             int32
+	TotalPrice           int64
+	Deadline             pgtype.Date
+	ReadinessWeekStart   pgtype.Date
+	Status               WorkOrderStatus
+	ShippedAt            pgtype.Timestamptz
+	ConfirmedAt          pgtype.Timestamptz
+	AutoConfirmed        bool
+	CancelledByID        pgtype.UUID
+	CancellationReason   pgtype.Text
+	CancelledAt          pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	BuyerAccount         pgtype.UUID
+	SubcontractorAccount pgtype.UUID
+	ProductItemID        pgtype.UUID
+	ReadinessLeadDays    int32
+}
+
+// Loads one work order with the fields WorkOrderDetail needs beyond the row
+// itself: both parties' account ids (for the party guard), the request's product
+// item, and the offer's readiness lead. Keyed on the work order id; the caller
+// checks the account ids against the principal so a non-party sees a 404.
+func (q *Queries) GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetWorkOrderForViewRow, error) {
+	row := q.db.QueryRow(ctx, getWorkOrderForView, id)
+	var i GetWorkOrderForViewRow
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+		&i.BuyerAccount,
+		&i.SubcontractorAccount,
+		&i.ProductItemID,
+		&i.ReadinessLeadDays,
 	)
 	return i, err
 }
@@ -374,6 +514,166 @@ func (q *Queries) ListOtherCandidatesToNotify(ctx context.Context, arg ListOther
 	return items, nil
 }
 
+const listWorkOrderAllocations = `-- name: ListWorkOrderAllocations :many
+SELECT p.week_start, p.total_capacity, p.used_capacity, p.marked_full
+FROM capacity_allocation a
+JOIN availability_period p ON p.id = a.period_id
+WHERE a.work_order_id = $1 AND a.reversed_at IS NULL
+ORDER BY p.week_start
+`
+
+type ListWorkOrderAllocationsRow struct {
+	WeekStart     pgtype.Date
+	TotalCapacity int32
+	UsedCapacity  int32
+	MarkedFull    bool
+}
+
+// The still-active allocation periods of one work order with the period figures
+// WorkOrderDetail renders, ordered ascending by week_start. Reversed rows are
+// left out so a cancelled order shows no live allocation.
+func (q *Queries) ListWorkOrderAllocations(ctx context.Context, workOrderID pgtype.UUID) ([]ListWorkOrderAllocationsRow, error) {
+	rows, err := q.db.Query(ctx, listWorkOrderAllocations, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWorkOrderAllocationsRow{}
+	for rows.Next() {
+		var i ListWorkOrderAllocationsRow
+		if err := rows.Scan(
+			&i.WeekStart,
+			&i.TotalCapacity,
+			&i.UsedCapacity,
+			&i.MarkedFull,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkOrderStatusHistory = `-- name: ListWorkOrderStatusHistory :many
+SELECT new_status, created_at, note
+FROM work_order_status_history
+WHERE work_order_id = $1
+ORDER BY created_at, id
+`
+
+type ListWorkOrderStatusHistoryRow struct {
+	NewStatus WorkOrderStatus
+	CreatedAt pgtype.Timestamptz
+	Note      pgtype.Text
+}
+
+// The status trail of one work order, oldest first, for WorkOrderDetail. Rides
+// idx_status_history_order (work_order_id, created_at) so it stays ordered
+// without a sort.
+func (q *Queries) ListWorkOrderStatusHistory(ctx context.Context, workOrderID pgtype.UUID) ([]ListWorkOrderStatusHistoryRow, error) {
+	rows, err := q.db.Query(ctx, listWorkOrderStatusHistory, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWorkOrderStatusHistoryRow{}
+	for rows.Next() {
+		var i ListWorkOrderStatusHistoryRow
+		if err := rows.Scan(&i.NewStatus, &i.CreatedAt, &i.Note); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkOrdersForParty = `-- name: ListWorkOrdersForParty :many
+SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+FROM work_order wo
+WHERE (
+        ($1::text = 'as_buyer' AND wo.buyer_id = $2::uuid)
+        OR ($1::text = 'as_subcontractor' AND wo.subcontractor_id = $2::uuid)
+        OR ($1::text NOT IN ('as_buyer', 'as_subcontractor')
+            AND (wo.buyer_id = $2::uuid OR wo.subcontractor_id = $2::uuid))
+    )
+  AND (
+        cardinality($3::work_order_status[]) = 0
+        OR wo.status = ANY($3::work_order_status[])
+    )
+  AND (
+        $4::timestamptz IS NULL
+        OR (wo.created_at, wo.id) < ($4::timestamptz, $5::uuid)
+    )
+ORDER BY wo.created_at DESC, wo.id DESC
+LIMIT $6::int
+`
+
+type ListWorkOrdersForPartyParams struct {
+	RoleFilter    string
+	ProfileID     pgtype.UUID
+	StatusFilter  []WorkOrderStatus
+	BeforeCreated pgtype.Timestamptz
+	BeforeID      pgtype.UUID
+	PageLimit     int32
+}
+
+// One party's work orders newest first, keyset paginated on (created_at, id) so
+// the order is stable across pages (FR-038). role_filter selects the side:
+// 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
+// profile, any other value matches either. An empty status_filter array means no
+// status restriction; otherwise only the listed statuses pass. A null
+// before_created is the first page.
+func (q *Queries) ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]WorkOrder, error) {
+	rows, err := q.db.Query(ctx, listWorkOrdersForParty,
+		arg.RoleFilter,
+		arg.ProfileID,
+		arg.StatusFilter,
+		arg.BeforeCreated,
+		arg.BeforeID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WorkOrder{}
+	for rows.Next() {
+		var i WorkOrder
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.OfferID,
+			&i.BuyerID,
+			&i.SubcontractorID,
+			&i.Quantity,
+			&i.TotalPrice,
+			&i.Deadline,
+			&i.ReadinessWeekStart,
+			&i.Status,
+			&i.ShippedAt,
+			&i.ConfirmedAt,
+			&i.AutoConfirmed,
+			&i.CancelledByID,
+			&i.CancellationReason,
+			&i.CancelledAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockListingByID = `-- name: LockListingByID :one
 SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at FROM capacity_listing WHERE id = $1 FOR UPDATE
 `
@@ -451,6 +751,38 @@ SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_p
 // reversal runs under a lock in the same spirit as formation locking the listing.
 func (q *Queries) LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) (WorkOrder, error) {
 	row := q.db.QueryRow(ctx, lockWorkOrderForReversal, id)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const lockWorkOrderForStatusChange = `-- name: LockWorkOrderForStatusChange :one
+SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at FROM work_order WHERE id = $1 FOR UPDATE
+`
+
+// Row-locks a work order before a status transition so a concurrent status
+// change or cancellation on the same order serializes, matching the reversal
+// lock spirit (R-04).
+func (q *Queries) LockWorkOrderForStatusChange(ctx context.Context, id pgtype.UUID) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, lockWorkOrderForStatusChange, id)
 	var i WorkOrder
 	err := row.Scan(
 		&i.ID,
@@ -573,4 +905,46 @@ type SetCandidateAgreedParams struct {
 func (q *Queries) SetCandidateAgreed(ctx context.Context, arg SetCandidateAgreedParams) error {
 	_, err := q.db.Exec(ctx, setCandidateAgreed, arg.ID, arg.UpdatedAt)
 	return err
+}
+
+const updateWorkOrderStatus = `-- name: UpdateWorkOrderStatus :one
+UPDATE work_order
+SET status = $2,
+    shipped_at = CASE WHEN $2 = 'shipped'::work_order_status THEN $3 ELSE shipped_at END
+WHERE id = $1
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+`
+
+type UpdateWorkOrderStatusParams struct {
+	ID        pgtype.UUID
+	Status    WorkOrderStatus
+	ShippedAt pgtype.Timestamptz
+}
+
+// Advances a work order to its next forward status. shipped_at is stamped only
+// on the move into 'shipped' and left untouched otherwise, so it records the
+// moment shipment was declared (the auto-confirm clock start, FR-068).
+func (q *Queries) UpdateWorkOrderStatus(ctx context.Context, arg UpdateWorkOrderStatusParams) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, updateWorkOrderStatus, arg.ID, arg.Status, arg.ShippedAt)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }

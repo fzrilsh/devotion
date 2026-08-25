@@ -523,7 +523,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: jalankan seluruh transisi status; pada pesanan kedua, biarkan status Dikirim melewati tujuh hari dan pastikan tertutup otomatis.
 
-- [ ] T053 [US5] [BE] Mesin keadaan pesanan
+- [x] T053 [US5] [BE] Mesin keadaan pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-038, FR-039, FR-044
   **Kemampuan**: transisi sesuai diagram `data-model.md` §7; riwayat status dengan waktu dan pelaku; penolakan transisi melompat beserta daftar transisi yang diizinkan
@@ -531,7 +531,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: `WorkOrderDetail` mengirim `allowed_transitions` dan `self_cancellable`; galat `INVALID_STATUS_TRANSITION` menyebut urutan yang benar
   **Hati-hati**: perubahan oleh penjadwal ditandai `oleh_sistem`, bukan dibiarkan tanpa identitas.
 
-- [ ] T054 [US5] [BE] Pembatalan
+- [x] T054 [US5] [BE] Pembatalan
   **Modul**: `backend/internal/order/`
   **FR**: FR-065, FR-066, FR-072
   **Kemampuan**: pembatalan oleh kedua pihak selama status masih diterima, wajib beralasan, membalik seluruh alokasi; setelah produksi diarahkan ke sengketa

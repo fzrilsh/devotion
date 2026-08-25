@@ -90,6 +90,21 @@ func principalAccount(w http.ResponseWriter, r *http.Request) (sqlcgen.UserAccou
 	return acc, true
 }
 
+// decodeJSON reads the request body into dst, rejecting an unknown field or a
+// malformed body with VALIDATION_FAILED. The body is capped so a large payload
+// cannot exhaust memory. It returns false when it already wrote the problem, so
+// the handler returns early. Modeled on notification's decodeJSON.
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(dst); err != nil {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Format permintaan tidak sah.")
+		return false
+	}
+	return true
+}
+
 // itoa64 formats an int64 in base 10, for the capacity and quantity figures the
 // Indonesian detail strings quote.
 func itoa64(n int64) string { return strconv.FormatInt(n, 10) }

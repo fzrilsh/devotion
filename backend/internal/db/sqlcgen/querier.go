@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	// Records a pre-production self-cancellation on the order itself (FR-065): the
+	// cancelling party's profile id, the reason, and the moment, moving status to
+	// 'cancelled'. Together the four columns satisfy the cancellation_complete
+	// CHECK. The allocation reversal (FR-020) runs separately under the same tx.
+	CancelWorkOrder(ctx context.Context, arg CancelWorkOrderParams) (WorkOrder, error)
 	// CityExists reports whether a city code is known, so registration and profile
 	// edits can answer 422 on an unknown city instead of surfacing a foreign key
 	// violation as a 500.
@@ -206,6 +211,11 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// Loads one work order with the fields WorkOrderDetail needs beyond the row
+	// itself: both parties' account ids (for the party guard), the request's product
+	// item, and the offer's readiness lead. Keyed on the work order id; the caller
+	// checks the account ids against the principal so a non-party sees a 404.
+	GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetWorkOrderForViewRow, error)
 	// One capacity allocation row per used period (FR-077).
 	InsertAllocation(ctx context.Context, arg InsertAllocationParams) (CapacityAllocation, error)
 	// InsertItemProposal records a user's proposal for a new catalog item (FR-061).
@@ -322,6 +332,21 @@ type Querier interface {
 	// VerificationRequest carries (the verification_request table has no such
 	// column). The caller sees only their own submissions (FR-006).
 	ListVerificationRequestsByProfile(ctx context.Context, profileID pgtype.UUID) ([]ListVerificationRequestsByProfileRow, error)
+	// The still-active allocation periods of one work order with the period figures
+	// WorkOrderDetail renders, ordered ascending by week_start. Reversed rows are
+	// left out so a cancelled order shows no live allocation.
+	ListWorkOrderAllocations(ctx context.Context, workOrderID pgtype.UUID) ([]ListWorkOrderAllocationsRow, error)
+	// The status trail of one work order, oldest first, for WorkOrderDetail. Rides
+	// idx_status_history_order (work_order_id, created_at) so it stays ordered
+	// without a sort.
+	ListWorkOrderStatusHistory(ctx context.Context, workOrderID pgtype.UUID) ([]ListWorkOrderStatusHistoryRow, error)
+	// One party's work orders newest first, keyset paginated on (created_at, id) so
+	// the order is stable across pages (FR-038). role_filter selects the side:
+	// 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
+	// profile, any other value matches either. An empty status_filter array means no
+	// status restriction; otherwise only the listed statuses pass. A null
+	// before_created is the first page.
+	ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]WorkOrder, error)
 	// Takes a row lock on a listing by its own id, so the accept path can extend the
 	// calendar horizon (FR-088) under the same lock the listing owner's edits take.
 	LockListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
@@ -347,6 +372,10 @@ type Querier interface {
 	// Takes a row lock on the work order whose allocation is being reversed, so the
 	// reversal runs under a lock in the same spirit as formation locking the listing.
 	LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) (WorkOrder, error)
+	// Row-locks a work order before a status transition so a concurrent status
+	// change or cancellation on the same order serializes, matching the reversal
+	// lock spirit (R-04).
+	LockWorkOrderForStatusChange(ctx context.Context, id pgtype.UUID) (WorkOrder, error)
 	// Returns a period's used_capacity to its pre-order value by subtracting the
 	// reversed amount. The inverse of RaiseUsedCapacity; the quantity comes from the
 	// allocation row being reversed, so used_capacity never drops below zero.
@@ -488,6 +517,10 @@ type Querier interface {
 	// the business name, the chosen city, the map coordinates, and the free-text
 	// description. account_id and verified are never touched here.
 	UpdateProfile(ctx context.Context, arg UpdateProfileParams) (BusinessProfile, error)
+	// Advances a work order to its next forward status. shipped_at is stamped only
+	// on the move into 'shipped' and left untouched otherwise, so it records the
+	// moment shipment was declared (the auto-confirm clock start, FR-068).
+	UpdateWorkOrderStatus(ctx context.Context, arg UpdateWorkOrderStatusParams) (WorkOrder, error)
 	// UpsertAdmin creates the admin account or, when the email already exists,
 	// resets its password. Idempotent so admin:create can run twice without a
 	// duplicate. role_admin is set true and the two business roles false, which the

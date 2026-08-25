@@ -21,6 +21,7 @@ import (
 func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	gate := httpx.RequireRole(auth, httpx.RoleBuyer)
 	r.Gated("POST /api/offers/{offerId}/accept", gate, s.handleAccept)
+	s.registerWorkOrder(r, auth)
 }
 
 // handleAccept forms the agreement from an accepted offer (FR-034, FR-036). The
@@ -437,10 +438,12 @@ func remainingCapacity(p sqlcgen.AvailabilityPeriod) int32 {
 	return r
 }
 
-// allowedTransitions returns the status moves the buyer may trigger next, so the
-// client renders buttons from this array instead of re-implementing the machine
-// (FR-039). A freshly accepted order may enter production, be cancelled, or go to
-// mediation.
+// allowedTransitions returns the status moves that may follow the current one, so
+// the client renders buttons from this array instead of re-implementing the
+// machine (FR-039). The table is data-model.md section 7: the forward chain
+// accepted -> production -> completed -> shipped -> confirmed, cancellation only
+// before production, and mediation reachable from any active stage. Terminal
+// states (confirmed, cancelled) have no outgoing move.
 func allowedTransitions(status sqlcgen.WorkOrderStatus) []string {
 	switch status {
 	case sqlcgen.WorkOrderStatusAccepted:
@@ -449,7 +452,52 @@ func allowedTransitions(status sqlcgen.WorkOrderStatus) []string {
 			string(sqlcgen.WorkOrderStatusCancelled),
 			string(sqlcgen.WorkOrderStatusInMediation),
 		}
+	case sqlcgen.WorkOrderStatusProduction:
+		return []string{
+			string(sqlcgen.WorkOrderStatusCompleted),
+			string(sqlcgen.WorkOrderStatusInMediation),
+		}
+	case sqlcgen.WorkOrderStatusCompleted:
+		return []string{
+			string(sqlcgen.WorkOrderStatusShipped),
+			string(sqlcgen.WorkOrderStatusInMediation),
+		}
+	case sqlcgen.WorkOrderStatusShipped:
+		return []string{
+			string(sqlcgen.WorkOrderStatusConfirmed),
+			string(sqlcgen.WorkOrderStatusInMediation),
+		}
+	case sqlcgen.WorkOrderStatusInMediation:
+		return []string{
+			string(sqlcgen.WorkOrderStatusCancelled),
+			string(sqlcgen.WorkOrderStatusConfirmed),
+		}
 	default:
 		return []string{}
+	}
+}
+
+// statusLabelID maps a work-order status to the Indonesian label the user sees.
+// The INVALID_STATUS_TRANSITION detail and the ordered-sequence hint are composed
+// from these labels, so the message reads in the interface language while the
+// stored status stays the English machine value.
+func statusLabelID(status sqlcgen.WorkOrderStatus) string {
+	switch status {
+	case sqlcgen.WorkOrderStatusAccepted:
+		return "Diterima"
+	case sqlcgen.WorkOrderStatusProduction:
+		return "Produksi"
+	case sqlcgen.WorkOrderStatusCompleted:
+		return "Selesai"
+	case sqlcgen.WorkOrderStatusShipped:
+		return "Dikirim"
+	case sqlcgen.WorkOrderStatusConfirmed:
+		return "Dikonfirmasi"
+	case sqlcgen.WorkOrderStatusCancelled:
+		return "Dibatalkan"
+	case sqlcgen.WorkOrderStatusInMediation:
+		return "Dalam Mediasi"
+	default:
+		return string(status)
 	}
 }

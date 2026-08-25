@@ -2,6 +2,7 @@ package order
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -21,44 +22,52 @@ import (
 // This is the reversal capability US5's cancellation (T054) builds on. It does
 // not itself change the work order status or write history; the cancellation
 // path owns those. For T048 the reversal opens its own transaction and stays
-// self-contained.
+// self-contained. The cancellation path reuses reverseAllocationInTx under its
+// own transaction so the reversal and the status change commit together.
 func (s *Service) ReverseAllocation(ctx context.Context, workOrderID pgtype.UUID) error {
 	now := s.clock.Now()
 	return db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
-		q := sqlcgen.New(tx)
-
-		// Lock the work order first, in the same spirit formation locks the listing,
-		// so a concurrent reversal or status change on the same order serializes.
-		if _, err := q.LockWorkOrderForReversal(ctx, workOrderID); err != nil {
-			return err
-		}
-
-		// Lock the active allocation rows and their periods ascending by week_start.
-		// The order matches LockPeriodsInRange in formation: two transactions on the
-		// same periods always take them in the same order (R-04 deadlock preventer).
-		allocs, err := q.ListActiveAllocationsForReversal(ctx, workOrderID)
-		if err != nil {
-			return err
-		}
-
-		for _, a := range allocs {
-			// Return the period to its pre-order used_capacity. The amount is the
-			// allocation's own quantity, so the subtraction cannot drop below zero.
-			if _, err := q.LowerUsedCapacity(ctx, sqlcgen.LowerUsedCapacityParams{
-				ID:           a.PeriodID,
-				UsedCapacity: a.Quantity,
-				UpdatedAt:    tstz(now),
-			}); err != nil {
-				return err
-			}
-			// Mark the row reversed rather than deleting it (FR-020).
-			if err := q.MarkAllocationReversed(ctx, sqlcgen.MarkAllocationReversedParams{
-				ID:         a.AllocationID,
-				ReversedAt: tstz(now),
-			}); err != nil {
-				return err
-			}
-		}
-		return nil
+		return s.reverseAllocationInTx(ctx, sqlcgen.New(tx), workOrderID, now)
 	})
+}
+
+// reverseAllocationInTx performs the reversal on an existing transaction's
+// queries. Kept separate from ReverseAllocation so the cancellation path can run
+// it under the same transaction that flips the status, keeping both atomic
+// rather than opening a nested transaction that would self-block on the work
+// order's row lock.
+func (s *Service) reverseAllocationInTx(ctx context.Context, q *sqlcgen.Queries, workOrderID pgtype.UUID, now time.Time) error {
+	// Lock the work order first, in the same spirit formation locks the listing,
+	// so a concurrent reversal or status change on the same order serializes.
+	if _, err := q.LockWorkOrderForReversal(ctx, workOrderID); err != nil {
+		return err
+	}
+
+	// Lock the active allocation rows and their periods ascending by week_start.
+	// The order matches LockPeriodsInRange in formation: two transactions on the
+	// same periods always take them in the same order (R-04 deadlock preventer).
+	allocs, err := q.ListActiveAllocationsForReversal(ctx, workOrderID)
+	if err != nil {
+		return err
+	}
+
+	for _, a := range allocs {
+		// Return the period to its pre-order used_capacity. The amount is the
+		// allocation's own quantity, so the subtraction cannot drop below zero.
+		if _, err := q.LowerUsedCapacity(ctx, sqlcgen.LowerUsedCapacityParams{
+			ID:           a.PeriodID,
+			UsedCapacity: a.Quantity,
+			UpdatedAt:    tstz(now),
+		}); err != nil {
+			return err
+		}
+		// Mark the row reversed rather than deleting it (FR-020).
+		if err := q.MarkAllocationReversed(ctx, sqlcgen.MarkAllocationReversedParams{
+			ID:         a.AllocationID,
+			ReversedAt: tstz(now),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -29,6 +29,38 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Endpoint pembatalan pesanan `POST /api/work-orders/{workOrderId}/cancel` (T054,
+  FR-020, FR-065, FR-066, FR-072). Kedua pihak (pembeli atau subkontraktor) boleh
+  membatalkan selama status masih `accepted`; rute digerbang kedua peran usaha dan
+  handler menegakkan penjaga pihak, jadi bukan-pihak jadi 404 tanpa membocorkan
+  keberadaan pesanan. Alasan wajib 5 sampai 500 karakter, di luar rentang itu
+  ditolak `VALIDATION_FAILED` (422). Dalam satu transaksi: status dikunci lalu
+  diperiksa, `cancelled_by_id` diisi id profil pihak pembatal (dasar perhitungan
+  tingkat penyelesaian FR-072), alasan dan waktu dicatat, status menjadi
+  `cancelled`, baris riwayat status ditulis dengan pelaku manusia (`by_system` =
+  false), dan seluruh alokasi dibalik lewat `reverseAllocationInTx` sehingga
+  perubahan status dan pengembalian kapasitas commit bersama (FR-020). Setelah
+  pesanan lewat `accepted` (masuk produksi atau lebih), pembatalan sendiri tidak
+  tersedia: `CANCELLATION_AFTER_PRODUCTION` (409) dengan meta `alternative_path`
+  menuju jalur sengketa (FR-066). Pihak lawan diberi tahu beserta alasannya
+  lewat kejadian `order_status_changed` (FR-051 mendaftar "perubahan status
+  pesanan", pembatalan adalah transisi accepted ke cancelled, jadi tidak ada
+  nilai enum baru), FR-065. Respons mengembalikan `WorkOrderDetail`
+  yang sudah dimuat ulang.
+- Mesin keadaan pesanan dan endpoint baca work-order (T053, FR-038, FR-039,
+  FR-044). `GET /api/work-orders/{workOrderId}` mengembalikan `WorkOrderDetail`
+  lengkap dengan `allowed_transitions` dan `self_cancellable` supaya frontend
+  merender tombol dari array itu, bukan menyalin mesin keadaan. Penjaga pihak
+  membandingkan akun pemanggil dengan pembeli dan subkontraktor pesanan, jadi
+  bukan-pihak, id tak sah, dan pesanan tidak ada sama-sama jadi 404 tanpa
+  membocorkan keberadaan pesanan. `POST /api/work-orders/{workOrderId}/status`
+  digerbang subkontraktor (FR-005) untuk transisi maju (production, completed,
+  shipped); lompatan di luar urutan ditolak `INVALID_STATUS_TRANSITION` yang
+  menyebut urutan yang diizinkan (Diterima, Produksi, Selesai, Dikirim) beserta
+  meta `current_status` dan `allowed_transitions`. Perubahan status mencatat
+  pelaku (`changed_by` = id akun, `by_system` = false) dan memberi tahu pembeli.
+  `GET /api/work-orders` melistkan pesanan per pihak dengan paginasi keyset
+  (kursor opaque), filter `status[]` dan `role=as_buyer|as_subcontractor`.
 - Pembalikan alokasi kapasitas satu pesanan dalam satu transaksi (`ReverseAllocation`
   di `internal/order`, FR-020). Setiap periode dikembalikan ke `used_capacity`
   sebelum pesanan terbentuk dengan mengurangi kuantitas baris alokasinya, dan
