@@ -464,44 +464,6 @@ func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCa
 	return items, nil
 }
 
-const listOffersByCandidate = `-- name: ListOffersByCandidate :many
-SELECT id, candidate_id, sequence, proposed_by, total_price, readiness_lead_days, note, created_at
-FROM offer
-WHERE candidate_id = $1
-ORDER BY sequence ASC
-`
-
-// ListOffersByCandidate returns a candidate's full offer chain oldest first so
-// the buyer sees every round side by side (FR-032).
-func (q *Queries) ListOffersByCandidate(ctx context.Context, candidateID pgtype.UUID) ([]Offer, error) {
-	rows, err := q.db.Query(ctx, listOffersByCandidate, candidateID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Offer{}
-	for rows.Next() {
-		var i Offer
-		if err := rows.Scan(
-			&i.ID,
-			&i.CandidateID,
-			&i.Sequence,
-			&i.ProposedBy,
-			&i.TotalPrice,
-			&i.ReadinessLeadDays,
-			&i.Note,
-			&i.CreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listOffersByRequest = `-- name: ListOffersByRequest :many
 SELECT o.id, o.candidate_id, o.sequence, o.proposed_by, o.total_price,
        o.readiness_lead_days, o.note, o.created_at

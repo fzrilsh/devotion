@@ -33,19 +33,6 @@ func (q *Queries) CountActiveCatalogItemsOfType(ctx context.Context, arg CountAc
 	return column_1, err
 }
 
-const countPeriods = `-- name: CountPeriods :one
-SELECT count(*)::bigint FROM availability_period WHERE listing_id = $1
-`
-
-// CountPeriods counts a listing's periods, backing the FR-088 "at least 13
-// periods" check.
-func (q *Queries) CountPeriods(ctx context.Context, listingID pgtype.UUID) (int64, error) {
-	row := q.db.QueryRow(ctx, countPeriods, listingID)
-	var column_1 int64
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const createListing = `-- name: CreateListing :one
 
 INSERT INTO capacity_listing (
@@ -471,19 +458,6 @@ func (q *Queries) LockPeriodByWeek(ctx context.Context, arg LockPeriodByWeekPara
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const maxPeriodWeek = `-- name: MaxPeriodWeek :one
-SELECT max(week_start)::date FROM availability_period WHERE listing_id = $1
-`
-
-// MaxPeriodWeek returns the furthest week_start a listing has, so a test can
-// assert horizon_until equals the last generated period.
-func (q *Queries) MaxPeriodWeek(ctx context.Context, listingID pgtype.UUID) (pgtype.Date, error) {
-	row := q.db.QueryRow(ctx, maxPeriodWeek, listingID)
-	var column_1 pgtype.Date
-	err := row.Scan(&column_1)
-	return column_1, err
 }
 
 const periodHasActiveAllocation = `-- name: PeriodHasActiveAllocation :one
