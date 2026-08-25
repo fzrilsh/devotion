@@ -9,6 +9,7 @@ package account
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -33,6 +34,11 @@ const bcryptCost = 10
 // default, so tests move the clock instead of waiting.
 const codeTTL = 15 * time.Minute
 
+// deliverTimeout bounds a single out-of-band code send. The send runs detached
+// from the request context (R-09), so it needs its own ceiling: a hung SMTP or
+// WhatsApp dial cannot leak a goroutine forever.
+const deliverTimeout = 30 * time.Second
+
 // CodeDelivery hands a freshly minted plaintext code to its out-of-band
 // channel. The account service never persists the plaintext; it stores only the
 // hash and passes the plaintext here exactly once. Delivery failures must not
@@ -54,13 +60,23 @@ type Service struct {
 	sessions *session.Store
 	limiter  *ratelimit.Limiter
 	delivery CodeDelivery
+	log      *slog.Logger
+	// devMode logs the plaintext verification code to slog so local development
+	// can read a code that is otherwise only stored as a hash. It must never be
+	// true in production: the code would leak into the log stream.
+	devMode bool
 }
 
 // New builds a Service. delivery may be nil, in which case issued codes are
 // stored but not sent anywhere (useful before the notification channels exist
-// and in tests that read the hash directly).
-func New(pool *pgxpool.Pool, clock platform.Clock, sessions *session.Store, limiter *ratelimit.Limiter, delivery CodeDelivery) *Service {
-	return &Service{pool: pool, clock: clock, sessions: sessions, limiter: limiter, delivery: delivery}
+// and in tests that read the hash directly). log may be nil (the CLI admin
+// subcommand does not send codes); a nil logger falls back to slog.Default so a
+// send failure is never silently dropped. devMode must be false in production.
+func New(pool *pgxpool.Pool, clock platform.Clock, sessions *session.Store, limiter *ratelimit.Limiter, delivery CodeDelivery, log *slog.Logger, devMode bool) *Service {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &Service{pool: pool, clock: clock, sessions: sessions, limiter: limiter, delivery: delivery, log: log, devMode: devMode}
 }
 
 // queries returns a Queries bound to the pool for a standalone statement.

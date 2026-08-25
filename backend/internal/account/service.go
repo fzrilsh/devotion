@@ -143,21 +143,45 @@ func (s *Service) issueAndSend(ctx context.Context, acc sqlcgen.UserAccount, pur
 	s.deliver(ctx, acc, purpose, code)
 }
 
-// deliver routes a plaintext code to its channel. A nil delivery is a no-op, so
-// wiring works before the notification channels exist. Delivery errors are
-// swallowed here: every caller treats delivery as best effort.
+// deliver routes a plaintext code to its channel. The send runs in its own
+// goroutine so the HTTP response never waits on SMTP or WhatsApp (R-09), and a
+// send failure only lands in the log: registration, resend, and recover all
+// treat delivery as best effort and never fail on it. Email failure is silent
+// at the protocol level, so this log line is the only trace that a code did not
+// go out. In development the plaintext code is logged too, because codes are
+// stored only as a hash and local dev has no other way to read one; devMode is
+// never true in production, where logging a code would leak it.
 func (s *Service) deliver(ctx context.Context, acc sqlcgen.UserAccount, purpose sqlcgen.VerificationPurpose, code string) {
+	if s.devMode {
+		s.log.InfoContext(ctx, "kode verifikasi (development)",
+			"purpose", string(purpose), "account_id", uuidString(acc.ID), "code", code)
+	}
 	if s.delivery == nil {
+		s.log.WarnContext(ctx, "kode verifikasi tidak dikirim: pengirim belum terpasang",
+			"purpose", string(purpose), "account_id", uuidString(acc.ID))
 		return
 	}
-	switch purpose {
-	case sqlcgen.VerificationPurposeEmail:
-		_ = s.delivery.SendEmailCode(ctx, acc.Email, code)
-	case sqlcgen.VerificationPurposePhone:
-		_ = s.delivery.SendPhoneCode(ctx, acc.Phone, code)
-	case sqlcgen.VerificationPurposeRecovery:
-		_ = s.delivery.SendRecoveryCode(ctx, acc.Email, code)
-	}
+
+	// The context of the request may be cancelled once the handler returns, so
+	// the send uses a detached context bounded by its own timeout. Without this
+	// the goroutine could race the response and be cancelled mid-send.
+	sendCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), deliverTimeout)
+	go func() {
+		defer cancel()
+		var err error
+		switch purpose {
+		case sqlcgen.VerificationPurposeEmail:
+			err = s.delivery.SendEmailCode(sendCtx, acc.Email, code)
+		case sqlcgen.VerificationPurposePhone:
+			err = s.delivery.SendPhoneCode(sendCtx, acc.Phone, code)
+		case sqlcgen.VerificationPurposeRecovery:
+			err = s.delivery.SendRecoveryCode(sendCtx, acc.Email, code)
+		}
+		if err != nil {
+			s.log.WarnContext(sendCtx, "pengiriman kode verifikasi gagal",
+				"purpose", string(purpose), "account_id", uuidString(acc.ID), "error", err)
+		}
+	}()
 }
 
 // verify checks a submitted code against the latest unconsumed code for the

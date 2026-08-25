@@ -66,7 +66,7 @@ func TestVerifyPhone_JalurBerhasil_FR002(t *testing.T) {
 	h := newHarness(t, "verify_phone_ok")
 	cookie := h.registerAndLogin(t, "hp@example.com", "+6281300030003", "rahasia123")
 
-	code := h.delivery.phone
+	code := h.delivery.waitPhone(t)
 	if !codeRe.MatchString(code) {
 		t.Fatalf("kode HP = %q, mau enam digit", code)
 	}

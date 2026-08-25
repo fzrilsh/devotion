@@ -126,7 +126,7 @@ func runServe(ctx context.Context, args []string) error {
 	// transports as notifications, but out of band of the queue, so registration
 	// actually sends the code it mints (FR-001). The adapter is best effort: a
 	// nil transport or a send failure never fails the request that issued the code.
-	acc := account.New(pool, clock, sessions, limiter, notification.NewCodeDelivery(email, wa))
+	acc := account.New(pool, clock, sessions, limiter, notification.NewCodeDelivery(email, wa), log, cfg.IsDevelopment())
 	acc.Register(router)
 	ls := listing.New(pool, clock)
 	ls.Register(router, acc)

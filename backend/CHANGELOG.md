@@ -7,6 +7,16 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Pengiriman kode verifikasi kini berjalan di goroutine sehingga respons HTTP
+  registrasi tidak menunggu SMTP atau WhatsApp (R-09). Kegagalan kirim email
+  maupun WhatsApp tidak lagi membatalkan registrasi yang sudah tersimpan, dan
+  setiap kegagalan dicatat ke `slog` beserta alasannya (kegagalan email senyap
+  di level protokol, jadi baris log ini satu-satunya jejaknya). Cabang senyap
+  `if s.delivery == nil { return }` dihapus: pengirim yang belum terpasang kini
+  memunculkan peringatan di log, bukan hilang tanpa jejak. Pada
+  `APP_ENV=development` saja, kode verifikasi plaintext ikut dicatat ke `slog`
+  karena kode hanya disimpan sebagai hash dan pengembangan lokal tidak punya
+  cara lain membacanya; ini tidak pernah aktif di produksi. (FR-001, FR-002, R-09)
 - `POST /api/auth/register` sekarang benar-benar mengirim kode verifikasi email
   dan nomor. Sebelumnya `account.New` dipasang dengan `delivery` nil di
   `serve.go`, jadi kode dibuat dan di-hash tapi tidak pernah diserahkan ke
