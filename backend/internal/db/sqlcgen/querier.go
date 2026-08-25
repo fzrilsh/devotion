@@ -22,6 +22,9 @@ type Querier interface {
 	// delivery job runs under an advisory lock, so no row lock is needed to keep two
 	// instances off the same channel.
 	ClaimPendingChannels(ctx context.Context, limit int32) ([]ClaimPendingChannelsRow, error)
+	// Closes the request's other candidates once one is agreed (FR-034): they move to
+	// not_continued, leaving already rejected, expired, or agreed rows untouched.
+	CloseOtherCandidates(ctx context.Context, arg CloseOtherCandidatesParams) error
 	// ConsumeVerificationCode marks a code used so it cannot be replayed. The
 	// consumed_at IS NULL guard makes double-consume a no-op, and the returned row
 	// count lets the caller detect a code already spent.
@@ -44,9 +47,6 @@ type Querier interface {
 	// the current window. Each (address, member) pair is one row, so the row count
 	// is the distinct-member count. The pattern is address + separator + '%'.
 	CountDistinctMembers(ctx context.Context, arg CountDistinctMembersParams) (int64, error)
-	// CountPeriods counts a listing's periods, backing the FR-088 "at least 13
-	// periods" check.
-	CountPeriods(ctx context.Context, listingID pgtype.UUID) (int64, error)
 	// CountProvinces, CountCities, CountCatalogByType back the seed verification and
 	// the "count is greater than zero" done-check.
 	CountProvinces(ctx context.Context) (int64, error)
@@ -112,6 +112,15 @@ type Querier interface {
 	// EmailExists reports whether an email is already registered, so registration
 	// can answer 409 without leaking through a full row read.
 	EmailExists(ctx context.Context, email string) (bool, error)
+	// Optimistic remaining capacity across the readiness..deadline range, read BEFORE
+	// the accept path takes any lock. It mirrors search's formula (search.sql,
+	// FR-080/FR-088): recorded remaining over not-full periods plus an optimistic
+	// estimate for weeks past horizon_until counted at weekly_capacity. A shortfall
+	// here means the offer never had enough capacity, so accept fails fast with
+	// INSUFFICIENT_CAPACITY without locking. If this passes but the post-lock read is
+	// short, the capacity was definitively taken between the two reads
+	// (CAPACITY_ALREADY_TAKEN). Deadline is rounded to Monday in Go before calling.
+	EstimateCapacityInRange(ctx context.Context, arg EstimateCapacityInRangeParams) (EstimateCapacityInRangeRow, error)
 	// FindFutureAllocatedPeriodOverCapacity returns the earliest future period whose
 	// used capacity already exceeds the proposed new weekly capacity, so a listing
 	// edit that would strand a running order is rejected with a 409 that names the
@@ -154,6 +163,12 @@ type Querier interface {
 	// GetNotifPreferences reads the two non-transactional channel toggles for one
 	// account, backing GET /notifications/preferences (FR-054).
 	GetNotifPreferences(ctx context.Context, id pgtype.UUID) (GetNotifPreferencesRow, error)
+	// Loads everything the accept path needs about one offer: the offer terms, the
+	// candidate and its owning listing, the request and both parties, the listing
+	// capacity fields, whether the offer is the standing (latest) one, and whether
+	// any candidate of the request already reached an agreement. Keyed on the offer
+	// id the buyer accepts.
+	GetOfferForAccept(ctx context.Context, id pgtype.UUID) (GetOfferForAcceptRow, error)
 	// GetOfferForCounter loads one offer with the context the counter-offer path
 	// needs: the candidate it belongs to, that candidate's status, and both parties'
 	// accounts so the service can check the caller alternates with the last proposer
@@ -184,6 +199,8 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// One capacity allocation row per used period (FR-077).
+	InsertAllocation(ctx context.Context, arg InsertAllocationParams) (CapacityAllocation, error)
 	// InsertItemProposal records a user's proposal for a new catalog item (FR-061).
 	// profile_id is the proposer's business profile, type is product or machine, and
 	// created_at comes from the Clock since the column has no DB default. status
@@ -211,6 +228,8 @@ type Querier interface {
 	// sequence as max+1 so every counter-offer is a new row and the full history is
 	// preserved (FR-033). created_at comes from the injected Clock (Rule 5).
 	InsertOffer(ctx context.Context, arg InsertOfferParams) (Offer, error)
+	// Records the opening status transition of a work order for its history trail.
+	InsertOrderStatusHistory(ctx context.Context, arg InsertOrderStatusHistoryParams) error
 	// ── availability calendar ──
 	// InsertPeriodsUpToWeek generates every missing weekly period from the current
 	// horizon forward to untilWeek in one statement. The series runs on date, not
@@ -231,6 +250,9 @@ type Querier interface {
 	// subcontractor_id equals the request's buyer_id; the service rejects that case
 	// first (FR-083), so this insert is the safety net.
 	InsertRequestCandidate(ctx context.Context, arg InsertRequestCandidateParams) (RequestCandidate, error)
+	// Inserts the work order at agreement formation. readiness_week_start is stored,
+	// not recomputed later (FR-084); status takes its 'accepted' default.
+	InsertWorkOrder(ctx context.Context, arg InsertWorkOrderParams) (WorkOrder, error)
 	// InvalidateVerificationCodes consumes all outstanding codes for an account and
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
@@ -263,12 +285,12 @@ type Querier interface {
 	// rows arrive. unread_only filters to still-unread rows (FR-051 list). A null
 	// before_created is the first page; later pages pass the last row's cursor.
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
-	// ListOffersByCandidate returns a candidate's full offer chain oldest first so
-	// the buyer sees every round side by side (FR-032).
-	ListOffersByCandidate(ctx context.Context, candidateID pgtype.UUID) ([]Offer, error)
 	// ListOffersByRequest returns every offer across all candidates of a request so
 	// the detail view attaches each candidate's chain in one query (FR-032).
 	ListOffersByRequest(ctx context.Context, requestID pgtype.UUID) ([]Offer, error)
+	// The other still-open candidates of the request, so their subcontractors learn
+	// the request was agreed elsewhere. Rejected and expired candidates are left out.
+	ListOtherCandidatesToNotify(ctx context.Context, arg ListOtherCandidatesToNotifyParams) ([]ListOtherCandidatesToNotifyRow, error)
 	// ListPeriodsInRange returns the periods of a listing within an inclusive
 	// week_start range, ordered ascending, for GET /listing/me/periods. allocated
 	// is the sum of active allocation quantities on each period; remaining is the
@@ -282,6 +304,9 @@ type Querier interface {
 	// across pages (FR-030, FR-080). The cursor tuple admits every row on the first
 	// page via sentinels above the maxima.
 	ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaRequestsByBuyerParams) ([]QuotaRequest, error)
+	// Takes a row lock on a listing by its own id, so the accept path can extend the
+	// calendar horizon (FR-088) under the same lock the listing owner's edits take.
+	LockListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
 	// LockListingByProfile takes a row lock on the profile's listing so a capacity
 	// edit and its propagation to future periods run as one serialized unit. The
 	// listing row is always locked before any availability_period row, and that
@@ -292,6 +317,11 @@ type Querier interface {
 	// horizon and must be generated first. Taken only after the listing row is
 	// locked, keeping the fixed lock order.
 	LockPeriodByWeek(ctx context.Context, arg LockPeriodByWeekParams) (AvailabilityPeriod, error)
+	// Locks every candidate period in the readiness..deadline range at once, ordered
+	// ascending by week_start. The order is the deadlock preventer of R-04, not tidy
+	// housekeeping: two agreements touching the same periods always lock them in the
+	// same order, so the second waits and then sees the reduced capacity.
+	LockPeriodsInRange(ctx context.Context, arg LockPeriodsInRangeParams) ([]AvailabilityPeriod, error)
 	// LockRateLimitKey takes a transaction-scoped advisory lock so the distinct
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
@@ -312,9 +342,6 @@ type Querier interface {
 	// the first read time, so re-marking an already-read notification still matches
 	// one row (idempotent 204) instead of a false 404.
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
-	// MaxPeriodWeek returns the furthest week_start a listing has, so a test can
-	// assert horizon_until equals the last generated period.
-	MaxPeriodWeek(ctx context.Context, listingID pgtype.UUID) (pgtype.Date, error)
 	// MemberRecorded reports whether member was already recorded under key in the
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
@@ -334,6 +361,10 @@ type Querier interface {
 	// RaiseHorizonUntil moves the horizon forward, never back: GREATEST keeps the
 	// result independent of commit order when two requests extend it at once.
 	RaiseHorizonUntil(ctx context.Context, arg RaiseHorizonUntilParams) error
+	// Raises a period's used_capacity by the allocated amount. The
+	// used_capacity_within_total CHECK is the FR-079/SC-018 storage-level safety net:
+	// if the fill logic ever over-allocates, this fails hard instead of corrupting.
+	RaiseUsedCapacity(ctx context.Context, arg RaiseUsedCapacityParams) (AvailabilityPeriod, error)
 	// RecordMember records that member was used under key in the current window.
 	// DO NOTHING keeps it idempotent within the window.
 	RecordMember(ctx context.Context, arg RecordMemberParams) error
@@ -370,6 +401,20 @@ type Querier interface {
 	// first page passes a score sentinel of 5, above the 0..4 maximum, so the first
 	// clause admits every row.
 	SearchCandidates(ctx context.Context, arg SearchCandidatesParams) ([]SearchCandidatesRow, error)
+	// SearchReputation computes reputation for the profiles on one search page,
+	// read at query time and never stored as a column (data-model.md section 19,
+	// FR-071). It mirrors the two derived-value formulas the public profile uses:
+	// average_rating and review_count from visible reviews, completed_jobs from
+	// confirmed orders where the profile is subcontractor (FR-048), and the
+	// completion-rate numerator/denominator (FR-071/FR-072). The FR-073 threshold
+	// (divisor >= 3 before a percentage is shown) is applied in the service, not
+	// here, so the raw counts stay visible. One query over the whole page avoids an
+	// N+1 across candidates.
+	SearchReputation(ctx context.Context, profileIds []pgtype.UUID) ([]SearchReputationRow, error)
+	// Marks the winning candidate agreed. The partial unique index
+	// idx_one_agreement_per_request enforces at most one agreement per request, so a
+	// concurrent second agreement violates it and the transaction fails (FR-036).
+	SetCandidateAgreed(ctx context.Context, arg SetCandidateAgreedParams) error
 	// SetCandidateStatus moves a candidate to a new status (offered on a reply,
 	// FR-031), stamping updated_at from the Clock.
 	SetCandidateStatus(ctx context.Context, arg SetCandidateStatusParams) error

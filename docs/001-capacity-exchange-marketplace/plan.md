@@ -56,9 +56,9 @@ Empat pertentangan antar artefak yang ditemukan `/analyze` dan diselesaikan pada
 
 | Isu | Keputusan | Dampak |
 |-----|-----------|--------|
-| Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `jeda_kesiapan_hari`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `pesanan.minggu_kesiapan_mulai` + trigger; kueri pencarian |
+| Jeda kesiapan mulai tidak dipakai dalam alokasi maupun penjumlahan kapasitas | Alokasi dan penjumlahan dimulai dari **minggu kesiapan mulai** = minggu yang memuat tanggal acuan + `readiness_lead_days`. Istilah **rentang kapasitas** dibakukan | FR-087, FR-090, SC-020; kolom `work_order.readiness_week_start` + trigger; kueri pencarian |
 | Horizon kalender 3 bulan lebih pendek dari deadline yang mungkin diminta | Periode dibuat otomatis sampai minggu deadline, **dipicu saat pencarian**, bukan penjadwal bergulir | FR-088, SC-021; kolom `capacity_listing.horizon_until` |
-| Constraint `batas_balasan_72_jam` selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; constraint tinggal menjaga urutan | Seluruh tabel; menegakkan Prinsip V pada tingkat data |
+| Constraint yang mensyaratkan batas balasan tepat sama dengan waktu dibuat ditambah 72 jam selalu gagal dan melewati `Clock` | `DEFAULT now()` dihapus dari **seluruh** tabel; aplikasi mengirim setiap waktu dari `Clock`; kini digantikan `reply_due_after_created` yang hanya menjaga urutan waktu, sementara angka 72 jam ditegakkan aplikasi dan diuji | Seluruh tabel; menegakkan Prinsip V pada tingkat data |
 | Kriteria mesin tidak terdefinisi ketika filternya dikosongkan | Kriteria yang filternya tidak diisi dihitung **terpenuhi**; respons menyebut kriteria mana yang dievaluasi. Skor tetap 0–4, tanpa normalisasi | FR-023, FR-026 |
 
 Dua temuan WARNING yang juga sudah ditutup: FR-089 (propagasi perubahan kapasitas mingguan ke periode mendatang tanpa alokasi) dan FR-091 (penggolongan notifikasi transaksional versus non-transaksional, dengan kolom `notifikasi.transaksional`).

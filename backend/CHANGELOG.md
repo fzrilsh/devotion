@@ -39,7 +39,7 @@ perubahannya.
   mengubah state proses. Wajib di semua environment: `APP_ENV`, `APP_BASE_URL`,
   `DATABASE_URL`, `UPLOAD_PATH`; wajib hanya di produksi: TLS, CF client CA,
   Mailjet, `MAIL_FROM`, `WHATSAPP_NUMBER`, `SENTRY_DSN`. Default
-  `UPLOAD_TOTAL_LIMIT_MB=500`, `UPLOAD_FILE_LIMIT_MB=5`. `APP_ENV` tak dikenal
+  `UPLOAD_MAX_TOTAL_MB=500`, `UPLOAD_MAX_FILE_MB=5`. `APP_ENV` tak dikenal
   adalah galat. Semua variabel hilang dikumpulkan dalam satu galat yang hanya
   memuat nama, tidak pernah nilai. `IsProduction()` untuk penjaga
   `seed:test-data`/`reset:test-data`. (T009)
@@ -443,8 +443,71 @@ perubahannya.
   subkontraktor) menampilkan satu halaman keyset kandidat masuk dengan filter
   status opsional (FR-030, FR-031). Semua waktu diambil dari `Clock` yang
   disuntikkan (Aturan 5).
+- Pembentukan kesepakatan dan alokasi kapasitas (T041): paket `internal/order`
+  dengan rute `POST /api/offers/{offerId}/accept`, digerbang peran pembeli, yang
+  mengubah satu penawaran diterima menjadi pesanan lewat transaksi R-04. Dalam
+  satu transaksi: kunci listing, tumbuhkan kalender sampai minggu tenggat
+  (FR-088), kunci tiap periode kandidat urut menaik `week_start` (pencegah
+  deadlock R-04), jumlahkan sisa kapasitas lintas periode tak-penuh dan tolak
+  kekurangan dengan angka sebenarnya (FR-035), sisipkan work order yang menyimpan
+  minggu kesiapannya (FR-084), isi minggu paling awal dulu melewati periode penuh
+  atau habis (FR-018/FR-078) dengan satu baris alokasi per periode terpakai
+  (FR-077), tandai kandidat pemenang `agreed`, tutup dan beri tahu kandidat lain
+  (FR-034), lalu catat transisi status pembuka. Penjaga akun pembeli membuat
+  penawaran milik pembeli lain jadi 404, bukan bocor keberadaannya. Balasan
+  `WorkOrderDetail` membawa `allowed_transitions` dan `self_cancellable` supaya
+  frontend merender tombol dari array itu, tidak menduplikasi mesin keadaan
+  (FR-039). Semua waktu diambil dari `Clock` yang disuntikkan (Aturan 5).
+- Uji perilaku dan balapan pembentukan kesepakatan (T042) di `internal/order`:
+  dua kesepakatan berbarengan atas periode yang sama dari dua request berbeda,
+  hanya satu menang dan yang kalah menerima `CAPACITY_ALREADY_TAKEN` dengan
+  `used_capacity` berakhir di satu pesanan bukan dua (FR-036); dua kesepakatan
+  berbarengan atas request yang sama lewat dua listing berkecukupan, yang kalah
+  menerima `REQUEST_ALREADY_AGREED` dari indeks unik parsial
+  `idx_one_agreement_per_request` dengan tepat satu kandidat `agreed` (FR-034);
+  `RaiseUsedCapacity` melampaui `total_capacity` ditolak constraint
+  `used_capacity_within_total` SQLSTATE 23514, jaring pengaman tingkat
+  penyimpanan yang jalur accept tak pernah menyentuh karena penjumlahan di bawah
+  lock menolak lebih dulu (FR-079/SC-018); tenggat di luar horizon tersimpan
+  berhasil karena `EnsureHorizon` memmaterialisasi minggu yang kurang di dalam
+  transaksi, membuktikan estimasi optimistik pra-lock tak memalsukan positif
+  (FR-088). Balapan digerakkan `runConcurrent` dengan barrier agar keduanya benar
+  berebut lock. Ketiga uji minimum per-endpoint menembus router: penolakan peran
+  bukan-pembeli 403 (FR-005), sesi absen 401 (FR-005), id penawaran tak sah 422
+  (respons kontrak, tanpa FR), plus satu jalur berhasil yang menembus gerbang,
+  `parseUUID`, transaksi, dan pemetaan 201 lalu memeriksa serialisasi
+  `WorkOrderDetail` (`work_order_id`, `status` accepted, `allowed_transitions`
+  tak kosong, `self_cancellable` ada). Uji memakai skema terpisah pada Postgres
+  yang sama dan `Clock` yang digantikan.
+- Detail request kini melampirkan seluruh rantai penawaran tiap kandidat, bukan
+  hanya penawaran terakhir: `RequestCandidate` bertambah larik `offers` terurut
+  `sequence` menaik dan `Offer` bertambah field wajib `sequence`, sehingga
+  pembeli melihat tiap putaran negosiasi dan tawar-balik berurutan (FR-032,
+  langkah manual 3.7). `latest_offer` tetap diisi dari elemen terakhir rantai.
+  Rantai dibangun dari `ListOffersByRequest` yang sudah dibaca, satu round-trip,
+  tanpa kueri atau endpoint baru.
+- `WorkOrderDetail` pada jalur pembentukan kesepakatan kini membawa larik
+  `payments`, kosong saat pesanan baru terbentuk karena belum ada pernyataan
+  pembayaran. Field mengikuti skema `PaymentRecord` tanpa kolom jumlah uang
+  (Batas Keuangan). Pengisian sungguhannya milik US5 (T056, FR-041..FR-043);
+  jalur accept hanya menyiapkan larik kosong agar bentuk respons sesuai kontrak.
+
+### Dihapus
+- Tiga kueri sqlc tanpa pemanggil dibuang beserta kode Go hasil generate-nya:
+  `ListOffersByCandidate` (digantikan `ListOffersByRequest` yang mengambil rantai
+  seluruh kandidat sekali jalan), `MaxPeriodWeek`, dan `CountPeriods`. `go build
+  ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
+- `EstimateCapacityInRange` (T041): klausa `GROUP BY` di `db/queries/order.sql`
+  ditambahi `p.readiness_week, p.deadline_week`, kolom `param` yang muncul di
+  `SELECT` lewat `uncreated_remaining` tapi tak teragregasi. Tanpa keduanya
+  Postgres menolak kueri saat runtime dengan SQLSTATE 42803 (grouping error).
+  sqlc menghasilkan kode Go yang tetap ter-compile dan `go vet` lolos, jadi
+  cacatnya tak tertangkap build maupun uji: sepanjang belum ada uji yang benar
+  menjalankan jalur accept, penjaga pra-lock (`INSUFFICIENT_CAPACITY`) tak pernah
+  sekali pun tereksekusi sejak T041 menulisnya. Uji T042 yang menembus kueri ini
+  itulah yang memunculkannya. `internal/db/sqlcgen/order.sql.go` diregenerasi.
 - Keyset pagination mesin pencarian (T036): klausa `WHERE` kursor yang memakai
   satu perbandingan row-value `<` untuk kelima kolom urut diganti rantai OR
   leksikografis eksplisit. Perbandingan row-value tunggal keliru karena urutan
@@ -461,5 +524,35 @@ perubahannya.
   kode setelah `READINESS_AFTER_DEADLINE` masuk peta kode dan enum `openapi.yaml`.
   Test masih menegakkan jumlah kode uji sama dengan jumlah entri peta status,
   jadi kode baru tanpa status akan tetap ketahuan.
+- `internal/platform/config`: nama variabel kuota unggahan diselaraskan dengan
+  `.env.example` dan quickstart menjadi `UPLOAD_MAX_TOTAL_MB` dan
+  `UPLOAD_MAX_FILE_MB` (sebelumnya `UPLOAD_TOTAL_LIMIT_MB`/`UPLOAD_FILE_LIMIT_MB`).
+  Nama lama tak pernah terbaca, sehingga `parseLimit` jatuh ke default 500/5
+  secara senyap dan kuota tak bisa dikonfigurasi sama sekali.
+- `docker-compose.yml`: bind mount TLS memakai path cermin
+  `/opt/devotion/tls:/opt/devotion/tls:ro` (sebelumnya `:/tls:ro`), sejalan
+  dengan keputusan path-di-dalam-container-sama-dengan-host agar `.env` tak
+  perlu dua versi.
+- `GET /health`: bentuk balasan diselaraskan dengan skema `Health` di
+  `openapi.yaml`. Blok per-ketergantungan berganti nama dari `checks` ke
+  `dependencies`, ditambah `version`; `database` memakai enum `[ok, fail]`,
+  `whatsapp` `[connected, disconnected]`, dan `storage` menjadi objek
+  `{status, used_mb, limit_mb}` dengan status `[ok, near_full, full]`. Status
+  keseluruhan pada 503 kini `degraded`, bukan `down`. `used_mb`/`limit_mb`
+  dihitung dari kuota TOTAL unggahan, bukan batas per berkas. (T025)
+- `SearchCandidate`: kandidat pencarian kini membawa seluruh atribut informatif
+  FR-027 yang sebelumnya hilang dari kontrak dan struct Go, yaitu `city_code`,
+  `city_name`, `machine_types`, `weekly_capacity`, `readiness_week`,
+  `readiness_lead_days`, `total_capacity_until_deadline`, `completed_jobs`,
+  blok `reputation`, dan penanda `stale_calendar` (FR-021). Tanpa atribut ini
+  US2 tak bisa lewat karena langkah uji manual 2.1, 2.6, dan 2.7 bergantung
+  padanya. Reputasi dihitung saat dibaca lewat kueri kedua `SearchReputation`
+  atas profil satu halaman, bukan dimaterialisasi ke kolom listing atau profil
+  (data-model.md bagian 19, FR-071). Ambang FR-073 ditegakkan di service:
+  `completion_rate` baru terisi setelah pembagi mencapai tiga pesanan
+  disepakati, di bawah itu `enough_data` tetap false dan `completion_rate` nil,
+  sama seperti skema Reputation publik. `stale_calendar` dihitung dari `Clock`
+  yang disuntikkan, bukan `time.Now` (Aturan 5), dan bersifat informatif saja,
+  tak pernah mengubah urutan.
 
 

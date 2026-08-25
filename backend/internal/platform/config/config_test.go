@@ -105,8 +105,24 @@ func TestLoad_ErrorNeverLeaksValues(t *testing.T) {
 
 func TestLoad_BadLimitIsError(t *testing.T) {
 	m := baseDev()
-	m["UPLOAD_FILE_LIMIT_MB"] = "-3"
+	m["UPLOAD_MAX_FILE_MB"] = "-3"
 	if _, err := Load(mapEnv(m)); err == nil {
 		t.Fatal("limit negatif harus galat")
+	}
+}
+
+func TestLoad_ReadsUploadLimitEnvNames(t *testing.T) {
+	m := baseDev()
+	m["UPLOAD_MAX_TOTAL_MB"] = "300"
+	m["UPLOAD_MAX_FILE_MB"] = "7"
+	cfg, err := Load(mapEnv(m))
+	if err != nil {
+		t.Fatalf("mau nil, dapat %v", err)
+	}
+	if cfg.UploadTotalLimitMB != 300 {
+		t.Errorf("UPLOAD_MAX_TOTAL_MB tidak terbaca: mau 300, dapat %d", cfg.UploadTotalLimitMB)
+	}
+	if cfg.UploadFileLimitMB != 7 {
+		t.Errorf("UPLOAD_MAX_FILE_MB tidak terbaca: mau 7, dapat %d", cfg.UploadFileLimitMB)
 	}
 }

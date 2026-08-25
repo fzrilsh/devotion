@@ -31,6 +31,7 @@ type offerResp struct {
 	Party             string    `json:"party"`
 	TotalPrice        int64     `json:"total_price"`
 	ReadinessLeadDays int       `json:"readiness_lead_days"`
+	Sequence          int       `json:"sequence"`
 	Note              *string   `json:"note"`
 	CreatedAt         time.Time `json:"created_at"`
 }

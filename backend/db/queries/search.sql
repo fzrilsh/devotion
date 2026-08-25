@@ -28,9 +28,11 @@ base_candidate AS (
         l.profile_id,
         pr.business_name,
         pr.verified,
+        pr.city_code,
         l.weekly_capacity,
         l.readiness_lead_days,
         l.horizon_until,
+        l.calendar_updated_at,
         date_trunc('week', p.search_date + (l.readiness_lead_days || ' days')::interval)::date
             AS readiness_week
     FROM capacity_listing l
@@ -64,8 +66,11 @@ scored AS (
         c.profile_id,
         c.business_name,
         c.verified,
+        c.city_code,
+        c.weekly_capacity,
         c.readiness_lead_days,
         c.horizon_until,
+        c.calendar_updated_at,
         c.readiness_week,
         (cap.recorded_remaining + cap.uncreated_remaining)::bigint AS remaining_capacity,
         (p.product_item IS NULL OR EXISTS (
@@ -90,19 +95,31 @@ ranked AS (
     FROM scored
 )
 SELECT
-    listing_id,
-    profile_id,
-    business_name,
-    verified,
-    readiness_lead_days,
-    horizon_until,
-    remaining_capacity,
-    product_match,
-    machine_match,
-    lead_match,
-    capacity_enough,
-    score
-FROM ranked
+    r.listing_id,
+    r.profile_id,
+    r.business_name,
+    r.verified,
+    r.city_code,
+    ct.name AS city_name,
+    r.weekly_capacity,
+    r.readiness_week,
+    r.readiness_lead_days,
+    r.horizon_until,
+    r.calendar_updated_at,
+    r.remaining_capacity,
+    coalesce((
+        SELECT array_agg(ci.name ORDER BY ci.name)
+          FROM listing_machine lm
+          JOIN catalog_item ci ON ci.id = lm.item_id
+         WHERE lm.listing_id = r.listing_id
+    ), ARRAY[]::text[])::text[] AS machine_types,
+    r.product_match,
+    r.machine_match,
+    r.lead_match,
+    r.capacity_enough,
+    r.score
+FROM ranked r
+LEFT JOIN city ct ON ct.code = r.city_code
 -- Keyset "after the cursor" expanded as an explicit lexicographic OR chain
 -- because the sort mixes directions: score and remaining_capacity descend while
 -- lead, business_name, and listing_id ascend. A single row-value "<" comparison
@@ -129,3 +146,42 @@ WHERE score < @cursor_score::int
 ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
          business_name ASC, listing_id ASC
 LIMIT @page_size::int;
+
+-- SearchReputation computes reputation for the profiles on one search page,
+-- read at query time and never stored as a column (data-model.md section 19,
+-- FR-071). It mirrors the two derived-value formulas the public profile uses:
+-- average_rating and review_count from visible reviews, completed_jobs from
+-- confirmed orders where the profile is subcontractor (FR-048), and the
+-- completion-rate numerator/denominator (FR-071/FR-072). The FR-073 threshold
+-- (divisor >= 3 before a percentage is shown) is applied in the service, not
+-- here, so the raw counts stay visible. One query over the whole page avoids an
+-- N+1 across candidates.
+-- name: SearchReputation :many
+SELECT
+    pr.id AS profile_id,
+    coalesce(rev.average_rating, 0)::numeric AS average_rating,
+    coalesce(rev.review_count, 0)::bigint    AS review_count,
+    coalesce(job.completed_jobs, 0)::bigint  AS completed_jobs,
+    coalesce(comp.completed, 0)::bigint      AS completion_completed,
+    coalesce(comp.divisor, 0)::bigint        AS completion_divisor
+FROM business_profile pr
+LEFT JOIN LATERAL (
+    SELECT round(avg(r.rating)::numeric, 2) AS average_rating,
+           count(*) AS review_count
+      FROM review r
+     WHERE r.reviewee_id = pr.id AND NOT r.hidden
+) rev ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) AS completed_jobs
+      FROM work_order o
+     WHERE o.subcontractor_id = pr.id AND o.status = 'confirmed'
+) job ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE status = 'confirmed') AS completed,
+           count(*) FILTER (
+               WHERE status <> 'cancelled' OR cancelled_by_id = pr.id
+           ) AS divisor
+      FROM work_order o
+     WHERE o.buyer_id = pr.id OR o.subcontractor_id = pr.id
+) comp ON true
+WHERE pr.id = ANY(@profile_ids::uuid[]);

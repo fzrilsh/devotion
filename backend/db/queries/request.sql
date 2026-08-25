@@ -142,14 +142,6 @@ WHERE o.id = $1
 ORDER BY o.sequence DESC
 LIMIT 1;
 
--- ListOffersByCandidate returns a candidate's full offer chain oldest first so
--- the buyer sees every round side by side (FR-032).
--- name: ListOffersByCandidate :many
-SELECT id, candidate_id, sequence, proposed_by, total_price, readiness_lead_days, note, created_at
-FROM offer
-WHERE candidate_id = $1
-ORDER BY sequence ASC;
-
 -- SetCandidateStatus moves a candidate to a new status (offered on a reply,
 -- FR-031), stamping updated_at from the Clock.
 -- name: SetCandidateStatus :exec

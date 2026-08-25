@@ -20,6 +20,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/listing"
 	"github.com/fzrilsh/devotion/backend/internal/masterdata"
 	"github.com/fzrilsh/devotion/backend/internal/notification"
+	"github.com/fzrilsh/devotion/backend/internal/order"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/config"
 	"github.com/fzrilsh/devotion/backend/internal/platform/health"
@@ -38,6 +39,11 @@ import (
 // listens on 443 with TLS (research R-01/R-06); development derives no benefit
 // from TLS, so it binds a fixed high port that docker-compose does not use.
 const devPort = ":8080"
+
+// buildVersion is the build identifier echoed by GET /health. CI sets it at
+// link time with -ldflags "-X main.buildVersion=<sha>"; unset builds report
+// "dev".
+var buildVersion = "dev"
 
 // shutdownTimeout bounds graceful shutdown so a hung connection cannot block a
 // deploy rollover forever.
@@ -132,11 +138,17 @@ func runServe(ctx context.Context, args []string) error {
 	// transaction (FR-029); both routes are gated to the buyer role.
 	quota.New(pool, clock, notif).Register(router, acc)
 
-	// GET /health probes the database, the WhatsApp link, and free space on the
-	// upload volume. The free-space floor is one file's worth: below it a new
-	// upload would fail, so the instance is reported unhealthy. It sits outside
-	// /api/ and is public (security:[] in the contract).
-	health.New(pool, wa, clock, cfg.UploadPath, cfg.UploadFileLimitMB).Register(router)
+	// order registers after notif and takes ls as its HorizonEnsurer: accepting
+	// an offer grows the listing calendar to the deadline week under the listing
+	// lock before allocating, and enqueues agreement_formed notifications inside
+	// the formation transaction (FR-034). The single route is gated to the buyer.
+	order.New(pool, clock, notif, ls).Register(router, acc)
+
+	// GET /health probes the database, the WhatsApp link, and the upload volume
+	// usage against its quota. It reports storage full when usage reaches the
+	// total limit, which drives 503. It sits outside /api/ and is public
+	// (security:[] in the contract).
+	health.New(pool, wa, clock, cfg.UploadPath, buildVersion, cfg.UploadTotalLimitMB).Register(router)
 
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
 		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))

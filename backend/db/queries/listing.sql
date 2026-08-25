@@ -134,16 +134,6 @@ SELECT gen_random_uuid(), $1, gs::date, $4, 0, false, $5, $5
 FROM generate_series($2::date, $3::date, interval '7 day') AS gs
 ON CONFLICT (listing_id, week_start) DO NOTHING;
 
--- MaxPeriodWeek returns the furthest week_start a listing has, so a test can
--- assert horizon_until equals the last generated period.
--- name: MaxPeriodWeek :one
-SELECT max(week_start)::date FROM availability_period WHERE listing_id = $1;
-
--- CountPeriods counts a listing's periods, backing the FR-088 "at least 13
--- periods" check.
--- name: CountPeriods :one
-SELECT count(*)::bigint FROM availability_period WHERE listing_id = $1;
-
 -- ListPeriodsInRange returns the periods of a listing within an inclusive
 -- week_start range, ordered ascending, for GET /listing/me/periods. allocated
 -- is the sum of active allocation quantities on each period; remaining is the
