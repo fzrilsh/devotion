@@ -292,6 +292,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MyProfile' }
         '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '403':
+          description: Akun admin tidak memiliki profil usaha
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/forbidden'
+                title: Tidak berwenang
+                status: 403
+                code: FORBIDDEN
+                detail: Akun admin tidak memiliki profil usaha.
     put:
       tags: [profile]
       summary: Ubah profil usaha
@@ -309,6 +320,18 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyProfile' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '403':
+          description: Akun admin tidak memiliki profil usaha
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/forbidden'
+                title: Tidak berwenang
+                status: 403
+                code: FORBIDDEN
+                detail: Akun admin tidak memiliki profil usaha.
         '422': { $ref: '#/components/responses/ValidationFailed' }
 
   /profile/{profileId}:

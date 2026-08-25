@@ -45,8 +45,16 @@ func (s *Service) Register(r *httpx.Router) {
 	r.Gated("GET /api/me", auth, s.fromPrincipal(s.handleGetMe))
 	r.Gated("PATCH /api/me/roles", auth, s.fromPrincipal(s.handlePatchRoles))
 
-	r.Gated("GET /api/profile/me", auth, s.fromPrincipal(s.handleGetProfileMe))
-	r.Gated("PUT /api/profile/me", auth, s.fromPrincipal(s.handlePutProfileMe))
+	// The business profile belongs to a business account, so both profile routes
+	// are gated to the two business roles rather than to bare authentication. An
+	// admin holds neither role (admin_has_no_business_role forbids it), so it is
+	// refused with 403 at the router before the handler runs, the same way every
+	// other business endpoint refuses it. A bare RequireAuth here is what let an
+	// admin reach the handler and hit a 500 on the missing profile row, and it
+	// would let a future third profile route make the same mistake. FR-005.
+	business := httpx.RequireRole(s, httpx.RoleSubcontractor, httpx.RoleBuyer)
+	r.Gated("GET /api/profile/me", business, s.fromPrincipal(s.handleGetProfileMe))
+	r.Gated("PUT /api/profile/me", business, s.fromPrincipal(s.handlePutProfileMe))
 	r.Public("GET /api/profile/{profileId}", s.handleGetPublicProfile)
 }
 

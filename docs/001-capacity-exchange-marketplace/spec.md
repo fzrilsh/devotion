@@ -347,7 +347,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 
 ### Key Entities
 
-- **Akun Pengguna**: Identitas login satu orang di platform; memuat kredensial, status verifikasi email dan nomor HP, serta satu atau dua peran usaha, atau peran admin. Satu akun memiliki satu Profil Usaha.
+- **Akun Pengguna**: Identitas login satu orang di platform; memuat kredensial, status verifikasi email dan nomor HP, serta satu atau dua peran usaha, atau peran admin. Akun berperan usaha memiliki tepat satu Profil Usaha. Akun berperan admin tidak memiliki Profil Usaha: peran admin bukan peran usaha, sehingga endpoint yang mengembalikan profil usaha menolak akun admin dengan 403, bukan mencari baris yang memang tidak ada.
 - **Profil Usaha**: Identitas usaha yang tampil publik: nama usaha, kota/kabupaten (merujuk Wilayah), titik koordinat lokasi usaha, deskripsi, status lencana verifikasi, ringkasan reputasi. Menjadi pemilik Listing Kapasitas dan menjadi pihak dalam Request Kuota dan Pesanan.
 - **Wilayah**: Satuan lokasi administratif dua tingkat (provinsi dan kota/kabupaten) beserta kode resminya. Setiap kota/kabupaten termasuk dalam tepat satu provinsi. Menjadi dasar penyaringan dan perluasan pencarian, dengan tingkat ketiga berupa seluruh Indonesia yang tidak memerlukan data tersendiri.
 - **Item Daftar Baku**: Satu item pada daftar jenis produk atau daftar jenis mesin, beserta penanda aktif atau nonaktif. Dikelola admin, dirujuk oleh Listing Kapasitas dan oleh filter pencarian, dan tidak dapat diisi bebas oleh pengguna.

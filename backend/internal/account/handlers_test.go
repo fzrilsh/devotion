@@ -142,6 +142,24 @@ func (h *harness) registerAndLogin(t *testing.T, email, phone, password string) 
 	return sessionCookie(rec)
 }
 
+// createAdminAndLogin creates an admin account through the same CreateAdmin path
+// the admin:create subcommand uses (no profile row, role_admin set), then logs
+// in and returns a live session cookie. It is the fixture for the admin-facing
+// gate tests: the account it makes owns no business_profile.
+func (h *harness) createAdminAndLogin(t *testing.T, email, phone, password string) string {
+	t.Helper()
+	if _, err := h.svc.CreateAdmin(context.Background(), email, phone, password); err != nil {
+		t.Fatalf("CreateAdmin: %v", err)
+	}
+	rec := h.do("POST", "/api/auth/login", map[string]any{
+		"email": email, "password": password,
+	}, "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login admin: status %d, body %s", rec.Code, rec.Body.String())
+	}
+	return sessionCookie(rec)
+}
+
 // TestRegisterLoginMe_HappyPath covers the success path across register, login,
 // and GET /me. FR: R-09 registration, T014 /auth and /me.
 func TestRegisterLoginMe_HappyPath(t *testing.T) {

@@ -511,6 +511,31 @@ perubahannya.
   ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
+- `GET /api/profile/me` dan `PUT /api/profile/me` menolak akun admin dengan 403
+  (`FORBIDDEN`, "Akun admin tidak memiliki profil usaha.") alih-alih 500. Akun
+  admin tidak punya baris `business_profile` karena `admin:create` tidak menulis
+  profil dan peran admin bukan peran usaha, jadi kueri profil dulu memberi
+  `ErrNoRows` yang tidak dipetakan handler dan jatuh ke 500. Akar masalahnya
+  kedua rute profil hanya digerbang autentikasi, bukan peran; menambah
+  pemeriksaan `RoleAdmin` per-handler hanya akan membuat rute profil ketiga nanti
+  lupa lagi, persis cara bug ini lahir. Kedua rute kini berada di balik gerbang
+  peran usaha di router (`RequireRole` subkontraktor atau pemberi order), jadi
+  admin ditolak dengan 403 sebelum handler jalan, sebentuk dengan setiap endpoint
+  usaha lain, dan pemeriksaan `RoleAdmin` di handler GET dicabut karena jadi
+  mubazir. Tidak ada pemanggil sah kedua rute ini yang tanpa peran usaha:
+  registrasi mewajibkan minimal satu peran usaha dan `admin_has_no_business_role`
+  melarang admin memegangnya. 403 dipilih, bukan 404, agar jaminan kontrak bahwa
+  endpoint ini tak pernah 404 untuk akun hasil registrasi tetap utuh. Untuk akun
+  usaha, profil lahir bersama akun, jadi baris yang hilang di sana tetap
+  pelanggaran invarian (500 plus catatan `slog` berlevel error dengan
+  `account_id`, karena bila terjadi itu tanda data rusak, bukan salah pemanggil),
+  bukan 404. Uji lewat router membuktikan admin memperoleh 403 berkode
+  `FORBIDDEN` pada GET dan PUT, dan akun usaha tetap 200 dengan profilnya.
+  Kontrak menambahkan respons 403 pada `PUT /profile/me`, sebentuk dengan GET.
+  Audit endpoint lain yang membaca `profile_id` dari sesi menunjukkan tidak ada
+  yang ikut cacat: `GET /api/me` mengembalikan `profile_id: null`, sedangkan
+  jalur kuota, usulan item, dan listing berada di balik gerbang peran usaha yang
+  menolak admin dengan 403 sebelum kueri profil dijalankan. (FR-005)
 - `GET /api/health` memisahkan liveness dari readiness: hanya basis data gagal
   (`database: fail`) atau penyimpanan penuh (`storage.status: full`) yang
   menggerakkan 503, sedangkan WhatsApp terputus kini menghasilkan 200 dengan
