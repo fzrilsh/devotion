@@ -98,6 +98,11 @@ func New(pool *pgxpool.Pool, clock platform.Clock, root string, fileLimitMB, tot
 
 func (s *Service) queries() *sqlcgen.Queries { return sqlcgen.New(s.pool) }
 
+// MaxFileBytes is the per-file ceiling in bytes. A handler caps the request body
+// at this (plus multipart framing slack) so an oversized upload is rejected
+// before ParseMultipartForm spills it to the 2GB box's disk.
+func (s *Service) MaxFileBytes() int64 { return s.fileLimit }
+
 // Caller is the authenticated principal Open checks against a file's owner. A
 // caller with no profile (ProfileID invalid) can still be an admin; a
 // non-admin with no profile matches no file and is refused.

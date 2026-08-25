@@ -29,7 +29,35 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
-- Uji penolakan masukan tidak sah untuk parameter query dan path pada rute baca
+- Handler HTTP dan pendaftaran rute untuk empat endpoint sisi pemohon verifikasi,
+  paket `internal/verification`: `POST /api/files` (unggah berkas identitas atau
+  foto lokasi), `GET /api/files/{fileId}` (unduh berkas milik sendiri),
+  `POST /api/verification` (ajukan verifikasi), dan `GET /api/verification` (baca
+  riwayat pengajuan sendiri, larik JSON polos). `POST /api/files`,
+  `POST /api/verification`, dan `GET /api/verification` digerbangi dua peran
+  usaha (`RoleSubcontractor`, `RoleBuyer`); admin tidak punya `business_profile`
+  sehingga ditolak 403 di router sebelum mencapai handler. `GET /api/files/{fileId}`
+  digerbangi dua peran usaha ditambah admin: SC-012 menuntut berkas terbaca oleh
+  pemilik dan admin, dan antrean verifikasi Fase 7 bergantung pada akses admin
+  itu. `POST /api/files`
+  membatasi bodi permintaan pada batas per-berkas plus slack multipart sebelum
+  `ParseMultipartForm`, lalu menyerahkan validasi magic byte, pembuangan EXIF, dan
+  kuota ke paket `storage`; sentinel storage dipetakan ke 413 `FILE_TOO_LARGE`,
+  415 `UNSUPPORTED_FILE_TYPE`, dan 507 `STORAGE_QUOTA_FULL`. `GET /api/files/{fileId}`
+  meneruskan `storage.Caller{ProfileID, IsAdmin}` ke `storage.Open`, jadi berkas
+  hanya terbaca oleh pemiliknya atau admin (bukan pemilik dan bukan admin -> 403),
+  path bukan UUID -> 422, id sah tapi tak dikenal -> 404 tanpa membocorkan
+  keberadaan. `POST /api/verification` menolak pengajuan kedua saat satu masih
+  menunggu dengan 409 `VERIFICATION_PENDING` lewat index parsial
+  `idx_one_pending_verification`, dan mengambil `created_at` dari `Clock` yang
+  disuntikkan. Ditambahkan `Service.MaxFileBytes()` pada paket `storage` sebagai
+  akses batas per-berkas untuk handler. Rangkaian uji tingkat router menutup
+  minimum per endpoint (jalur berhasil, penolakan peran, masukan tidak sah) plus
+  penolakan bukan-pemilik-bukan-admin pada unduh berkas, pembacaan admin atas
+  dokumen orang lain (sisi positif SC-012), penolakan tipe menipu lewat magic
+  byte (415), dan cakupan rute `UncoveredAPIRoutes` kosong. (FR-006, FR-009,
+  FR-010, FR-011, SC-012)
+
   request kuota, melengkapi uji T043 yang sebelumnya hanya mencakup jalur berhasil
   dan penolakan peran. `TestQuotaRequest_ListRejectsInvalidQuery_FR030` menutup
   `GET /api/quota-requests` dengan `size=0`, `size=51`, dan `cursor=busuk` (422

@@ -31,9 +31,11 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/ratelimit"
 	"github.com/fzrilsh/devotion/backend/internal/platform/scheduler"
 	"github.com/fzrilsh/devotion/backend/internal/platform/session"
+	"github.com/fzrilsh/devotion/backend/internal/platform/storage"
 	"github.com/fzrilsh/devotion/backend/internal/platform/tlsconf"
 	"github.com/fzrilsh/devotion/backend/internal/quota"
 	"github.com/fzrilsh/devotion/backend/internal/search"
+	"github.com/fzrilsh/devotion/backend/internal/verification"
 )
 
 // devPort is the plain-HTTP listen port outside production. Production always
@@ -151,6 +153,16 @@ func runServe(ctx context.Context, args []string) error {
 	// lock before allocating, and enqueues agreement_formed notifications inside
 	// the formation transaction (FR-034). The single route is gated to the buyer.
 	order.New(pool, clock, notif, ls).Register(router, acc)
+
+	// verification wires the applicant file and verification-request endpoints.
+	// The storage service enforces the magic-byte check, EXIF stripping, quota,
+	// and the owner-or-admin gate on GET /api/files/{fileId}; all four routes are
+	// gated to the two business roles (an admin has no business_profile).
+	fileStore, err := storage.New(pool, clock, cfg.UploadPath, cfg.UploadFileLimitMB, cfg.UploadTotalLimitMB)
+	if err != nil {
+		return err
+	}
+	verification.New(pool, clock, fileStore).Register(router, acc)
 
 	// GET /health probes the database, the WhatsApp link, and the upload volume
 	// usage against its quota. It reports storage full when usage reaches the
