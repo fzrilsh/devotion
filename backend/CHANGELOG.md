@@ -7,6 +7,18 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Swagger UI di `GET /docs`, hanya saat `APP_ENV=development`, agar jalur
+  frontend membaca kontrak tanpa membuka YAML mentah. Aset Swagger UI ditarik
+  dari CDN jsdelivr dipatok `swagger-ui-dist@5.17.14` dengan Subresource
+  Integrity (sha384) dan `crossorigin="anonymous"`, jadi CDN yang disusupi tidak
+  bisa menyuntik kode. Kontrak disajikan di `GET /docs/openapi.yaml` dari salinan
+  `apidocs/openapi.yaml` yang disematkan `embed.FS`, disegel byte-identik dengan
+  `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` lewat uji
+  (bukan hash, pembandingan isi dengan pesan gagal yang menyebut lokasi
+  menyimpang) dan gerbang drift di CI (`apidocs-sync.sh` lalu `git diff
+  --exit-code`). Rute didaftarkan hanya di pengembangan, jadi di produksi absen
+  dan jatuh ke 404 yang sudah ada; tidak ada layanan runtime baru (Gate I tetap
+  dua), tidak ada dependency Go baru. (T082)
 - Modul Go `github.com/fzrilsh/devotion/backend` dengan toolchain dipatok
   `go 1.25.0`.
 - Dispatcher subcommand di `cmd/devotion` dengan delapan perintah terdaftar:

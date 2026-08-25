@@ -46,6 +46,11 @@ type Config struct {
 // reset:test-data refuse to run when this is true.
 func (c Config) IsProduction() bool { return c.AppEnv == EnvProduction }
 
+// IsDevelopment reports whether the app runs in development. The /docs Swagger
+// UI routes are registered only when this is true, so they are absent (not
+// merely rejected) in production and fall to the existing 404.
+func (c Config) IsDevelopment() bool { return c.AppEnv == EnvDevelopment }
+
 const (
 	defaultUploadTotalLimitMB = 500
 	defaultUploadFileLimitMB  = 5
