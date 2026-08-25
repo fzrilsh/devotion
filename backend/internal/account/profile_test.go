@@ -218,9 +218,10 @@ func TestUpdateProfile_TanpaSesi_Unauthorized_FR004(t *testing.T) {
 
 // TestGetProfileMe_AdminDitolak_FR005 proves an admin account is refused the
 // business profile view with 403, not a 500 from an ErrNoRows the handler never
-// mapped: an admin has no business profile because the role is not a business
-// role and admin:create writes no profile row. The gate is a role check that
-// precedes any query, the same shape as the role gates elsewhere. FR-005.
+// mapped. Both profile routes are gated to the business roles, so an admin (which
+// holds neither, per admin_has_no_business_role) is turned away at the router
+// before the handler runs, the same way every other business endpoint refuses
+// it. FR-005.
 func TestGetProfileMe_AdminDitolak_FR005(t *testing.T) {
 	h := newHarness(t, "profile_me_admin")
 	cookie := h.createAdminAndLogin(t, "admin@example.com", "+6281300009999", "rahasia123")
@@ -258,6 +259,56 @@ func TestGetProfileMe_AkunUsahaBerhasil_FR004(t *testing.T) {
 	}
 	if pv.ProfileID == "" {
 		t.Fatal("profile_id kosong untuk akun usaha")
+	}
+}
+
+// TestPutProfileMe_AdminDitolak_FR005 proves an admin account is refused the
+// profile update with 403, not a 500. PUT shares the business-role gate with
+// GET, so the admin is turned away at the router before the handler runs. This
+// is the same class of bug the GET gate fixed: without a role gate PUT would
+// reach updateProfile, read no profile row, and 500. FR-005.
+func TestPutProfileMe_AdminDitolak_FR005(t *testing.T) {
+	h := newHarness(t, "profile_put_admin")
+	cookie := h.createAdminAndLogin(t, "admin@example.com", "+6281300009999", "rahasia123")
+
+	rec := h.do("PUT", "/api/profile/me", map[string]any{
+		"business_name": "Konveksi Contoh",
+		"city_code":     testCityCode,
+	}, cookie)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d, mau 403, body %s", rec.Code, rec.Body.String())
+	}
+	var prob struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &prob); err != nil {
+		t.Fatalf("decode problem: %v", err)
+	}
+	if prob.Code != "FORBIDDEN" {
+		t.Fatalf("code = %q, mau FORBIDDEN", prob.Code)
+	}
+}
+
+// TestPutProfileMe_AkunUsahaBerhasil_FR057 proves a business account still
+// updates its profile with 200, so the business-role gate on PUT does not shut
+// the door on the accounts that own a profile. FR-057.
+func TestPutProfileMe_AkunUsahaBerhasil_FR057(t *testing.T) {
+	h := newHarness(t, "profile_put_usaha")
+	cookie := h.registerAndLogin(t, "usaha@example.com", "+6281300001010", "rahasia123")
+
+	rec := h.do("PUT", "/api/profile/me", map[string]any{
+		"business_name": "Konveksi Baru",
+		"city_code":     testCityCode,
+	}, cookie)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200, body %s", rec.Code, rec.Body.String())
+	}
+	var pv profileView
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if pv.BusinessName != "Konveksi Baru" {
+		t.Fatalf("business_name = %q", pv.BusinessName)
 	}
 }
 

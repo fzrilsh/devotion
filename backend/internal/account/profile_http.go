@@ -2,6 +2,7 @@ package account
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
@@ -67,18 +68,20 @@ type publicProfileBody struct {
 // column is NOT NULL but the contract models as nullable.
 func strPtr(s string) *string { return &s }
 
-// handleGetProfileMe returns the caller's own profile. An admin account has no
-// business profile (the role is not a business role and admin:create writes no
-// profile row), so it is refused with 403 before any query, the same shape as
-// the role gates on other endpoints (FR-005). For a business account the profile
-// is born with it, so a missing row there is an invariant violation, not a 404.
+// handleGetProfileMe returns the caller's own profile. The route is gated to the
+// business roles, so an admin never reaches this handler (it is refused with 403
+// at the router, the same as every other business endpoint). For a business
+// account the profile is born with it in one transaction (FR-004), so a missing
+// row here is an invariant break, not a 404: it is logged with the account id and
+// answered 500, because if it ever happens it means the data is corrupt, not that
+// the caller did anything wrong.
 func (s *Service) handleGetProfileMe(w http.ResponseWriter, r *http.Request, acc sqlcgen.UserAccount) {
-	if acc.RoleAdmin {
-		httpx.WriteProblem(w, httpx.CodeForbidden, "Akun admin tidak memiliki profil usaha.")
-		return
-	}
 	row, err := s.getMyProfile(r.Context(), acc.ID)
 	if err != nil {
+		if isNoRows(err) {
+			slog.ErrorContext(r.Context(), "account: akun usaha tanpa baris profil, invarian rusak",
+				"account_id", uuidString(acc.ID))
+		}
 		httpx.WriteInternal(w)
 		return
 	}
@@ -130,6 +133,10 @@ func (s *Service) handlePutProfileMe(w http.ResponseWriter, r *http.Request, acc
 				{Field: "city_code", Message: "Kota tidak dikenal."},
 			})
 			return
+		}
+		if isNoRows(err) {
+			slog.ErrorContext(r.Context(), "account: akun usaha tanpa baris profil, invarian rusak",
+				"account_id", uuidString(acc.ID))
 		}
 		httpx.WriteInternal(w)
 		return
