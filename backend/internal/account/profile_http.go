@@ -67,9 +67,16 @@ type publicProfileBody struct {
 // column is NOT NULL but the contract models as nullable.
 func strPtr(s string) *string { return &s }
 
-// handleGetProfileMe returns the caller's own profile. The profile is born with
-// the account, so a missing row is an invariant violation, not a 404.
+// handleGetProfileMe returns the caller's own profile. An admin account has no
+// business profile (the role is not a business role and admin:create writes no
+// profile row), so it is refused with 403 before any query, the same shape as
+// the role gates on other endpoints (FR-005). For a business account the profile
+// is born with it, so a missing row there is an invariant violation, not a 404.
 func (s *Service) handleGetProfileMe(w http.ResponseWriter, r *http.Request, acc sqlcgen.UserAccount) {
+	if acc.RoleAdmin {
+		httpx.WriteProblem(w, httpx.CodeForbidden, "Akun admin tidak memiliki profil usaha.")
+		return
+	}
 	row, err := s.getMyProfile(r.Context(), acc.ID)
 	if err != nil {
 		httpx.WriteInternal(w)

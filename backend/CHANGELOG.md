@@ -511,6 +511,22 @@ perubahannya.
   ./...` tetap bersih setelah `sqlc generate`.
 
 ### Diperbaiki
+- `GET /api/profile/me` menolak akun admin dengan 403 (`FORBIDDEN`,
+  "Akun admin tidak memiliki profil usaha.") alih-alih 500. Akun admin tidak
+  punya baris `business_profile` karena `admin:create` tidak menulis profil dan
+  peran admin bukan peran usaha, jadi kueri profil dulu memberi `ErrNoRows` yang
+  tidak dipetakan handler dan jatuh ke 500. Gerbang kini memeriksa `RoleAdmin`
+  sebelum menyentuh basis data, sebentuk dengan gerbang peran di endpoint lain
+  (FR-005); 403 dipilih, bukan 404, agar jaminan kontrak bahwa endpoint ini tak
+  pernah 404 untuk akun hasil registrasi tetap utuh. Untuk akun usaha, profil
+  lahir bersama akun, jadi baris yang hilang di sana tetap dianggap pelanggaran
+  invarian (500), bukan 404. Uji lewat router membuktikan admin memperoleh 403
+  berkode `FORBIDDEN` dan akun usaha tetap 200 dengan profilnya. Audit endpoint
+  lain yang membaca `profile_id` dari sesi menunjukkan tidak ada yang ikut cacat:
+  `GET /api/me` mengembalikan `profile_id: null`, sedangkan `PUT /api/profile/me`
+  serta jalur kuota, usulan item, dan listing berada di balik gerbang peran
+  usaha yang menolak admin dengan 403 sebelum kueri profil dijalankan.
+  (FR-005)
 - `GET /api/health` memisahkan liveness dari readiness: hanya basis data gagal
   (`database: fail`) atau penyimpanan penuh (`storage.status: full`) yang
   menggerakkan 503, sedangkan WhatsApp terputus kini menghasilkan 200 dengan
