@@ -541,6 +541,44 @@ func TestQuotaRequest_ListPagination_StableAcrossPages_FR030_FR080(t *testing.T)
 	}
 }
 
+// TestQuotaRequest_ListRejectsInvalidQuery_FR030 proves the query params of the
+// list endpoint are validated as user input: an out-of-range size and a garbage
+// cursor are each a 422 with the VALIDATION_FAILED code. FR-030 governs the
+// endpoint; no separate FR pins query validation, so what is enforced here is the
+// 422 contract response for a malformed page request.
+func TestQuotaRequest_ListRejectsInvalidQuery_FR030(t *testing.T) {
+	h := newHarness(t, "quota_list_badquery")
+
+	cases := map[string]string{
+		"size zero":     "/api/quota-requests?size=0",
+		"size over max": "/api/quota-requests?size=51",
+		"bad cursor":    "/api/quota-requests?cursor=busuk",
+	}
+	for name, path := range cases {
+		t.Run(name, func(t *testing.T) {
+			rec := h.do(http.MethodGet, path)
+			mustStatus(t, rec, http.StatusUnprocessableEntity)
+			if p := decodeProblem(t, rec); p.Code != "VALIDATION_FAILED" {
+				t.Fatalf("code %q, mau VALIDATION_FAILED", p.Code)
+			}
+		})
+	}
+}
+
+// TestQuotaRequest_ListRejectsNonBuyer_FR030 proves the list endpoint is gated to
+// the buyer role: a subcontractor principal is rejected before the handler runs.
+// The route-coverage test only asserts a role decision exists; this proves the
+// GET decision actually rejects the wrong role with 403.
+func TestQuotaRequest_ListRejectsNonBuyer_FR030(t *testing.T) {
+	h := newHarness(t, "quota_list_role")
+	h.auth.principal = &httpx.Principal{
+		Roles:   httpx.RoleSubcontractor,
+		Account: sqlcgen.UserAccount{ID: h.buyerAcc},
+	}
+	rec := h.do(http.MethodGet, "/api/quota-requests")
+	mustStatus(t, rec, http.StatusForbidden)
+}
+
 // TestQuotaRoutes_TidakMeninggalkanRuteTanpaKeputusanPeran proves the quota
 // routes sit behind a role gate.
 func TestQuotaRoutes_TidakMeninggalkanRuteTanpaKeputusanPeran(t *testing.T) {

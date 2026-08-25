@@ -29,6 +29,18 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Uji penolakan masukan tidak sah untuk parameter query dan path pada rute baca
+  request kuota, melengkapi uji T043 yang sebelumnya hanya mencakup jalur berhasil
+  dan penolakan peran. `TestQuotaRequest_ListRejectsInvalidQuery_FR030` menutup
+  `GET /api/quota-requests` dengan `size=0`, `size=51`, dan `cursor=busuk` (422
+  `VALIDATION_FAILED`); `TestDetail_RejectsMalformedRequestID_FR032` menutup
+  `requestId` bukan UUID pada detail (422, dibedakan dari 404 milik id sah tapi
+  bukan milik pemanggil); `TestIncoming_RejectsInvalidQuery_FR031` menutup
+  `status=ngawur` dan `size=0` pada incoming. Ditambah pula
+  `TestQuotaRequest_ListRejectsNonBuyer_FR030` yang membuktikan gerbang peran
+  `GET /api/quota-requests` benar-benar menolak subkontraktor dengan 403; uji
+  cakupan rute yang ada hanya memastikan keputusan peran terpasang, bukan menguji
+  penolakannya secara fungsional. (FR-030, FR-031, FR-032)
 - T043 (test request kuota) ditutup: ketujuh skenario yang didaftarkan task sudah
   tercakup uji tingkat router yang ada di `internal/quota/`, jadi tidak ditulis uji
   duplikat. Pemetaan skenario ke uji, supaya keterlacakannya tidak hilang:
