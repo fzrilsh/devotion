@@ -315,7 +315,7 @@ func (s *Service) CreateAdmin(ctx context.Context, email, phone, password string
 	}
 	return s.queries().UpsertAdmin(ctx, sqlcgen.UpsertAdminParams{
 		Email:        email,
-		Phone:        phone,
+		Phone:        normalizePhone(phone),
 		PasswordHash: hash,
 		CreatedAt:    tstz(s.clock.Now()),
 	})

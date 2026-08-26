@@ -11,6 +11,16 @@ import (
 )
 
 type Querier interface {
+	// Closes one shipped order as system-confirmed (FR-068): status to 'confirmed',
+	// auto_confirmed true (marking this closure as the system's, not a party's), and
+	// confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+	// guard makes the write a no-op if a party confirmed the order since the scan. The
+	// NOT EXISTS open-dispute guard closes the race where a dispute is reported between
+	// the scan and this update: a disputed order stays open even though its status is
+	// still 'shipped' (FR-070). A returned row means this call did the closing.
+	// Together the columns satisfy the auto_confirm_needs_confirmation and
+	// shipped_before_confirmed CHECKs.
+	AutoConfirmWorkOrder(ctx context.Context, arg AutoConfirmWorkOrderParams) (WorkOrder, error)
 	// Records a pre-production self-cancellation on the order itself (FR-065): the
 	// cancelling party's profile id, the reason, and the moment, moving status to
 	// 'cancelled'. Together the four columns satisfy the cancellation_complete
@@ -215,9 +225,19 @@ type Querier interface {
 	// itself: both parties' account ids (for the party guard), the request's product
 	// item, and the offer's readiness lead. Keyed on the work order id; the caller
 	// checks the account ids against the principal so a non-party sees a 404.
+	// has_open_dispute carries whether any unresolved dispute exists on the order, so
+	// the read layer feeds it to order.IsAutoConfirmDue: an open dispute halts the
+	// lazy auto-confirm exactly as the NOT EXISTS guard halts the ticker, so the two
+	// layers never disagree on a disputed order (FR-070).
 	GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetWorkOrderForViewRow, error)
 	// One capacity allocation row per used period (FR-077).
 	InsertAllocation(ctx context.Context, arg InsertAllocationParams) (CapacityAllocation, error)
+	// Opens a dispute on a work order (FR-046). status takes its 'reported' default.
+	// The idx_one_open_dispute partial unique index (work_order_id WHERE status <>
+	// 'resolved') means at most one dispute may be open per order; a second report
+	// violates it and the caller turns the 23505 into a readable DISPUTE_ALREADY_OPEN
+	// 409 (FR-046). reporter_id is the reporting party's business profile id.
+	InsertDispute(ctx context.Context, arg InsertDisputeParams) (Dispute, error)
 	// InsertItemProposal records a user's proposal for a new catalog item (FR-061).
 	// profile_id is the proposer's business profile, type is product or machine, and
 	// created_at comes from the Clock since the column has no DB default. status
@@ -247,6 +267,14 @@ type Querier interface {
 	InsertOffer(ctx context.Context, arg InsertOfferParams) (Offer, error)
 	// Records the opening status transition of a work order for its history trail.
 	InsertOrderStatusHistory(ctx context.Context, arg InsertOrderStatusHistoryParams) error
+	// Records one party's payment statement on a work order (FR-041). No money amount
+	// is stored: the platform neither holds nor verifies funds (FR-040, FR-042), so
+	// the row carries only the direction (sent/received), the date the party states,
+	// an optional free note, and the Clock-stamped created_at. The
+	// one_statement_per_party_per_direction unique constraint means a party can state
+	// each direction at most once; a repeat violates it and the caller turns the
+	// 23505 into a readable PAYMENT_STATEMENT_EXISTS 409.
+	InsertPaymentRecord(ctx context.Context, arg InsertPaymentRecordParams) (PaymentRecord, error)
 	// ── availability calendar ──
 	// InsertPeriodsUpToWeek generates every missing weekly period from the current
 	// horizon forward to untilWeek in one statement. The series runs on date, not
@@ -314,6 +342,12 @@ type Querier interface {
 	// The other still-open candidates of the request, so their subcontractors learn
 	// the request was agreed elsewhere. Rejected and expired candidates are left out.
 	ListOtherCandidatesToNotify(ctx context.Context, arg ListOtherCandidatesToNotifyParams) ([]ListOtherCandidatesToNotifyRow, error)
+	// Every payment statement on one work order for WorkOrderDetail (FR-041). Ordered
+	// by created_at so the two parties' statements read in the order they were made;
+	// both directions from both parties are visible, so a disagreement (one party
+	// states sent, the counterparty never states received) is apparent to the parties
+	// and to admin when a dispute is reported (FR-043).
+	ListPaymentRecordsForWorkOrder(ctx context.Context, workOrderID pgtype.UUID) ([]PaymentRecord, error)
 	// ListPeriodsInRange returns the periods of a listing within an inclusive
 	// week_start range, ordered ascending, for GET /listing/me/periods. allocated
 	// is the sum of active allocation quantities on each period; remaining is the
@@ -327,6 +361,29 @@ type Querier interface {
 	// across pages (FR-030, FR-080). The cursor tuple admits every row on the first
 	// page via sentinels above the maxima.
 	ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaRequestsByBuyerParams) ([]QuotaRequest, error)
+	// The shipped orders inside the FR-069 warning lead that have not yet been warned:
+	// shipped_at is within (warn_after, due_after] so the auto-confirm instant is
+	// between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
+	// the ticker warns each order once, not on every tick. The caller passes
+	// warn_after = now - AutoConfirmWindow + AutoConfirmWarnLead and due_after =
+	// now - AutoConfirmWindow, both from the Clock, so the window matches
+	// order.IsAutoConfirmApproaching. An order with an open dispute is excluded by the
+	// NOT EXISTS guard, so a disputed order is neither warned about nor auto-closed
+	// (FR-070). Rides idx_order_auto_confirm. Returns the id, the buyer account (the
+	// only party FR-069 warns), and shipped_at so the caller can name the auto-confirm
+	// date in the notice.
+	ListShippedApproachingAutoConfirm(ctx context.Context, arg ListShippedApproachingAutoConfirmParams) ([]ListShippedApproachingAutoConfirmRow, error)
+	// The shipped orders whose 7-day auto-confirm instant has arrived (FR-068),
+	// for the in-process ticker to close. shipped_at <= $1 is the due test with $1 =
+	// now - AutoConfirmWindow computed by the caller from the injected Clock, so the
+	// boundary matches order.IsAutoConfirmDue exactly and no wall clock is read in
+	// SQL. Rides idx_order_auto_confirm (shipped_at) WHERE status='shipped'. An order
+	// with an open dispute is excluded by the NOT EXISTS guard, so reporting a dispute
+	// stops the auto-confirm count without moving the order off 'shipped' (FR-070):
+	// the dispute row, not the work-order status, is what halts the clock, and admin
+	// moves the order to in_mediation separately (T071). Returns each order's id and
+	// both parties' account ids for the closure notice.
+	ListShippedDueForAutoConfirm(ctx context.Context, dueBefore pgtype.Timestamptz) ([]ListShippedDueForAutoConfirmRow, error)
 	// ListVerificationRequestsByProfile returns every submission a profile has made,
 	// newest first, joined to business_profile for the business_name the contract's
 	// VerificationRequest carries (the verification_request table has no such
@@ -344,9 +401,16 @@ type Querier interface {
 	// the order is stable across pages (FR-038). role_filter selects the side:
 	// 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
 	// profile, any other value matches either. An empty status_filter array means no
-	// status restriction; otherwise only the listed statuses pass. A null
-	// before_created is the first page.
-	ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]WorkOrder, error)
+	// status restriction; otherwise only the listed statuses pass. The filter is a
+	// text[] cast against wo.status::text, not a work_order_status[]: pgx cannot encode
+	// a slice of the named enum type without the enum OID registered on the pool, so an
+	// enum-array parameter fails to encode on every request (empty slice included). The
+	// text cast sidesteps that with no per-connection type registration (Principle IV).
+	// A null before_created is the first page. has_open_dispute rides along so
+	// listItemView feeds it to order.IsAutoConfirmDue, keeping the list's lazy
+	// auto-confirm in step with the detail view and the ticker on a disputed order
+	// (FR-070).
+	ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]ListWorkOrdersForPartyRow, error)
 	// Takes a row lock on a listing by its own id, so the accept path can extend the
 	// calendar horizon (FR-088) under the same lock the listing owner's edits take.
 	LockListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
@@ -392,6 +456,11 @@ type Querier interface {
 	// reflect the try that worked, sent_at and attempted_at stamped from the Clock.
 	// A claimed row had attempts <= 2, so the +1 stays within attempts_max_three.
 	MarkChannelSent(ctx context.Context, arg MarkChannelSentParams) error
+	// Stamps confirm_warn_sent_at so the FR-069 approaching notice is sent to the
+	// buyer once. The IS NULL guard keeps it idempotent if two overlapping ticker
+	// instances both scanned before either stamped (the advisory lock makes that
+	// rare, but the guard removes the race entirely).
+	MarkConfirmWarnSent(ctx context.Context, arg MarkConfirmWarnSentParams) error
 	// MarkNotificationRead stamps read_at on one notification the caller owns. The
 	// account_id predicate is the ownership check: a caller marking another
 	// account's id affects zero rows, which the handler turns into a 404, so the
@@ -403,6 +472,14 @@ type Querier interface {
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
 	MemberRecorded(ctx context.Context, arg MemberRecordedParams) (bool, error)
+	// Moves a shipped or otherwise-active order into 'in_mediation' when a dispute is
+	// reported (FR-070). The status = 'shipped' scan of ListShippedDueForAutoConfirm
+	// excludes 'in_mediation', so opening a dispute before the 7-day deadline stops
+	// the auto-confirm count. confirm_warn_sent_at is deliberately left untouched: a
+	// buyer already warned stays warned even if the dispute later closes without
+	// cancelling (data-model.md). The status guard rejects moving a terminal order
+	// (confirmed/cancelled), so a returned row means this call did the move.
+	MoveWorkOrderToMediation(ctx context.Context, id pgtype.UUID) (WorkOrder, error)
 	// PeriodHasActiveAllocation reports whether a period carries any unreversed
 	// allocation, gating the "cannot mark full" and "cannot lower below used" edits.
 	PeriodHasActiveAllocation(ctx context.Context, periodID pgtype.UUID) (bool, error)

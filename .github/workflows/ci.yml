@@ -53,7 +53,10 @@ jobs:
           git diff --exit-code apidocs/openapi.yaml \
             || { echo "backend/apidocs/openapi.yaml basi. Jalankan ./backend/apidocs-sync.sh lalu commit."; exit 1; }
       - run: go vet ./...
-      - run: go test ./...
+      # -p 1 serializes packages so concurrent test pools stay within Postgres
+      # max_connections=20 (pool 15). Without it, parallel packages exhaust
+      # connections and fail with SQLSTATE 53300.
+      - run: go test ./... -p 1
 
   # Build the frontend, embed it into the backend image, and push to GHCR.
   # Runs only on branch pushes, not pull requests. The frontend lives in

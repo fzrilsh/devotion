@@ -523,7 +523,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: jalankan seluruh transisi status; pada pesanan kedua, biarkan status Dikirim melewati tujuh hari dan pastikan tertutup otomatis.
 
-- [x] T053 [US5] [BE] Mesin keadaan pesanan
+- [ ] T053 [US5] [BE] Mesin keadaan pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-038, FR-039, FR-044
   **Kemampuan**: transisi sesuai diagram `data-model.md` §7; riwayat status dengan waktu dan pelaku; penolakan transisi melompat beserta daftar transisi yang diizinkan
@@ -538,7 +538,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T048, T053
   **Selesai bila**: `dibatalkan_oleh_id` tercatat, itu dasar perhitungan tingkat penyelesaian; galat `PEMBATALAN_SETELAH_PRODUKSI` menyebutkan jalur alternatifnya
 
-- [ ] T055 [US5] [BE] Konfirmasi otomatis tujuh hari
+- [x] T055 [US5] [BE] Konfirmasi otomatis tujuh hari
   **Modul**: `backend/internal/order/` + scheduler
   **FR**: FR-068, FR-069, FR-070
   **Kemampuan**: dua lapisan, yaitu dihitung saat pesanan dibaca, dan penjadwal untuk pemberitahuan tenggat mendekat serta penulisan status final; dihentikan oleh sengketa
@@ -546,7 +546,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu fungsi domain dipakai kedua lapisan; `dikonfirmasi_otomatis` menandai yang mana
   **Hati-hati**: kalau perhitungan tenggat diduplikasi di beberapa handler, keduanya akan berbeda pada suatu titik dan pesanan yang sama tampak beda status di halaman berbeda.
 
-- [ ] T056 [P] [US5] [BE] Catatan pembayaran
+- [x] T056 [P] [US5] [BE] Catatan pembayaran
   **Modul**: `backend/internal/order/`
   **FR**: FR-040 sampai FR-043
   **Kemampuan**: catat pernyataan terkirim dan diterima, tanpa kolom jumlah uang; penanda perbedaan pernyataan antar pihak; keterangan bahwa platform tidak menjamin
@@ -555,14 +555,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Hati-hati**: Batas Keuangan konstitusi. Dokumen sumber menempatkan escrow wajib sebagai mitigasi gagal bayar dan penipuan [1], sekaligus sebagai alat tawar dalam sengketa kualitas produk [1]. Keduanya sengaja tidak dibangun di versi ini, dan konsekuensinya tercatat di Assumptions spec. Jangan menambahkannya kembali tanpa mengubah spec lebih dulu.
   **Hati-hati (payments sudah ada di kontrak)**: `WorkOrderDetail` sudah punya field `payments`, dan jalur accept (T041) sudah mengisinya sebagai array kosong supaya kontrak dihormati. Task ini yang mengisinya sungguhan (FR-041..FR-043). Pastikan setiap jalur yang mengembalikan `WorkOrderDetail` menyertakan `payments` dari data, bukan lagi array kosong.
 
-- [ ] T057 [P] [US5] [BE] Pelaporan sengketa
+- [x] T057 [P] [US5] [BE] Pelaporan sengketa
   **Modul**: `backend/internal/order/`
   **FR**: FR-046, FR-070
   **Kemampuan**: laporkan sengketa, hentikan hitungan konfirmasi otomatis, satu sengketa terbuka per pesanan
   **Dependency**: prasyarat T053, T055
   **Selesai bila**: pelaporan berulang ditolak; hitungan otomatis benar-benar berhenti
 
-- [ ] T058 [P] [US5] [BE] Test pesanan
+- [x] T058 [P] [US5] [BE] Test pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-044, FR-065, FR-066, FR-068, FR-070
   **Kemampuan**: transisi melompat ditolak; pembatalan pra-produksi membalik alokasi; pembatalan pasca-produksi ditolak; konfirmasi otomatis dengan `Clock` digantikan; sengketa menghentikan hitungan
@@ -711,7 +711,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Kemampuan**: `seed:test-data` menyiapkan 50 usaha, kandidat 500 potong/minggu jeda 0 hari untuk skenario 3.000 potong, kandidat berjeda 14 dan 21 hari untuk memverifikasi minggu kesiapan, kandidat berkapasitas 200/minggu untuk skenario deadline lima bulan, kalender basi 8 hari, request kedaluwarsa, pesanan Dikirim 6 hari dan 8 hari lalu, pesanan telat, dua pengajuan verifikasi, usaha dengan hanya 2 pesanan; `reset:test-data` memulihkan
   **Dependency**: prasyarat T019, T041, T055, T067
   **Selesai bila**: perintah **menolak berjalan** saat `APP_ENV=production`; akun uji memakai domain `.test`
-  **Hati-hati**: alur bertenggat disiapkan sebagai data yang sudah berada pada keadaan itu, bukan lewat kendali geser waktu, data yang di-seed tidak berisiko terbawa ke lingkungan sungguhan.
+  **Hati-hati**: alur bertenggat disiapkan sebagai data yang sudah berada pada keadaan itu, bukan lewat kendali geser waktu, data yang di-seed tidak berisiko terbawa ke lingkungan sungguhan. Pesanan Dikirim 6 hari dan 8 hari sudah punya jalurnya lewat T055: `shipped_at` dipatok pada `Clock.Now()` dikurangi 6 atau 8 hari sehingga jendela konfirmasi otomatis tujuh hari jatuh di sisi yang benar tanpa menunggu waktu nyata.
 
 - [ ] T076 [P] [OPS] Dokumen skenario uji manual final
   **Modul**: `docs/skenario-uji-manual.md`

@@ -37,6 +37,8 @@ func (s *Service) registerWorkOrder(r *httpx.Router, auth httpx.Authenticator) {
 	r.Gated("GET /api/work-orders/{workOrderId}", authed, s.handleWorkOrderDetail)
 	r.Gated("POST /api/work-orders/{workOrderId}/status", subGate, s.handleWorkOrderStatus)
 	s.registerCancel(r, auth)
+	s.registerPayment(r, auth)
+	s.registerDispute(r, auth)
 }
 
 // handleWorkOrderDetail returns one work order's full detail (FR-038, FR-039). The
@@ -92,6 +94,10 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 	if err != nil {
 		return workOrderView{}, err
 	}
+	pays, err := s.queries().ListPaymentRecordsForWorkOrder(ctx, row.ID)
+	if err != nil {
+		return workOrderView{}, err
+	}
 
 	allocations := make([]allocationView, 0, len(allocs))
 	for _, a := range allocs {
@@ -101,6 +107,23 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 			Allocated:  a.UsedCapacity,
 			Remaining:  allocationRemaining(a),
 			MarkedFull: a.MarkedFull,
+		})
+	}
+
+	payments := make([]paymentView, 0, len(pays))
+	for _, p := range pays {
+		var note *string
+		if p.Note.Valid {
+			n := p.Note.String
+			note = &n
+		}
+		payments = append(payments, paymentView{
+			PaymentID:           uuidString(p.ID),
+			Direction:           string(p.Direction),
+			Date:                platform.FormatDateID(p.Date.Time),
+			DeclaredByProfileID: uuidString(p.ProfileID),
+			Note:                note,
+			CreatedAt:           p.CreatedAt.Time,
 		})
 	}
 
@@ -118,9 +141,22 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		})
 	}
 
+	// Lazy auto-confirm (research.md R-07 layer 1): a shipped order past its
+	// 7-day window reads as confirmed everywhere, without waiting for the ticker
+	// to write the row, so it never looks shipped on one page and confirmed on
+	// another. IsAutoConfirmDue takes the same open-dispute flag the ticker's
+	// NOT EXISTS guard enforces, so a disputed order reads as still shipped here
+	// too: both layers agree on both the boundary instant and the dispute halt
+	// (FR-068, FR-070).
+	effStatus := row.Status
+	if row.Status == sqlcgen.WorkOrderStatusShipped && row.ShippedAt.Valid &&
+		IsAutoConfirmDue(row.ShippedAt.Time, s.clock.Now(), row.HasOpenDispute) {
+		effStatus = sqlcgen.WorkOrderStatusConfirmed
+	}
+
 	view := workOrderView{
 		WorkOrderID:            uuidString(row.ID),
-		Status:                 string(row.Status),
+		Status:                 string(effStatus),
 		BuyerProfileID:         uuidString(row.BuyerID),
 		SubcontractorProfileID: uuidString(row.SubcontractorID),
 		ProductItemID:          uuidString(row.ProductItemID),
@@ -129,13 +165,16 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		TotalPrice:             row.TotalPrice,
 		ReadinessLeadDays:      row.ReadinessLeadDays,
 		ReadinessDeadline:      platform.FormatDateID(row.ReadinessWeekStart.Time),
-		AllowedTransitions:     allowedTransitions(row.Status),
-		SelfCancellable:        row.Status == sqlcgen.WorkOrderStatusAccepted,
+		AllowedTransitions:     allowedTransitions(effStatus),
+		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
 		Allocations:            allocations,
 		StatusHistory:          statusHistory,
-		Payments:               []paymentView{},
+		Payments:               payments,
 	}
-	if row.Status == sqlcgen.WorkOrderStatusShipped && row.ShippedAt.Valid {
+	// auto_confirm_at is shown while the order is still effectively shipped, so the
+	// buyer sees when it will close; once the window has passed the order already
+	// reads as confirmed and the field is dropped (FR-068).
+	if effStatus == sqlcgen.WorkOrderStatusShipped && row.ShippedAt.Valid {
 		at := AutoConfirmAt(row.ShippedAt.Time)
 		view.AutoConfirmAt = &at
 	}
@@ -380,7 +419,7 @@ func (s *Service) handleListWorkOrders(w http.ResponseWriter, r *http.Request) {
 
 	items := make([]workOrderView, 0, len(rows))
 	for _, wo := range rows {
-		items = append(items, listItemView(wo))
+		items = append(items, s.listItemView(wo))
 	}
 
 	page := pagination{HasNext: hasNext}
@@ -402,24 +441,32 @@ type workOrderList struct {
 // listItemView renders a list row as a WorkOrderDetail without its history,
 // allocations, or payments: the list carries the summary shape, and the detail
 // endpoint fills the rest. allowed_transitions and self_cancellable still come
-// from the shared state machine so the list can render the same buttons.
-func listItemView(wo sqlcgen.WorkOrder) workOrderView {
+// from the shared state machine so the list can render the same buttons. The
+// same lazy auto-confirm as buildDetailView (research.md R-07 layer 1) applies,
+// so a shipped order past its 7-day window reads as confirmed on the list too,
+// never shipped here and confirmed on the detail page (FR-068).
+func (s *Service) listItemView(wo sqlcgen.ListWorkOrdersForPartyRow) workOrderView {
+	effStatus := wo.Status
+	if wo.Status == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid &&
+		IsAutoConfirmDue(wo.ShippedAt.Time, s.clock.Now(), wo.HasOpenDispute) {
+		effStatus = sqlcgen.WorkOrderStatusConfirmed
+	}
 	view := workOrderView{
 		WorkOrderID:            uuidString(wo.ID),
-		Status:                 string(wo.Status),
+		Status:                 string(effStatus),
 		BuyerProfileID:         uuidString(wo.BuyerID),
 		SubcontractorProfileID: uuidString(wo.SubcontractorID),
 		Quantity:               wo.Quantity,
 		Deadline:               platform.FormatDateID(wo.Deadline.Time),
 		TotalPrice:             wo.TotalPrice,
 		ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
-		AllowedTransitions:     allowedTransitions(wo.Status),
-		SelfCancellable:        wo.Status == sqlcgen.WorkOrderStatusAccepted,
+		AllowedTransitions:     allowedTransitions(effStatus),
+		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
 		Allocations:            []allocationView{},
 		StatusHistory:          []statusEntry{},
 		Payments:               []paymentView{},
 	}
-	if wo.Status == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid {
+	if effStatus == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid {
 		at := AutoConfirmAt(wo.ShippedAt.Time)
 		view.AutoConfirmAt = &at
 	}
@@ -429,8 +476,12 @@ func listItemView(wo sqlcgen.WorkOrder) workOrderView {
 // parseStatusFilter validates the status[] query values against the known work
 // order statuses. An unknown value is rejected rather than silently dropped, so a
 // typo does not quietly widen the result. An empty filter means no restriction.
-func parseStatusFilter(values []string) ([]sqlcgen.WorkOrderStatus, bool) {
-	out := make([]sqlcgen.WorkOrderStatus, 0, len(values))
+// The result is []string, not []WorkOrderStatus: the query casts the parameter to
+// text[] because pgx cannot encode a slice of the named enum type without the enum
+// OID registered on the pool. An empty slice stays non-nil, matching the query's
+// cardinality(...) = 0 "no restriction" branch.
+func parseStatusFilter(values []string) ([]string, bool) {
+	out := make([]string, 0, len(values))
 	for _, v := range values {
 		switch sqlcgen.WorkOrderStatus(v) {
 		case sqlcgen.WorkOrderStatusAccepted,
@@ -440,7 +491,7 @@ func parseStatusFilter(values []string) ([]sqlcgen.WorkOrderStatus, bool) {
 			sqlcgen.WorkOrderStatusConfirmed,
 			sqlcgen.WorkOrderStatusCancelled,
 			sqlcgen.WorkOrderStatusInMediation:
-			out = append(out, sqlcgen.WorkOrderStatus(v))
+			out = append(out, v)
 		default:
 			return nil, false
 		}

@@ -239,3 +239,79 @@ func TestWorkOrderList_PartyListsOwnOrders_FR038(t *testing.T) {
 		t.Fatalf("items = %+v, mau satu pesanan milik pemanggil", body.Items)
 	}
 }
+
+// TestWorkOrderStatus_FullForwardChainRecordsActor_FR039_FR044 walks every legal
+// forward step the subcontractor can drive over HTTP (accepted -> production ->
+// completed -> shipped), proves each one is accepted and the response reflects
+// the new status, then reads the history rows directly to prove every human move
+// is attributed to the acting subcontractor: changed_by is that account and
+// by_system is false. The read query does not expose those columns, so the actor
+// assertion queries work_order_status_history straight from the pool. This is the
+// counterpart to the auto-confirm test that proves the system closure writes a
+// by_system row with no human actor: forward moves are the human's, closure is
+// the system's, and neither is mislabeled.
+func TestWorkOrderStatus_FullForwardChainRecordsActor_FR039_FR044(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_status_fullchain")
+	handler := woRouter(h, httpx.RoleSubcontractor, h.subAcc)
+
+	for _, step := range []sqlcgen.WorkOrderStatus{
+		sqlcgen.WorkOrderStatusProduction,
+		sqlcgen.WorkOrderStatusCompleted,
+		sqlcgen.WorkOrderStatusShipped,
+	} {
+		req := httptest.NewRequest(http.MethodPost,
+			"/api/work-orders/"+uuidString(h.workOrderID)+"/status",
+			strings.NewReader(`{"new_status":"`+string(step)+`"}`))
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("majukan ke %q: status %d, mau 200; body %s", step, rec.Code, rec.Body.String())
+		}
+		var body struct {
+			Status string `json:"status"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode %q: %v", rec.Body.String(), err)
+		}
+		if body.Status != string(step) {
+			t.Fatalf("status %q, mau %q", body.Status, step)
+		}
+	}
+
+	// Every forward move must carry the acting subcontractor as changed_by and
+	// leave by_system false. The opening 'accepted' row (written by accept) is
+	// also the subcontractor's, so no forward row may be attributed to the system.
+	rows, err := h.pool.Query(context.Background(),
+		`SELECT new_status, changed_by, by_system
+		   FROM work_order_status_history
+		  WHERE work_order_id = $1 AND new_status <> 'accepted'
+		  ORDER BY created_at, id`, h.workOrderID)
+	if err != nil {
+		t.Fatalf("baca riwayat: %v", err)
+	}
+	defer rows.Close()
+
+	var seen int
+	for rows.Next() {
+		var status sqlcgen.WorkOrderStatus
+		var changedBy pgtype.UUID
+		var bySystem bool
+		if err := rows.Scan(&status, &changedBy, &bySystem); err != nil {
+			t.Fatalf("scan riwayat: %v", err)
+		}
+		if bySystem {
+			t.Fatalf("langkah %q ditandai by_system; perpindahan maju adalah tindakan subkontraktor (FR-039)", status)
+		}
+		if changedBy != h.subAcc {
+			t.Fatalf("langkah %q changed_by bukan subkontraktor yang memindahkan (FR-039)", status)
+		}
+		seen++
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterasi riwayat: %v", err)
+	}
+	if seen != 3 {
+		t.Fatalf("baris riwayat maju = %d, mau 3 (production, completed, shipped)", seen)
+	}
+}
