@@ -87,6 +87,28 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Endpoint ulasan dan nilai reputasi turunan (FR-047, FR-048, FR-049, FR-050,
+  FR-071, FR-072, FR-073). `POST /api/work-orders/{workOrderId}/reviews` mencatat
+  ulasan satu pihak atas lawan transaksinya: rating 1..5 dan teks opsional sampai
+  2000 karakter, hanya pada pesanan yang sudah dikonfirmasi diterima (manual atau
+  auto-konfirmasi malas lewat predikat yang sama dengan `order`), satu ulasan per
+  pesanan per pihak, tidak anonim. Prasyarat status pesanan tidak bisa jadi CHECK
+  (ia membaca tabel lain), jadi ditegakkan di aplikasi. `GET /api/profile/{profileId}/reviews`
+  menyajikan daftar ulasan publik ber-keyset. Nilai reputasi (tingkat penyelesaian,
+  rata-rata rating, jumlah ulasan) dihitung saat baca, tidak pernah disimpan:
+  `reputation.Derive` adalah satu-satunya tempat ambang FR-073 (persentase ditahan
+  sampai pembagi >= 3) dan pembulatan persennya berada, sementara aturan pembagi
+  FR-072 (pembatalan masuk pembagi hanya bagi pihak yang membatalkan) tetap di
+  kueri SQL `SearchReputation` yang sama dipakai profil dan pencarian, sehingga
+  keduanya tidak mungkin melaporkan angka berbeda untuk usaha yang sama. Stub
+  `emptyReputation()` di `account/profile_http.go` diganti nilai nyata dari kueri
+  itu. Test: rantai murni `Derive` di kedua batas ambang (termasuk 0 dari 3 yang
+  bernilai 0%, bukan nil), penolakan ulasan pada pesanan belum dikonfirmasi,
+  penolakan pihak yang tak pernah bertransaksi, penolakan ulasan kedua oleh pihak
+  sama, pembatalan yang menurunkan tingkat penyelesaian hanya pihak yang
+  membatalkan dan tidak pihak lain, ulasan tersembunyi keluar dari rata-rata, dan
+  satu test yang membuktikan profil dan pencarian menampilkan angka sama untuk
+  usaha yang sama.
 - Test rantai maju penuh mesin keadaan pesanan (FR-039, FR-044). Sebuah test
   menempuh tiap langkah legal yang dapat dijalankan subkontraktor lewat HTTP
   (accepted -> production -> completed -> shipped), memastikan tiap langkah
