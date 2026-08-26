@@ -10,6 +10,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/db"
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
 	"github.com/fzrilsh/devotion/backend/internal/platform"
+	"github.com/fzrilsh/devotion/backend/internal/reputation"
 )
 
 // regionLevel is the coverage scope of one search: exactly one of the three
@@ -51,14 +52,10 @@ type criterion struct {
 
 // reputationView is the Reputation schema as carried on a search candidate. It
 // is computed at read time from SearchReputation, never materialized to a column
-// (data-model.md section 19). completion_rate is nil until enough_data is true
-// (FR-073), so the client never shows a raw percentage below the threshold.
-type reputationView struct {
-	EnoughData     bool     `json:"enough_data"`
-	CompletionRate *int     `json:"completion_rate"`
-	AverageRating  *float64 `json:"average_rating"`
-	ReviewCount    int      `json:"review_count"`
-}
+// (data-model.md section 19). The shape and the FR-073 threshold belong to the
+// reputation package, so search and the public profile render the same numbers
+// for the same business.
+type reputationView = reputation.View
 
 // pageReputation bundles a profile's read-time reputation block with its
 // completed-jobs count, which sits on the candidate itself (FR-048) rather than
@@ -290,11 +287,11 @@ func matchCriterion(name string, met, evaluated bool, notEvaluated string) crite
 
 // reputationForPage computes the read-time reputation for every profile on one
 // page in a single query (data-model.md section 19, FR-071), keyed by profile id
-// text. It applies the FR-073 threshold here in the service: a completion
-// percentage is only filled once the divisor reaches three agreed orders,
-// otherwise enough_data stays false and completion_rate is nil, mirroring the
-// public Reputation schema. A query error yields an empty map so the search
-// still answers with empty reputation blocks rather than failing.
+// text. The threshold and the percentage rounding are not applied here: the row's
+// scalars go to reputation.Derive, the one place that owns FR-073, so a candidate
+// and that same business's public profile can never show different numbers. A
+// query error yields an empty map so the search still answers with empty
+// reputation blocks rather than failing.
 func (s *Service) reputationForPage(ctx context.Context, rows []sqlcgen.SearchCandidatesRow) map[string]pageReputation {
 	out := make(map[string]pageReputation, len(rows))
 	if len(rows) == 0 {
@@ -309,20 +306,12 @@ func (s *Service) reputationForPage(ctx context.Context, rows []sqlcgen.SearchCa
 		return out
 	}
 	for _, rep := range reps {
-		body := reputationView{
-			ReviewCount: int(rep.ReviewCount),
-		}
-		if rep.ReviewCount > 0 {
-			body.AverageRating = floatFromNumeric(rep.AverageRating)
-		}
-		// FR-073: hold the completion percentage until at least three agreed
-		// orders (the divisor). Below the threshold the client shows a "belum
-		// cukup data" note, not a raw ratio, so completion_rate stays nil.
-		if rep.CompletionDivisor >= 3 {
-			body.EnoughData = true
-			pct := int((rep.CompletionCompleted*100 + rep.CompletionDivisor/2) / rep.CompletionDivisor)
-			body.CompletionRate = &pct
-		}
+		body := reputation.Derive(
+			int(rep.CompletionCompleted),
+			int(rep.CompletionDivisor),
+			int(rep.ReviewCount),
+			floatFromNumeric(rep.AverageRating),
+		)
 		out[uuidString(rep.ProfileID)] = pageReputation{
 			Reputation:    body,
 			CompletedJobs: rep.CompletedJobs,

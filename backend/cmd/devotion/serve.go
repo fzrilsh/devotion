@@ -34,6 +34,7 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/storage"
 	"github.com/fzrilsh/devotion/backend/internal/platform/tlsconf"
 	"github.com/fzrilsh/devotion/backend/internal/quota"
+	"github.com/fzrilsh/devotion/backend/internal/reputation"
 	"github.com/fzrilsh/devotion/backend/internal/search"
 	"github.com/fzrilsh/devotion/backend/internal/verification"
 )
@@ -156,6 +157,11 @@ func runServe(ctx context.Context, args []string) error {
 	// scheduler below.
 	orderSvc := order.New(pool, clock, notif, ls)
 	orderSvc.Register(router, acc)
+
+	// reputation wires the review write and the public review list. It reads the
+	// same auto-confirm predicate order uses, so a lazily auto-confirmed order is
+	// reviewable without waiting for the ticker.
+	reputation.New(pool, clock).Register(router, acc)
 
 	// verification wires the applicant file and verification-request endpoints.
 	// The storage service enforces the magic-byte check, EXIF stripping, quota,

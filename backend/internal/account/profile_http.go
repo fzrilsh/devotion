@@ -1,29 +1,44 @@
 package account
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
+	"github.com/fzrilsh/devotion/backend/internal/reputation"
 )
 
-// reputationBody is the Reputation schema. In US1 no reviews exist yet, so every
-// profile reports enough_data false with a zero review_count and null rates. The
-// shape is fixed now so the contract field is populated; the reputation package
-// fills it later.
-type reputationBody struct {
-	EnoughData     bool     `json:"enough_data"`
-	CompletionRate *int     `json:"completion_rate"`
-	AverageRating  *float64 `json:"average_rating"`
-	ReviewCount    int      `json:"review_count"`
-}
+// reputationBody is the Reputation schema, owned by the reputation package so
+// the profile and a search result render one shape with one threshold (FR-073).
+type reputationBody = reputation.View
 
-// emptyReputation is the reputation of a profile with no reviews: not enough
-// data, nothing to average, zero reviews.
-func emptyReputation() reputationBody {
-	return reputationBody{EnoughData: false, ReviewCount: 0}
+// reputationOf computes a profile's read-time reputation (FR-071). It runs the
+// same SearchReputation query the search page runs, over a one-element id array,
+// and hands its scalars to reputation.Derive. Reusing that query rather than
+// writing a second one is what keeps the profile and the search from reporting
+// different completion rates for the same business: the FR-072 divisor rule
+// exists in exactly one statement.
+//
+// A query failure degrades to the empty block rather than failing the profile
+// read: reputation is informative, and a profile page that 500s over it would be
+// worse than one that shows "belum cukup data".
+func (s *Service) reputationOf(ctx context.Context, profileID pgtype.UUID) reputationBody {
+	rows, err := s.queries().SearchReputation(ctx, []pgtype.UUID{profileID})
+	if err != nil || len(rows) == 0 {
+		return reputation.Derive(0, 0, 0, nil)
+	}
+	r := rows[0]
+	return reputation.Derive(
+		int(r.CompletionCompleted),
+		int(r.CompletionDivisor),
+		int(r.ReviewCount),
+		floatFromNumeric(r.AverageRating),
+	)
 }
 
 // myProfileBody is the MyProfile response. city_name, province_code, and
@@ -97,7 +112,7 @@ func (s *Service) handleGetProfileMe(w http.ResponseWriter, r *http.Request, acc
 		Longitude:          floatFromNumeric(row.Longitude),
 		IdentityVerified:   row.Verified,
 		VerificationStatus: nil,
-		Reputation:         emptyReputation(),
+		Reputation:         s.reputationOf(r.Context(), row.ID),
 	})
 }
 
@@ -153,7 +168,7 @@ func (s *Service) handlePutProfileMe(w http.ResponseWriter, r *http.Request, acc
 		Longitude:          floatFromNumeric(row.Longitude),
 		IdentityVerified:   row.Verified,
 		VerificationStatus: nil,
-		Reputation:         emptyReputation(),
+		Reputation:         s.reputationOf(r.Context(), row.ID),
 	})
 }
 
@@ -186,6 +201,6 @@ func (s *Service) handleGetPublicProfile(w http.ResponseWriter, r *http.Request)
 		Longitude:        floatFromNumeric(row.Longitude),
 		IdentityVerified: row.Verified,
 		Listing:          nil,
-		Reputation:       emptyReputation(),
+		Reputation:       s.reputationOf(r.Context(), row.ID),
 	})
 }

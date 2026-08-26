@@ -598,7 +598,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: selesaikan pesanan, isi rating dari kedua sisi; batalkan pesanan lain dari satu sisi, pastikan hanya tingkat penyelesaian pihak itu yang turun.
 
-- [ ] T062 [US6] [BE] Ulasan
+- [x] T062 [US6] [BE] Ulasan
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-047, FR-049, FR-050
   **Kemampuan**: rating 1–5 dan teks hanya atas pesanan yang sudah dikonfirmasi, satu kali per pesanan per pihak, tidak anonim
@@ -606,7 +606,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: ulasan atas pesanan belum selesai ditolak; ulasan atas usaha yang belum pernah bertransaksi ditolak
   **Hati-hati**: pemeriksaan status pesanan tidak dapat ditegakkan `CHECK` karena merujuk tabel lain. Wajib di aplikasi.
 
-- [ ] T063 [US6] [BE] Nilai turunan reputasi
+- [x] T063 [US6] [BE] Nilai turunan reputasi
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-048, FR-071, FR-072, FR-073
   **Kemampuan**: rating rata-rata mengecualikan ulasan yang disembunyikan; tingkat penyelesaian dihitung saat dibaca; pembatalan masuk pembagi hanya bagi pihak yang membatalkan; persentase ditahan sampai 3 pesanan disepakati
@@ -615,7 +615,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Hati-hati**: dihitung saat dibaca, **bukan** disimpan sebagai kolom. Kolom yang harus diperbarui setiap kali ulasan disembunyikan atau pesanan dibatalkan adalah sumber ketidaksesuaian yang paling sering muncul.
   **Hati-hati**: `SearchReputation` di `db/queries/search.sql` sudah menghitung `completed`/`divisor` dengan aturan FR-072 `FILTER (WHERE status <> 'cancelled' OR cancelled_by_id = pr.id)`. T063 wajib memakai kueri yang sama, jangan menulis kueri baru. Kalau ditulis ulang, profil publik dan hasil pencarian akan menampilkan angka berbeda untuk usaha yang sama tanpa gejala. Lihat catatan BERISIKO di `docs/utang-teknis.md`.
 
-- [ ] T064 [P] [US6] [BE] Test reputasi
+- [x] T064 [P] [US6] [BE] Test reputasi
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-047, FR-050, FR-071, FR-072, FR-073
   **Kemampuan**: pembatalan menurunkan tingkat penyelesaian pihak yang membatalkan dan **tidak** mempengaruhi pihak lain; ulasan disembunyikan keluar dari rata-rata; ambang 3 pesanan

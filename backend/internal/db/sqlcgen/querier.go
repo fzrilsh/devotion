@@ -213,6 +213,10 @@ type Querier interface {
 	// view (FR-032). The buyer account guard makes a request that is not the
 	// caller's a 404 rather than leaking its existence.
 	GetRequestForBuyer(ctx context.Context, arg GetRequestForBuyerParams) (QuotaRequest, error)
+	// Reloads one review with the author's business name and the transaction date,
+	// so the 201 body carries the same shape the public list returns. Keyed on the
+	// review id just inserted.
+	GetReviewForResponse(ctx context.Context, id pgtype.UUID) (GetReviewForResponseRow, error)
 	// GetSessionByTokenHash loads a live session by token hash. The expiry check is
 	// in SQL so an expired row is treated as absent without a second round trip.
 	GetSessionByTokenHash(ctx context.Context, arg GetSessionByTokenHashParams) (Session, error)
@@ -295,6 +299,14 @@ type Querier interface {
 	// subcontractor_id equals the request's buyer_id; the service rejects that case
 	// first (FR-083), so this insert is the safety net.
 	InsertRequestCandidate(ctx context.Context, arg InsertRequestCandidateParams) (RequestCandidate, error)
+	// Records one party's review of the other on a finished work order (FR-047).
+	// rating is 1..5 (enforced by the rating_one_to_five CHECK), text is optional.
+	// The one_review_per_order_per_reviewer unique constraint means each party may
+	// review an order once; a repeat violates it and the caller turns the 23505 into
+	// a readable REVIEW_ALREADY_SUBMITTED 409 (FR-049). Reviews are never anonymous:
+	// reviewer_id is stored and shown (FR-050). hidden takes its false default;
+	// admin hiding is a later moderation action (T069), not a field the author sets.
+	InsertReview(ctx context.Context, arg InsertReviewParams) (Review, error)
 	// Inserts the work order at agreement formation. readiness_week_start is stored,
 	// not recomputed later (FR-084); status takes its 'accepted' default.
 	InsertWorkOrder(ctx context.Context, arg InsertWorkOrderParams) (WorkOrder, error)
@@ -361,6 +373,15 @@ type Querier interface {
 	// across pages (FR-030, FR-080). The cursor tuple admits every row on the first
 	// page via sentinels above the maxima.
 	ListQuotaRequestsByBuyer(ctx context.Context, arg ListQuotaRequestsByBuyerParams) ([]QuotaRequest, error)
+	// One profile's received reviews, newest first, keyset paginated on
+	// (created_at, id) so the order is stable across pages (FR-048). Hidden reviews
+	// are excluded: a review admin took down must not reappear in the public list,
+	// and the same NOT hidden filter is what SearchReputation applies to the average,
+	// so the list and the average never disagree (FR-050). Rides
+	// idx_review_reviewee (reviewee_id) WHERE NOT hidden. A null before_created is
+	// the first page. The author's business name rides along because reviews are not
+	// anonymous, and transaction_date names the order the review is about.
+	ListReviewsForProfile(ctx context.Context, arg ListReviewsForProfileParams) ([]ListReviewsForProfileRow, error)
 	// The shipped orders inside the FR-069 warning lead that have not yet been warned:
 	// shipped_at is within (warn_after, due_after] so the auto-confirm instant is
 	// between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
