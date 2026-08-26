@@ -43,6 +43,8 @@ const (
 	CodeWorkOrderNotCompleted     Code = "WORK_ORDER_NOT_COMPLETED"
 	CodeReviewAlreadySubmitted    Code = "REVIEW_ALREADY_SUBMITTED"
 	CodeReadinessAfterDeadline    Code = "READINESS_AFTER_DEADLINE"
+	CodePaymentStatementExists    Code = "PAYMENT_STATEMENT_EXISTS"
+	CodeDisputeAlreadyOpen        Code = "DISPUTE_ALREADY_OPEN"
 )
 
 // codeMeta binds a code to its HTTP status and Indonesian title. Deriving both
@@ -88,6 +90,8 @@ var codes = map[Code]codeMeta{
 	CodeWorkOrderNotCompleted:       {409, "Pesanan belum dikonfirmasi"},
 	CodeReviewAlreadySubmitted:      {409, "Ulasan sudah dikirim"},
 	CodeReadinessAfterDeadline:      {422, "Kesiapan melewati tenggat"},
+	CodePaymentStatementExists:      {409, "Pernyataan sudah dicatat"},
+	CodeDisputeAlreadyOpen:          {409, "Sengketa sudah terbuka"},
 }
 
 // StatusFor returns the HTTP status bound to code, or 500 if the code is

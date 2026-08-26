@@ -3,6 +3,10 @@ package db
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -10,6 +14,52 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
 	"github.com/fzrilsh/devotion/backend/internal/db/testdb"
 )
+
+// highestMigrationVersion reads backend/db/migrations and returns the largest
+// numeric prefix present, so this test asserts the schema lands on whatever is
+// on disk instead of a hardcoded number. Adding a migration does not force an
+// edit here; the test still fails if the applied version does not match disk.
+func highestMigrationVersion(t *testing.T) int {
+	t.Helper()
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			dir = filepath.Join(dir, "db", "migrations")
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("go.mod tidak ditemukan di atas direktori kerja")
+		}
+		dir = parent
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("baca direktori migrasi: %v", err)
+	}
+	num := regexp.MustCompile(`^(\d{6})_.*\.up\.sql$`)
+	highest := 0
+	for _, e := range entries {
+		m := num.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			t.Fatalf("nomor migrasi tidak sah pada %s: %v", e.Name(), err)
+		}
+		if n > highest {
+			highest = n
+		}
+	}
+	if highest == 0 {
+		t.Fatal("tidak ada berkas migrasi up ditemukan")
+	}
+	return highest
+}
 
 // TestPool_MigratedSchemaAndPing verifies the testdb harness migrates a fresh
 // schema and the generated Ping query runs through the pool.
@@ -32,8 +82,9 @@ func TestPool_MigratedSchemaAndPing(t *testing.T) {
 		"SELECT version, dirty FROM schema_migrations").Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 15 || dirty {
-		t.Fatalf("harap versi 15 dirty=false, dapat %d dirty=%v", version, dirty)
+	want := highestMigrationVersion(t)
+	if version != want || dirty {
+		t.Fatalf("harap versi %d dirty=false, dapat %d dirty=%v", want, version, dirty)
 	}
 }
 

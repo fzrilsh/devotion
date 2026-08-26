@@ -899,6 +899,7 @@ type WorkOrder struct {
 	CancellationReason pgtype.Text
 	CancelledAt        pgtype.Timestamptz
 	CreatedAt          pgtype.Timestamptz
+	ConfirmWarnSentAt  pgtype.Timestamptz
 }
 
 type WorkOrderStatusHistory struct {

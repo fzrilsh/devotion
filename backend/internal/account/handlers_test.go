@@ -298,7 +298,9 @@ func TestRegister_SendsBothCodes_AndSurvivesDeliveryFailure_FR001_FR002(t *testi
 			if emailTo != "gagal@example.com" {
 				t.Fatalf("email dikirim ke %q, mau gagal@example.com", emailTo)
 			}
-			if phoneTo != "+6281311112222" {
+			// Registration normalizes the phone (drops the '+') before insert to
+			// satisfy phone_format, and delivery sends the stored value.
+			if phoneTo != "6281311112222" {
 				t.Fatalf("kode HP dikirim ke %q", phoneTo)
 			}
 			break

@@ -7,6 +7,64 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Gerbang uji basis data di CI tidak pernah benar-benar berjalan sejak pipeline
+  dibuat. `go test ./...` dijalankan tanpa `-p 1`, jadi paket-paket berjalan
+  paralel dan menghabiskan koneksi Postgres (max_connections=20, pool 15),
+  gagal dengan SQLSTATE 53300. Kegagalan itu tersamar karena uji yang butuh
+  basis data melewati diri sendiri (skip) saat koneksi tak tersedia, sehingga
+  paket tetap mencetak `ok`: build hijau tanpa pernah menyentuh jalur nyata.
+  Akibatnya beberapa bug lolos ke branch dalam keadaan "lulus", antara lain
+  `CreateAdmin` yang tidak menormalkan nomor telepon dan menabrak constraint
+  `phone_format`, serta beberapa test yang mematok jumlah (versi migrasi 15,
+  jumlah kode galat 31, nomor telepon ber-'+') yang basi begitu data bertambah.
+  Perbaikannya menambahkan `-p 1` pada langkah `go test` di `ci.yml` supaya
+  paket berjalan berurutan dalam batas koneksi, tanpa menaikkan
+  `max_connections` (angka itu keputusan untuk VPS 2GB). Ini dicatat sebagai
+  keputusan, bukan perbaikan diam-diam: gerbang yang selama ini hijau tidak
+  menjamin apa pun, dan angka yang lolos sebelumnya harus dianggap belum teruji.
+
+- `CreateAdmin` kini menormalkan nomor telepon (membuang '+' di depan) lewat
+  `normalizePhone` yang sama dengan jalur registrasi, sebelum menyimpan. Jalur
+  registrasi sudah menormalkan sejak awal, tapi `CreateAdmin` meneruskan nomor
+  mentah ke `UpsertAdmin`, jadi admin dengan nomor ber-'+' menabrak constraint
+  `phone_format` (`^62[0-9]{8,13}$`, SQLSTATE 23514). Satu fungsi normalisasi
+  dipakai kedua jalur, bukan dua salinan.
+  Akibat nyatanya: sebelum perbaikan ini, `admin:create` dipastikan gagal untuk
+  nomor yang ditulis dalam bentuk E.164 dengan '+' di depan, bentuk yang paling
+  wajar diketik operator. Bug itu laten selama gerbang uji basis data tidak
+  pernah benar-benar berjalan, jadi tidak pernah muncul sebagai kegagalan build.
+  Nomor berawalan '0' tetap ditolak dan memang seharusnya begitu: `normalizePhone`
+  hanya membuang '+', tidak mengubah awalan lokal menjadi 62, dan constraint
+  `phone_format` adalah penjaga terakhirnya.
+- `GET /api/work-orders` sebelumnya membalas 500 pada setiap permintaan, termasuk
+  jalur berhasil tanpa filter, sejak endpoint daftar itu ditulis: endpoint utama
+  FR-038 tidak pernah berfungsi. Penyebabnya `ListWorkOrdersForParty` mengirim
+  parameter `status_filter` bertipe `work_order_status[]`. pgx tidak dapat
+  meng-encode slice dari tipe enum bernama tanpa OID enum itu terdaftar di
+  koneksi pool, dan `parseStatusFilter` mengembalikan slice kosong non-nil pada
+  setiap permintaan tanpa filter, jadi setiap permintaan menabrak kegagalan
+  encode `cannot find encode plan`, bukan hanya jalur `?status=`. Perbaikannya
+  meng-cast parameter ke `text[]` di query (`wo.status::text = ANY(...::text[])`)
+  dan `parseStatusFilter` kini mengembalikan `[]string`, sehingga tidak perlu
+  registrasi tipe per koneksi (Prinsip IV). Ini satu-satunya parameter
+  enum-array di basis kode; filter kandidat kuota memakai enum skalar, bukan
+  array, jadi tidak terpengaruh. (FR-038)
+
+- Konfirmasi otomatis tujuh hari kini menyertakan keberadaan sengketa terbuka
+  ke dalam keputusan domain, bukan sebagai pemeriksaan kedua yang berdiri
+  sendiri. `IsAutoConfirmDue` menerima parameter `hasOpenDispute` dan
+  mengembalikan `false` selama ada sengketa yang belum `resolved`.
+  `GetWorkOrderForView` dan `ListWorkOrdersForParty` kini membawa
+  `has_open_dispute` lewat `EXISTS`, dan lapisan baca (detail serta daftar)
+  meneruskannya ke fungsi domain yang sama dengan yang dipakai penjadwal.
+  Sebelumnya lapisan baca menghitung ulang status "confirmed" hanya dari
+  `shipped_at` dan waktu sekarang, sementara penjadwal sudah benar melewati
+  pesanan bersengketa lewat `NOT EXISTS`. Akibatnya satu pesanan bersengketa
+  yang lewat tujuh hari terbaca "confirmed" di halaman detail dan daftar tapi
+  tetap "shipped" oleh penjadwal: dua pihak melihat dua kenyataan berbeda atas
+  pesanan yang sama, dan FR-070 hanya setengah ditegakkan. Kini kedua lapisan
+  memakai flag sengketa yang sama sehingga selalu sepakat "belum dikonfirmasi".
+  (FR-068, FR-070)
 - Pengiriman kode verifikasi kini berjalan di goroutine sehingga respons HTTP
   registrasi tidak menunggu SMTP atau WhatsApp (R-09). Kegagalan kirim email
   maupun WhatsApp tidak lagi membatalkan registrasi yang sudah tersimpan, dan
@@ -29,7 +87,68 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
-- Endpoint pembatalan pesanan `POST /api/work-orders/{workOrderId}/cancel` (T054,
+- Test rantai maju penuh mesin keadaan pesanan (FR-039, FR-044). Sebuah test
+  menempuh tiap langkah legal yang dapat dijalankan subkontraktor lewat HTTP
+  (accepted -> production -> completed -> shipped), memastikan tiap langkah
+  diterima dan respons mencerminkan status baru, lalu membaca
+  `work_order_status_history` langsung untuk membuktikan tiap perpindahan manusia
+  tercatat atas nama subkontraktor yang memindahkan: `changed_by` akun itu dan
+  `by_system` bernilai false. Ini pasangan dari test konfirmasi otomatis yang
+  membuktikan penutupan sistem menulis baris `by_system` tanpa aktor manusia,
+  jadi perpindahan maju milik manusia dan penutupan milik sistem, tak ada yang
+  salah label. Melengkapi cakupan T058 yang sisanya sudah ada di test transisi,
+  pembatalan, dan konfirmasi otomatis sebelumnya.
+- Pencatatan pernyataan pembayaran pada pesanan (T056, FR-040, FR-041, FR-042,
+  FR-043). `POST /api/work-orders/{workOrderId}/payments` memungkinkan salah satu
+  pihak mencatat pernyataannya sendiri, arah `sent` atau `received`, dengan
+  tanggal dan catatan bebas opsional. Tidak ada kolom jumlah uang: platform hanya
+  mencatat pernyataan, tidak menahan, menyalurkan, maupun memverifikasi dana.
+  Setiap pihak mencatat tiap arah paling banyak sekali; constraint
+  `one_statement_per_party_per_direction` menegakkannya dan pelanggarannya
+  diterjemahkan menjadi `PAYMENT_STATEMENT_EXISTS` 409 yang bisa dibaca pengguna,
+  bukan galat 500. Pernyataan disimpan atas profil bisnis pihak, sehingga
+  pernyataan kedua pihak tetap dapat dibedakan dan perbedaan di antara keduanya
+  terlihat oleh admin saat sengketa ditengahi. Setiap jalur yang mengembalikan
+  `WorkOrderDetail` kini mengisi array `payments`. Pihak lain diberi tahu saat
+  sebuah pernyataan dicatat lewat event `payment_record`. Rute memeriksa peran
+  (buyer atau subkontraktor) lalu menjaga bahwa pemanggil memang pihak pesanan
+  itu; non-pihak menerima 404, bukan kebocoran keberadaan pesanan. (T056, FR-040,
+  FR-041, FR-042, FR-043)
+- Pelaporan sengketa pada pesanan (T057, FR-046, FR-070).
+  `POST /api/work-orders/{workOrderId}/disputes` memungkinkan salah satu pihak
+  melaporkan sengketa dengan uraian 10 sampai 2000 karakter yang dibaca admin
+  saat menengahi. Hanya satu sengketa boleh terbuka per pesanan: laporan kedua
+  selagi yang pertama belum diselesaikan melanggar indeks parsial
+  `idx_one_open_dispute` dan diterjemahkan menjadi `DISPUTE_ALREADY_OPEN` 409 yang
+  bisa dibaca pengguna. Melaporkan sengketa tidak memindahkan status pesanan:
+  pesanan tetap pada statusnya sekarang (`shipped` misalnya), dan justru baris
+  sengketa terbuka itu yang menghentikan hitung mundur konfirmasi otomatis tujuh
+  hari, karena pemindaian auto-confirm mengecualikan pesanan mana pun yang punya
+  sengketa belum selesai lewat penjaga `NOT EXISTS` pada tabel `dispute`. Admin
+  yang memindahkan pesanan ke `in_mediation` saat menengahi (T071).
+  `confirm_warn_sent_at` sengaja tidak direset. Pihak lain diberi tahu bahwa
+  sengketa dilaporkan. Rute
+  memeriksa peran (buyer atau subkontraktor) lalu menjaga keanggotaan pihak;
+  non-pihak menerima 404. (T057, FR-046, FR-070)
+  FR-069, FR-070). Pesanan berstatus `shipped` yang melewati jendela tujuh hari
+  sejak `shipped_at` dianggap diterima secara otomatis: statusnya menjadi
+  `confirmed`, kolom `auto_confirmed` disetel true untuk menandai bahwa penutupan
+  itu dilakukan sistem, bukan salah satu pihak, dan baris riwayat status ditulis
+  dengan `by_system = true` tanpa pelaku manusia. Kedua pihak diberi tahu bahwa
+  penutupan terjadi otomatis. Dua hari sebelum tenggat, pemberi order (buyer)
+  diperingatkan sekali lewat notifikasi yang menyebut tanggal konfirmasi otomatis;
+  penanda `confirm_warn_sent_at` mencegah peringatan terkirim ulang tiap tick.
+  Pesanan yang punya sengketa terbuka tidak pernah ditutup otomatis karena
+  pemindaian mengecualikannya lewat penjaga `NOT EXISTS` pada tabel `dispute`,
+  jadi baris sengketa yang menghentikan hitung mundur, bukan status pesanan. Tenggat dihitung satu kali di fungsi domain `AutoConfirmAt`/
+  `IsAutoConfirmDue` yang dipakai kedua lapisan (R-07): lapisan baca lazy di
+  `buildDetailView` dan `listItemView` membuat pesanan yang lewat tenggat langsung
+  terbaca `confirmed` di halaman daftar maupun detail tanpa menunggu ticker, dan
+  ticker dalam proses (`order:auto-confirm`, dibungkus advisory lock
+  `LockKeyAutoConfirm`) yang menulis penutupan final serta mengirim peringatan
+  FR-069. Migrasi 000016 menambah kolom `confirm_warn_sent_at`. (FR-068, FR-069,
+  FR-070, R-07)
+
   FR-020, FR-065, FR-066, FR-072). Kedua pihak (pembeli atau subkontraktor) boleh
   membatalkan selama status masih `accepted`; rute digerbang kedua peran usaha dan
   handler menegakkan penjaga pihak, jadi bukan-pihak jadi 404 tanpa membocorkan

@@ -152,7 +152,10 @@ func runServe(ctx context.Context, args []string) error {
 	// an offer grows the listing calendar to the deadline week under the listing
 	// lock before allocating, and enqueues agreement_formed notifications inside
 	// the formation transaction (FR-034). The single route is gated to the buyer.
-	order.New(pool, clock, notif, ls).Register(router, acc)
+	// The reference is kept so its seven-day auto-confirm job (T055) joins the
+	// scheduler below.
+	orderSvc := order.New(pool, clock, notif, ls)
+	orderSvc.Register(router, acc)
 
 	// verification wires the applicant file and verification-request endpoints.
 	// The storage service enforces the magic-byte check, EXIF stripping, quota,
@@ -188,6 +191,7 @@ func runServe(ctx context.Context, args []string) error {
 	// when the serve context is cancelled.
 	sched := scheduler.New(pool, clock, log)
 	sched.Register(notif.DeliverJob())
+	sched.Register(orderSvc.AutoConfirmJob())
 	go sched.Start(ctx)
 
 	dist, err := fs.Sub(web.FS, "webdist")

@@ -7,10 +7,45 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 )
+
+// highestMigrationVersion reads the migrations directory and returns the largest
+// numeric prefix present. The integration tests assert the stack lands on this
+// version instead of a hardcoded number, so adding a migration does not force a
+// test edit; the test still fails if the applied version does not match what is
+// on disk.
+func highestMigrationVersion(t *testing.T) int {
+	t.Helper()
+	dir := migrationsDir(t)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("baca direktori migrasi: %v", err)
+	}
+	num := regexp.MustCompile(`^(\d{6})_.*\.up\.sql$`)
+	highest := 0
+	for _, e := range entries {
+		m := num.FindStringSubmatch(e.Name())
+		if m == nil {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			t.Fatalf("nomor migrasi tidak sah pada %s: %v", e.Name(), err)
+		}
+		if n > highest {
+			highest = n
+		}
+	}
+	if highest == 0 {
+		t.Fatal("tidak ada berkas migrasi up ditemukan")
+	}
+	return highest
+}
 
 // testDSN returns the test database URL or skips. DATABASE_URL_TEST defaults to
 // the compose Postgres; when it cannot be reached the test skips while naming
@@ -75,15 +110,17 @@ func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// TestRun_ReachesVersion14Clean verifies the full stack applies and lands at
-// version 15 with dirty=false, and that a second run is a no-op.
-func TestRun_ReachesVersion14Clean(t *testing.T) {
+// TestRun_ReachesVersionClean verifies the full stack applies and lands at the
+// highest version present in the migrations directory with dirty=false, and that
+// a second run is a no-op.
+func TestRun_ReachesVersionClean(t *testing.T) {
 	base := testDSN(t)
-	const schema = "test_migrate_v14"
+	const schema = "test_migrate_clean"
 	conn := setupSchema(t, base, schema)
 	dsn := schemaDSN(t, base, schema)
 	ctx := context.Background()
 
+	want := highestMigrationVersion(t)
 	if err := Run(ctx, dsn, quietLogger()); err != nil {
 		t.Fatalf("run pertama: %v", err)
 	}
@@ -95,8 +132,8 @@ func TestRun_ReachesVersion14Clean(t *testing.T) {
 		Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 15 || dirty {
-		t.Fatalf("harap versi 15 dirty=false, dapat versi %d dirty=%v", version, dirty)
+	if version != want || dirty {
+		t.Fatalf("harap versi %d dirty=false, dapat versi %d dirty=%v", want, version, dirty)
 	}
 
 	// Idempotent: a second run changes nothing and does not error.
@@ -106,7 +143,8 @@ func TestRun_ReachesVersion14Clean(t *testing.T) {
 }
 
 // TestRun_DownUpReturnsSameVersion verifies migrating fully down then back up
-// lands on version 15 again, exercising the exact-reverse down migrations.
+// lands on the highest version again, exercising the exact-reverse down
+// migrations.
 func TestRun_DownUpReturnsSameVersion(t *testing.T) {
 	base := testDSN(t)
 	const schema = "test_migrate_downup"
@@ -114,6 +152,7 @@ func TestRun_DownUpReturnsSameVersion(t *testing.T) {
 	dsn := schemaDSN(t, base, schema)
 	ctx := context.Background()
 
+	want := highestMigrationVersion(t)
 	if err := Run(ctx, dsn, quietLogger()); err != nil {
 		t.Fatalf("run awal: %v", err)
 	}
@@ -135,8 +174,8 @@ func TestRun_DownUpReturnsSameVersion(t *testing.T) {
 		Scan(&version, &dirty); err != nil {
 		t.Fatalf("baca schema_migrations: %v", err)
 	}
-	if version != 15 || dirty {
-		t.Fatalf("setelah down-up harap versi 15 dirty=false, dapat %d dirty=%v", version, dirty)
+	if version != want || dirty {
+		t.Fatalf("setelah down-up harap versi %d dirty=false, dapat %d dirty=%v", want, version, dirty)
 	}
 }
 

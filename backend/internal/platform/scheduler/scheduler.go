@@ -44,6 +44,11 @@ const (
 	// tick claims pending channel rows and fans them out to email and WhatsApp, so
 	// two overlapping instances during a deploy rollover must not both send.
 	LockKeyNotificationDeliver int32 = lockKeyBase + 1
+	// LockKeyAutoConfirm guards the seven-day auto-confirm job (T055): one tick
+	// closes shipped orders past their window and warns buyers whose deadline is
+	// near, so two overlapping instances during a deploy rollover must not both
+	// close an order or send the same warning twice.
+	LockKeyAutoConfirm int32 = lockKeyBase + 2
 )
 
 // Job is one unit of scheduled work. Run receives the pinned connection that

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -59,37 +60,47 @@ func TestNoTimeDefaultInMigrations(t *testing.T) {
 }
 
 // TestMigrationPairsComplete verifies every up has a matching down and the set
-// runs 1..15 without a gap.
+// runs 1..N without a gap, where N is the highest version present in the
+// directory. It reads the count from the directory instead of hardcoding it, so
+// adding a migration does not turn this red on its own; it stays red only if a
+// pair is missing or a number is skipped.
 func TestMigrationPairsComplete(t *testing.T) {
 	dir := migrationsDir(t)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ups := map[string]bool{}
-	downs := map[string]bool{}
+	ups := map[int]bool{}
+	downs := map[int]bool{}
+	highest := 0
 	num := regexp.MustCompile(`^(\d{6})_.*\.(up|down)\.sql$`)
 	for _, e := range entries {
 		m := num.FindStringSubmatch(e.Name())
 		if m == nil {
 			continue
 		}
+		n, err := strconv.Atoi(m[1])
+		if err != nil {
+			t.Fatalf("nomor migrasi tidak sah pada %s: %v", e.Name(), err)
+		}
 		if m[2] == "up" {
-			ups[m[1]] = true
+			ups[n] = true
 		} else {
-			downs[m[1]] = true
+			downs[n] = true
+		}
+		if n > highest {
+			highest = n
 		}
 	}
-	if len(ups) != 15 {
-		t.Fatalf("harap 15 migrasi up, ada %d", len(ups))
+	if highest == 0 {
+		t.Fatal("tidak ada berkas migrasi ditemukan")
 	}
-	for i := 1; i <= 15; i++ {
-		key := fmtNum(i)
-		if !ups[key] {
-			t.Errorf("migrasi up %s hilang", key)
+	for i := 1; i <= highest; i++ {
+		if !ups[i] {
+			t.Errorf("migrasi up %s hilang", fmtNum(i))
 		}
-		if !downs[key] {
-			t.Errorf("migrasi down %s hilang", key)
+		if !downs[i] {
+			t.Errorf("migrasi down %s hilang", fmtNum(i))
 		}
 	}
 }

@@ -11,6 +11,57 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const autoConfirmWorkOrder = `-- name: AutoConfirmWorkOrder :one
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = true, confirmed_at = $2
+WHERE work_order.id = $1 AND work_order.status = 'shipped'
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = work_order.id AND d.status <> 'resolved'
+  )
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at
+`
+
+type AutoConfirmWorkOrderParams struct {
+	ID          pgtype.UUID
+	ConfirmedAt pgtype.Timestamptz
+}
+
+// Closes one shipped order as system-confirmed (FR-068): status to 'confirmed',
+// auto_confirmed true (marking this closure as the system's, not a party's), and
+// confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+// guard makes the write a no-op if a party confirmed the order since the scan. The
+// NOT EXISTS open-dispute guard closes the race where a dispute is reported between
+// the scan and this update: a disputed order stays open even though its status is
+// still 'shipped' (FR-070). A returned row means this call did the closing.
+// Together the columns satisfy the auto_confirm_needs_confirmation and
+// shipped_before_confirmed CHECKs.
+func (q *Queries) AutoConfirmWorkOrder(ctx context.Context, arg AutoConfirmWorkOrderParams) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, autoConfirmWorkOrder, arg.ID, arg.ConfirmedAt)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
+	)
+	return i, err
+}
+
 const cancelWorkOrder = `-- name: CancelWorkOrder :one
 UPDATE work_order
 SET status = 'cancelled',
@@ -18,7 +69,7 @@ SET status = 'cancelled',
     cancellation_reason = $3,
     cancelled_at = $4
 WHERE id = $1
-RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at
 `
 
 type CancelWorkOrderParams struct {
@@ -58,6 +109,7 @@ func (q *Queries) CancelWorkOrder(ctx context.Context, arg CancelWorkOrderParams
 		&i.CancellationReason,
 		&i.CancelledAt,
 		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
 	)
 	return i, err
 }
@@ -242,7 +294,11 @@ SELECT
     buyer.account_id AS buyer_account,
     sub.account_id   AS subcontractor_account,
     r.product_item_id,
-    o.readiness_lead_days
+    o.readiness_lead_days,
+    EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+    ) AS has_open_dispute
 FROM work_order wo
 JOIN business_profile buyer ON buyer.id = wo.buyer_id
 JOIN business_profile sub   ON sub.id = wo.subcontractor_id
@@ -274,12 +330,17 @@ type GetWorkOrderForViewRow struct {
 	SubcontractorAccount pgtype.UUID
 	ProductItemID        pgtype.UUID
 	ReadinessLeadDays    int32
+	HasOpenDispute       bool
 }
 
 // Loads one work order with the fields WorkOrderDetail needs beyond the row
 // itself: both parties' account ids (for the party guard), the request's product
 // item, and the offer's readiness lead. Keyed on the work order id; the caller
 // checks the account ids against the principal so a non-party sees a 404.
+// has_open_dispute carries whether any unresolved dispute exists on the order, so
+// the read layer feeds it to order.IsAutoConfirmDue: an open dispute halts the
+// lazy auto-confirm exactly as the NOT EXISTS guard halts the ticker, so the two
+// layers never disagree on a disputed order (FR-070).
 func (q *Queries) GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetWorkOrderForViewRow, error) {
 	row := q.db.QueryRow(ctx, getWorkOrderForView, id)
 	var i GetWorkOrderForViewRow
@@ -305,6 +366,7 @@ func (q *Queries) GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetW
 		&i.SubcontractorAccount,
 		&i.ProductItemID,
 		&i.ReadinessLeadDays,
+		&i.HasOpenDispute,
 	)
 	return i, err
 }
@@ -342,6 +404,49 @@ func (q *Queries) InsertAllocation(ctx context.Context, arg InsertAllocationPara
 	return i, err
 }
 
+const insertDispute = `-- name: InsertDispute :one
+INSERT INTO dispute (
+    work_order_id, reporter_id, report_body, created_at
+) VALUES ($1, $2, $3, $4)
+RETURNING id, work_order_id, reporter_id, report_body, status, admin_note, allocation_reversed, liable_party_id, handled_by, resolved_at, created_at
+`
+
+type InsertDisputeParams struct {
+	WorkOrderID pgtype.UUID
+	ReporterID  pgtype.UUID
+	ReportBody  string
+	CreatedAt   pgtype.Timestamptz
+}
+
+// Opens a dispute on a work order (FR-046). status takes its 'reported' default.
+// The idx_one_open_dispute partial unique index (work_order_id WHERE status <>
+// 'resolved') means at most one dispute may be open per order; a second report
+// violates it and the caller turns the 23505 into a readable DISPUTE_ALREADY_OPEN
+// 409 (FR-046). reporter_id is the reporting party's business profile id.
+func (q *Queries) InsertDispute(ctx context.Context, arg InsertDisputeParams) (Dispute, error) {
+	row := q.db.QueryRow(ctx, insertDispute,
+		arg.WorkOrderID,
+		arg.ReporterID,
+		arg.ReportBody,
+		arg.CreatedAt,
+	)
+	var i Dispute
+	err := row.Scan(
+		&i.ID,
+		&i.WorkOrderID,
+		&i.ReporterID,
+		&i.ReportBody,
+		&i.Status,
+		&i.AdminNote,
+		&i.AllocationReversed,
+		&i.LiablePartyID,
+		&i.HandledBy,
+		&i.ResolvedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertOrderStatusHistory = `-- name: InsertOrderStatusHistory :exec
 INSERT INTO work_order_status_history (
     work_order_id, old_status, new_status, changed_by, by_system, note, created_at
@@ -372,12 +477,57 @@ func (q *Queries) InsertOrderStatusHistory(ctx context.Context, arg InsertOrderS
 	return err
 }
 
+const insertPaymentRecord = `-- name: InsertPaymentRecord :one
+INSERT INTO payment_record (
+    work_order_id, profile_id, direction, date, note, created_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, work_order_id, profile_id, direction, date, note, created_at
+`
+
+type InsertPaymentRecordParams struct {
+	WorkOrderID pgtype.UUID
+	ProfileID   pgtype.UUID
+	Direction   PaymentDirection
+	Date        pgtype.Date
+	Note        pgtype.Text
+	CreatedAt   pgtype.Timestamptz
+}
+
+// Records one party's payment statement on a work order (FR-041). No money amount
+// is stored: the platform neither holds nor verifies funds (FR-040, FR-042), so
+// the row carries only the direction (sent/received), the date the party states,
+// an optional free note, and the Clock-stamped created_at. The
+// one_statement_per_party_per_direction unique constraint means a party can state
+// each direction at most once; a repeat violates it and the caller turns the
+// 23505 into a readable PAYMENT_STATEMENT_EXISTS 409.
+func (q *Queries) InsertPaymentRecord(ctx context.Context, arg InsertPaymentRecordParams) (PaymentRecord, error) {
+	row := q.db.QueryRow(ctx, insertPaymentRecord,
+		arg.WorkOrderID,
+		arg.ProfileID,
+		arg.Direction,
+		arg.Date,
+		arg.Note,
+		arg.CreatedAt,
+	)
+	var i PaymentRecord
+	err := row.Scan(
+		&i.ID,
+		&i.WorkOrderID,
+		&i.ProfileID,
+		&i.Direction,
+		&i.Date,
+		&i.Note,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertWorkOrder = `-- name: InsertWorkOrder :one
 INSERT INTO work_order (
     candidate_id, offer_id, buyer_id, subcontractor_id,
     quantity, total_price, deadline, readiness_week_start, created_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at
 `
 
 type InsertWorkOrderParams struct {
@@ -425,6 +575,7 @@ func (q *Queries) InsertWorkOrder(ctx context.Context, arg InsertWorkOrderParams
 		&i.CancellationReason,
 		&i.CancelledAt,
 		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
 	)
 	return i, err
 }
@@ -504,6 +655,152 @@ func (q *Queries) ListOtherCandidatesToNotify(ctx context.Context, arg ListOther
 	for rows.Next() {
 		var i ListOtherCandidatesToNotifyRow
 		if err := rows.Scan(&i.CandidateID, &i.SubcontractorAccount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPaymentRecordsForWorkOrder = `-- name: ListPaymentRecordsForWorkOrder :many
+SELECT id, work_order_id, profile_id, direction, date, note, created_at
+FROM payment_record
+WHERE work_order_id = $1
+ORDER BY created_at, id
+`
+
+// Every payment statement on one work order for WorkOrderDetail (FR-041). Ordered
+// by created_at so the two parties' statements read in the order they were made;
+// both directions from both parties are visible, so a disagreement (one party
+// states sent, the counterparty never states received) is apparent to the parties
+// and to admin when a dispute is reported (FR-043).
+func (q *Queries) ListPaymentRecordsForWorkOrder(ctx context.Context, workOrderID pgtype.UUID) ([]PaymentRecord, error) {
+	rows, err := q.db.Query(ctx, listPaymentRecordsForWorkOrder, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PaymentRecord{}
+	for rows.Next() {
+		var i PaymentRecord
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkOrderID,
+			&i.ProfileID,
+			&i.Direction,
+			&i.Date,
+			&i.Note,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShippedApproachingAutoConfirm = `-- name: ListShippedApproachingAutoConfirm :many
+SELECT wo.id, buyer.account_id AS buyer_account, wo.shipped_at
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+WHERE wo.status = 'shipped'
+  AND wo.confirm_warn_sent_at IS NULL
+  AND wo.shipped_at > $1::timestamptz
+  AND wo.shipped_at <= $2::timestamptz
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+  )
+ORDER BY wo.shipped_at
+`
+
+type ListShippedApproachingAutoConfirmParams struct {
+	DueBefore  pgtype.Timestamptz
+	WarnBefore pgtype.Timestamptz
+}
+
+type ListShippedApproachingAutoConfirmRow struct {
+	ID           pgtype.UUID
+	BuyerAccount pgtype.UUID
+	ShippedAt    pgtype.Timestamptz
+}
+
+// The shipped orders inside the FR-069 warning lead that have not yet been warned:
+// shipped_at is within (warn_after, due_after] so the auto-confirm instant is
+// between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
+// the ticker warns each order once, not on every tick. The caller passes
+// warn_after = now - AutoConfirmWindow + AutoConfirmWarnLead and due_after =
+// now - AutoConfirmWindow, both from the Clock, so the window matches
+// order.IsAutoConfirmApproaching. An order with an open dispute is excluded by the
+// NOT EXISTS guard, so a disputed order is neither warned about nor auto-closed
+// (FR-070). Rides idx_order_auto_confirm. Returns the id, the buyer account (the
+// only party FR-069 warns), and shipped_at so the caller can name the auto-confirm
+// date in the notice.
+func (q *Queries) ListShippedApproachingAutoConfirm(ctx context.Context, arg ListShippedApproachingAutoConfirmParams) ([]ListShippedApproachingAutoConfirmRow, error) {
+	rows, err := q.db.Query(ctx, listShippedApproachingAutoConfirm, arg.DueBefore, arg.WarnBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListShippedApproachingAutoConfirmRow{}
+	for rows.Next() {
+		var i ListShippedApproachingAutoConfirmRow
+		if err := rows.Scan(&i.ID, &i.BuyerAccount, &i.ShippedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShippedDueForAutoConfirm = `-- name: ListShippedDueForAutoConfirm :many
+SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+WHERE wo.status = 'shipped' AND wo.shipped_at <= $1::timestamptz
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+  )
+ORDER BY wo.shipped_at
+`
+
+type ListShippedDueForAutoConfirmRow struct {
+	ID                   pgtype.UUID
+	BuyerAccount         pgtype.UUID
+	SubcontractorAccount pgtype.UUID
+}
+
+// The shipped orders whose 7-day auto-confirm instant has arrived (FR-068),
+// for the in-process ticker to close. shipped_at <= $1 is the due test with $1 =
+// now - AutoConfirmWindow computed by the caller from the injected Clock, so the
+// boundary matches order.IsAutoConfirmDue exactly and no wall clock is read in
+// SQL. Rides idx_order_auto_confirm (shipped_at) WHERE status='shipped'. An order
+// with an open dispute is excluded by the NOT EXISTS guard, so reporting a dispute
+// stops the auto-confirm count without moving the order off 'shipped' (FR-070):
+// the dispute row, not the work-order status, is what halts the clock, and admin
+// moves the order to in_mediation separately (T071). Returns each order's id and
+// both parties' account ids for the closure notice.
+func (q *Queries) ListShippedDueForAutoConfirm(ctx context.Context, dueBefore pgtype.Timestamptz) ([]ListShippedDueForAutoConfirmRow, error) {
+	rows, err := q.db.Query(ctx, listShippedDueForAutoConfirm, dueBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListShippedDueForAutoConfirmRow{}
+	for rows.Next() {
+		var i ListShippedDueForAutoConfirmRow
+		if err := rows.Scan(&i.ID, &i.BuyerAccount, &i.SubcontractorAccount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -594,7 +891,11 @@ func (q *Queries) ListWorkOrderStatusHistory(ctx context.Context, workOrderID pg
 }
 
 const listWorkOrdersForParty = `-- name: ListWorkOrdersForParty :many
-SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+SELECT wo.id, wo.candidate_id, wo.offer_id, wo.buyer_id, wo.subcontractor_id, wo.quantity, wo.total_price, wo.deadline, wo.readiness_week_start, wo.status, wo.shipped_at, wo.confirmed_at, wo.auto_confirmed, wo.cancelled_by_id, wo.cancellation_reason, wo.cancelled_at, wo.created_at, wo.confirm_warn_sent_at,
+    EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+    ) AS has_open_dispute
 FROM work_order wo
 WHERE (
         ($1::text = 'as_buyer' AND wo.buyer_id = $2::uuid)
@@ -603,8 +904,8 @@ WHERE (
             AND (wo.buyer_id = $2::uuid OR wo.subcontractor_id = $2::uuid))
     )
   AND (
-        cardinality($3::work_order_status[]) = 0
-        OR wo.status = ANY($3::work_order_status[])
+        cardinality($3::text[]) = 0
+        OR wo.status::text = ANY($3::text[])
     )
   AND (
         $4::timestamptz IS NULL
@@ -617,19 +918,48 @@ LIMIT $6::int
 type ListWorkOrdersForPartyParams struct {
 	RoleFilter    string
 	ProfileID     pgtype.UUID
-	StatusFilter  []WorkOrderStatus
+	StatusFilter  []string
 	BeforeCreated pgtype.Timestamptz
 	BeforeID      pgtype.UUID
 	PageLimit     int32
+}
+
+type ListWorkOrdersForPartyRow struct {
+	ID                 pgtype.UUID
+	CandidateID        pgtype.UUID
+	OfferID            pgtype.UUID
+	BuyerID            pgtype.UUID
+	SubcontractorID    pgtype.UUID
+	Quantity           int32
+	TotalPrice         int64
+	Deadline           pgtype.Date
+	ReadinessWeekStart pgtype.Date
+	Status             WorkOrderStatus
+	ShippedAt          pgtype.Timestamptz
+	ConfirmedAt        pgtype.Timestamptz
+	AutoConfirmed      bool
+	CancelledByID      pgtype.UUID
+	CancellationReason pgtype.Text
+	CancelledAt        pgtype.Timestamptz
+	CreatedAt          pgtype.Timestamptz
+	ConfirmWarnSentAt  pgtype.Timestamptz
+	HasOpenDispute     bool
 }
 
 // One party's work orders newest first, keyset paginated on (created_at, id) so
 // the order is stable across pages (FR-038). role_filter selects the side:
 // 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
 // profile, any other value matches either. An empty status_filter array means no
-// status restriction; otherwise only the listed statuses pass. A null
-// before_created is the first page.
-func (q *Queries) ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]WorkOrder, error) {
+// status restriction; otherwise only the listed statuses pass. The filter is a
+// text[] cast against wo.status::text, not a work_order_status[]: pgx cannot encode
+// a slice of the named enum type without the enum OID registered on the pool, so an
+// enum-array parameter fails to encode on every request (empty slice included). The
+// text cast sidesteps that with no per-connection type registration (Principle IV).
+// A null before_created is the first page. has_open_dispute rides along so
+// listItemView feeds it to order.IsAutoConfirmDue, keeping the list's lazy
+// auto-confirm in step with the detail view and the ticker on a disputed order
+// (FR-070).
+func (q *Queries) ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]ListWorkOrdersForPartyRow, error) {
 	rows, err := q.db.Query(ctx, listWorkOrdersForParty,
 		arg.RoleFilter,
 		arg.ProfileID,
@@ -642,9 +972,9 @@ func (q *Queries) ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrders
 		return nil, err
 	}
 	defer rows.Close()
-	items := []WorkOrder{}
+	items := []ListWorkOrdersForPartyRow{}
 	for rows.Next() {
-		var i WorkOrder
+		var i ListWorkOrdersForPartyRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.CandidateID,
@@ -663,6 +993,8 @@ func (q *Queries) ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrders
 			&i.CancellationReason,
 			&i.CancelledAt,
 			&i.CreatedAt,
+			&i.ConfirmWarnSentAt,
+			&i.HasOpenDispute,
 		); err != nil {
 			return nil, err
 		}
@@ -744,7 +1076,7 @@ func (q *Queries) LockPeriodsInRange(ctx context.Context, arg LockPeriodsInRange
 }
 
 const lockWorkOrderForReversal = `-- name: LockWorkOrderForReversal :one
-SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at FROM work_order WHERE id = $1 FOR UPDATE
+SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at FROM work_order WHERE id = $1 FOR UPDATE
 `
 
 // Takes a row lock on the work order whose allocation is being reversed, so the
@@ -770,12 +1102,13 @@ func (q *Queries) LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) 
 		&i.CancellationReason,
 		&i.CancelledAt,
 		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
 	)
 	return i, err
 }
 
 const lockWorkOrderForStatusChange = `-- name: LockWorkOrderForStatusChange :one
-SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at FROM work_order WHERE id = $1 FOR UPDATE
+SELECT id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at FROM work_order WHERE id = $1 FOR UPDATE
 `
 
 // Row-locks a work order before a status transition so a concurrent status
@@ -802,6 +1135,7 @@ func (q *Queries) LockWorkOrderForStatusChange(ctx context.Context, id pgtype.UU
 		&i.CancellationReason,
 		&i.CancelledAt,
 		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
 	)
 	return i, err
 }
@@ -854,6 +1188,66 @@ type MarkAllocationReversedParams struct {
 func (q *Queries) MarkAllocationReversed(ctx context.Context, arg MarkAllocationReversedParams) error {
 	_, err := q.db.Exec(ctx, markAllocationReversed, arg.ID, arg.ReversedAt)
 	return err
+}
+
+const markConfirmWarnSent = `-- name: MarkConfirmWarnSent :exec
+UPDATE work_order
+SET confirm_warn_sent_at = $2
+WHERE id = $1 AND confirm_warn_sent_at IS NULL
+`
+
+type MarkConfirmWarnSentParams struct {
+	ID                pgtype.UUID
+	ConfirmWarnSentAt pgtype.Timestamptz
+}
+
+// Stamps confirm_warn_sent_at so the FR-069 approaching notice is sent to the
+// buyer once. The IS NULL guard keeps it idempotent if two overlapping ticker
+// instances both scanned before either stamped (the advisory lock makes that
+// rare, but the guard removes the race entirely).
+func (q *Queries) MarkConfirmWarnSent(ctx context.Context, arg MarkConfirmWarnSentParams) error {
+	_, err := q.db.Exec(ctx, markConfirmWarnSent, arg.ID, arg.ConfirmWarnSentAt)
+	return err
+}
+
+const moveWorkOrderToMediation = `-- name: MoveWorkOrderToMediation :one
+UPDATE work_order
+SET status = 'in_mediation'
+WHERE id = $1 AND status IN ('accepted', 'production', 'completed', 'shipped')
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at
+`
+
+// Moves a shipped or otherwise-active order into 'in_mediation' when a dispute is
+// reported (FR-070). The status = 'shipped' scan of ListShippedDueForAutoConfirm
+// excludes 'in_mediation', so opening a dispute before the 7-day deadline stops
+// the auto-confirm count. confirm_warn_sent_at is deliberately left untouched: a
+// buyer already warned stays warned even if the dispute later closes without
+// cancelling (data-model.md). The status guard rejects moving a terminal order
+// (confirmed/cancelled), so a returned row means this call did the move.
+func (q *Queries) MoveWorkOrderToMediation(ctx context.Context, id pgtype.UUID) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, moveWorkOrderToMediation, id)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
+	)
+	return i, err
 }
 
 const raiseUsedCapacity = `-- name: RaiseUsedCapacity :one
@@ -912,7 +1306,7 @@ UPDATE work_order
 SET status = $2,
     shipped_at = CASE WHEN $2 = 'shipped'::work_order_status THEN $3 ELSE shipped_at END
 WHERE id = $1
-RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at
 `
 
 type UpdateWorkOrderStatusParams struct {
@@ -945,6 +1339,7 @@ func (q *Queries) UpdateWorkOrderStatus(ctx context.Context, arg UpdateWorkOrder
 		&i.CancellationReason,
 		&i.CancelledAt,
 		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
 	)
 	return i, err
 }

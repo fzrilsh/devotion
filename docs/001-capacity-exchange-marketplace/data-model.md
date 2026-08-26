@@ -608,6 +608,7 @@ CREATE TABLE work_order (
     shipped_at          timestamptz,
     confirmed_at        timestamptz,
     auto_confirmed      boolean NOT NULL DEFAULT false,
+    confirm_warn_sent_at timestamptz,
     cancelled_by_id     uuid REFERENCES business_profile(id),
     cancellation_reason text,
     cancelled_at        timestamptz,
@@ -637,6 +638,8 @@ CREATE INDEX idx_order_subcon ON work_order (subcontractor_id, status);
 CREATE INDEX idx_order_deadline_active ON work_order (deadline)
     WHERE status IN ('accepted', 'production', 'completed', 'shipped');
 CREATE INDEX idx_order_auto_confirm ON work_order (shipped_at) WHERE status = 'shipped';
+CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
+    WHERE status = 'shipped' AND confirm_warn_sent_at IS NULL;
 ```
 
 **`readiness_week_start` adalah kolom baru untuk FR-087.** Ia dihitung sekali saat kesepakatan terbentuk, dari tanggal kesepakatan ditambah `readiness_lead_days` listing, lalu dibulatkan ke Senin minggu yang memuatnya. Disimpan alih-alih dihitung ulang karena `readiness_lead_days` pada listing dapat berubah kemudian, sementara alokasi pesanan yang sudah terbentuk tidak boleh bergeser. Ini juga yang menutup salah satu edge case spec: subkontraktor mengubah jeda kesiapan setelah punya alokasi berjalan.
@@ -647,7 +650,9 @@ CREATE INDEX idx_order_auto_confirm ON work_order (shipped_at) WHERE status = 's
 
 `two_distinct_parties` adalah lapisan kedua atas larangan request ke diri sendiri: bahkan bila trigger dilewati, pesanan berdua pihak sama tidak dapat terbentuk.
 
-Dua indeks parsial terakhir adalah jalur penjadwal R-07: `idx_order_auto_confirm` untuk FR-068 dan FR-069, `idx_order_deadline_active` untuk FR-045.
+`confirm_warn_sent_at` menandai kapan peringatan tenggat konfirmasi otomatis (FR-069) sudah dikirim ke pemberi order, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam jendela peringatan. Ia tidak direset saat sengketa ditutup tanpa pembatalan: pemberi order sudah pernah diperingatkan, mengirim ulang setelah mediasi hanya membingungkan.
+
+Tiga indeks parsial jalur penjadwal R-07: `idx_order_auto_confirm` untuk penutupan otomatis FR-068, `idx_order_confirm_warn` untuk peringatan FR-069 (hanya baris yang belum diperingatkan), `idx_order_deadline_active` untuk FR-045.
 
 **Transisi status yang sah** (FR-044). Semua transisi lain ditolak beserta penjelasan urutan yang diizinkan:
 
@@ -665,7 +670,7 @@ accepted ──▶ production ──▶ completed ──▶ shipped ──▶ co
 | `production → completed → shipped` | Subkontraktor | Berurutan, tidak boleh melompat |
 | `shipped → confirmed` | Pemberi order, atau sistem setelah 7 hari | FR-068; `auto_confirmed` menandai yang mana |
 | `accepted → cancelled` | Kedua pihak | Wajib beralasan; seluruh alokasi dibalik (FR-020, FR-065) |
-| `* → in_mediation` | Kedua pihak melapor | Menghentikan hitungan konfirmasi otomatis (FR-070) |
+| `* → in_mediation` | Admin, saat menengahi sengketa | Sengketa terbuka sudah menghentikan hitungan konfirmasi otomatis lewat penjaga `NOT EXISTS` pada tabel `dispute`; admin memindahkan status saat mengambil kasus (FR-070) |
 | `in_mediation → cancelled` | Admin | Admin menentukan pengembalian alokasi dan pihak penanggung (FR-067) |
 
 ```sql
@@ -1045,7 +1050,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 
 ## 12. Urutan Migrasi
 
-15 migrasi berurutan, mengikuti arah ketergantungan kunci asing. Daftar ini adalah sumber tunggal jumlah migrasi; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
+16 migrasi berurutan, mengikuti arah ketergantungan kunci asing. Daftar ini adalah sumber tunggal jumlah migrasi; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
 
 ```text
 001_extensions            citext, pgcrypto
@@ -1065,6 +1070,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 013_notification          notification (+ transactional), notification_channel
 014_rate_limit            rate_limit
 015_verification_code     verification_code
+016_confirm_warn_sent     work_order.confirm_warn_sent_at (+ idx_order_confirm_warn)
 ```
 
 `item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.

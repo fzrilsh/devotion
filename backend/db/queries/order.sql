@@ -171,6 +171,10 @@ WHERE id = $1 AND reversed_at IS NULL;
 -- itself: both parties' account ids (for the party guard), the request's product
 -- item, and the offer's readiness lead. Keyed on the work order id; the caller
 -- checks the account ids against the principal so a non-party sees a 404.
+-- has_open_dispute carries whether any unresolved dispute exists on the order, so
+-- the read layer feeds it to order.IsAutoConfirmDue: an open dispute halts the
+-- lazy auto-confirm exactly as the NOT EXISTS guard halts the ticker, so the two
+-- layers never disagree on a disputed order (FR-070).
 SELECT
     wo.id,
     wo.candidate_id,
@@ -192,7 +196,11 @@ SELECT
     buyer.account_id AS buyer_account,
     sub.account_id   AS subcontractor_account,
     r.product_item_id,
-    o.readiness_lead_days
+    o.readiness_lead_days,
+    EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+    ) AS has_open_dispute
 FROM work_order wo
 JOIN business_profile buyer ON buyer.id = wo.buyer_id
 JOIN business_profile sub   ON sub.id = wo.subcontractor_id
@@ -254,9 +262,20 @@ RETURNING *;
 -- the order is stable across pages (FR-038). role_filter selects the side:
 -- 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
 -- profile, any other value matches either. An empty status_filter array means no
--- status restriction; otherwise only the listed statuses pass. A null
--- before_created is the first page.
-SELECT *
+-- status restriction; otherwise only the listed statuses pass. The filter is a
+-- text[] cast against wo.status::text, not a work_order_status[]: pgx cannot encode
+-- a slice of the named enum type without the enum OID registered on the pool, so an
+-- enum-array parameter fails to encode on every request (empty slice included). The
+-- text cast sidesteps that with no per-connection type registration (Principle IV).
+-- A null before_created is the first page. has_open_dispute rides along so
+-- listItemView feeds it to order.IsAutoConfirmDue, keeping the list's lazy
+-- auto-confirm in step with the detail view and the ticker on a disputed order
+-- (FR-070).
+SELECT wo.*,
+    EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+    ) AS has_open_dispute
 FROM work_order wo
 WHERE (
         (sqlc.arg(role_filter)::text = 'as_buyer' AND wo.buyer_id = sqlc.arg(profile_id)::uuid)
@@ -265,8 +284,8 @@ WHERE (
             AND (wo.buyer_id = sqlc.arg(profile_id)::uuid OR wo.subcontractor_id = sqlc.arg(profile_id)::uuid))
     )
   AND (
-        cardinality(sqlc.arg(status_filter)::work_order_status[]) = 0
-        OR wo.status = ANY(sqlc.arg(status_filter)::work_order_status[])
+        cardinality(sqlc.arg(status_filter)::text[]) = 0
+        OR wo.status::text = ANY(sqlc.arg(status_filter)::text[])
     )
   AND (
         sqlc.narg(before_created)::timestamptz IS NULL
@@ -274,3 +293,126 @@ WHERE (
     )
 ORDER BY wo.created_at DESC, wo.id DESC
 LIMIT sqlc.arg(page_limit)::int;
+
+-- name: ListShippedDueForAutoConfirm :many
+-- The shipped orders whose 7-day auto-confirm instant has arrived (FR-068),
+-- for the in-process ticker to close. shipped_at <= $1 is the due test with $1 =
+-- now - AutoConfirmWindow computed by the caller from the injected Clock, so the
+-- boundary matches order.IsAutoConfirmDue exactly and no wall clock is read in
+-- SQL. Rides idx_order_auto_confirm (shipped_at) WHERE status='shipped'. An order
+-- with an open dispute is excluded by the NOT EXISTS guard, so reporting a dispute
+-- stops the auto-confirm count without moving the order off 'shipped' (FR-070):
+-- the dispute row, not the work-order status, is what halts the clock, and admin
+-- moves the order to in_mediation separately (T071). Returns each order's id and
+-- both parties' account ids for the closure notice.
+SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+WHERE wo.status = 'shipped' AND wo.shipped_at <= sqlc.arg(due_before)::timestamptz
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+  )
+ORDER BY wo.shipped_at;
+
+-- name: AutoConfirmWorkOrder :one
+-- Closes one shipped order as system-confirmed (FR-068): status to 'confirmed',
+-- auto_confirmed true (marking this closure as the system's, not a party's), and
+-- confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+-- guard makes the write a no-op if a party confirmed the order since the scan. The
+-- NOT EXISTS open-dispute guard closes the race where a dispute is reported between
+-- the scan and this update: a disputed order stays open even though its status is
+-- still 'shipped' (FR-070). A returned row means this call did the closing.
+-- Together the columns satisfy the auto_confirm_needs_confirmation and
+-- shipped_before_confirmed CHECKs.
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = true, confirmed_at = $2
+WHERE work_order.id = $1 AND work_order.status = 'shipped'
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = work_order.id AND d.status <> 'resolved'
+  )
+RETURNING *;
+
+-- name: ListShippedApproachingAutoConfirm :many
+-- The shipped orders inside the FR-069 warning lead that have not yet been warned:
+-- shipped_at is within (warn_after, due_after] so the auto-confirm instant is
+-- between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
+-- the ticker warns each order once, not on every tick. The caller passes
+-- warn_after = now - AutoConfirmWindow + AutoConfirmWarnLead and due_after =
+-- now - AutoConfirmWindow, both from the Clock, so the window matches
+-- order.IsAutoConfirmApproaching. An order with an open dispute is excluded by the
+-- NOT EXISTS guard, so a disputed order is neither warned about nor auto-closed
+-- (FR-070). Rides idx_order_auto_confirm. Returns the id, the buyer account (the
+-- only party FR-069 warns), and shipped_at so the caller can name the auto-confirm
+-- date in the notice.
+SELECT wo.id, buyer.account_id AS buyer_account, wo.shipped_at
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+WHERE wo.status = 'shipped'
+  AND wo.confirm_warn_sent_at IS NULL
+  AND wo.shipped_at > sqlc.arg(due_before)::timestamptz
+  AND wo.shipped_at <= sqlc.arg(warn_before)::timestamptz
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+  )
+ORDER BY wo.shipped_at;
+
+-- name: MarkConfirmWarnSent :exec
+-- Stamps confirm_warn_sent_at so the FR-069 approaching notice is sent to the
+-- buyer once. The IS NULL guard keeps it idempotent if two overlapping ticker
+-- instances both scanned before either stamped (the advisory lock makes that
+-- rare, but the guard removes the race entirely).
+UPDATE work_order
+SET confirm_warn_sent_at = $2
+WHERE id = $1 AND confirm_warn_sent_at IS NULL;
+
+-- name: InsertPaymentRecord :one
+-- Records one party's payment statement on a work order (FR-041). No money amount
+-- is stored: the platform neither holds nor verifies funds (FR-040, FR-042), so
+-- the row carries only the direction (sent/received), the date the party states,
+-- an optional free note, and the Clock-stamped created_at. The
+-- one_statement_per_party_per_direction unique constraint means a party can state
+-- each direction at most once; a repeat violates it and the caller turns the
+-- 23505 into a readable PAYMENT_STATEMENT_EXISTS 409.
+INSERT INTO payment_record (
+    work_order_id, profile_id, direction, date, note, created_at
+) VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: ListPaymentRecordsForWorkOrder :many
+-- Every payment statement on one work order for WorkOrderDetail (FR-041). Ordered
+-- by created_at so the two parties' statements read in the order they were made;
+-- both directions from both parties are visible, so a disagreement (one party
+-- states sent, the counterparty never states received) is apparent to the parties
+-- and to admin when a dispute is reported (FR-043).
+SELECT id, work_order_id, profile_id, direction, date, note, created_at
+FROM payment_record
+WHERE work_order_id = $1
+ORDER BY created_at, id;
+
+-- name: InsertDispute :one
+-- Opens a dispute on a work order (FR-046). status takes its 'reported' default.
+-- The idx_one_open_dispute partial unique index (work_order_id WHERE status <>
+-- 'resolved') means at most one dispute may be open per order; a second report
+-- violates it and the caller turns the 23505 into a readable DISPUTE_ALREADY_OPEN
+-- 409 (FR-046). reporter_id is the reporting party's business profile id.
+INSERT INTO dispute (
+    work_order_id, reporter_id, report_body, created_at
+) VALUES ($1, $2, $3, $4)
+RETURNING *;
+
+-- name: MoveWorkOrderToMediation :one
+-- Moves a shipped or otherwise-active order into 'in_mediation' when a dispute is
+-- reported (FR-070). The status = 'shipped' scan of ListShippedDueForAutoConfirm
+-- excludes 'in_mediation', so opening a dispute before the 7-day deadline stops
+-- the auto-confirm count. confirm_warn_sent_at is deliberately left untouched: a
+-- buyer already warned stays warned even if the dispute later closes without
+-- cancelling (data-model.md). The status guard rejects moving a terminal order
+-- (confirmed/cancelled), so a returned row means this call did the move.
+UPDATE work_order
+SET status = 'in_mediation'
+WHERE id = $1 AND status IN ('accepted', 'production', 'completed', 'shipped')
+RETURNING *;

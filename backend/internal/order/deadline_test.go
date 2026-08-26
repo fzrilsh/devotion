@@ -17,24 +17,31 @@ var jkt = func() *time.Location {
 	return loc
 }()
 
-// TestAutoConfirm_BoundaryInstant_FR068 proves the read predicate and the job
-// agree at the exact auto-confirm instant: one nanosecond before it the order
-// is not yet due, at it and after it the order is due. This is the boundary the
-// two scheduler layers must not disagree on.
-func TestAutoConfirm_BoundaryInstant_FR068(t *testing.T) {
+// TestAutoConfirm_BoundaryInstant_FR068_FR070 proves the read predicate and the
+// job agree at the exact auto-confirm instant, and that an open dispute halts the
+// count regardless of the instant. One nanosecond before the boundary the order
+// is not yet due, at it and after it the order is due; but with an open dispute
+// the order is never due, even well past the boundary. This is the boundary the
+// two scheduler layers must not disagree on, dispute included (FR-070).
+func TestAutoConfirm_BoundaryInstant_FR068_FR070(t *testing.T) {
 	shipped := time.Date(2026, 8, 1, 9, 0, 0, 0, jkt)
 	at := AutoConfirmAt(shipped)
 	if got := at.Sub(shipped); got != AutoConfirmWindow {
 		t.Fatalf("AutoConfirmAt lead = %v, mau %v", got, AutoConfirmWindow)
 	}
-	if IsAutoConfirmDue(shipped, at.Add(-time.Nanosecond)) {
+	if IsAutoConfirmDue(shipped, at.Add(-time.Nanosecond), false) {
 		t.Fatal("due sebelum instan batas, mau belum")
 	}
-	if !IsAutoConfirmDue(shipped, at) {
+	if !IsAutoConfirmDue(shipped, at, false) {
 		t.Fatal("belum due pada instan batas, mau due")
 	}
-	if !IsAutoConfirmDue(shipped, at.Add(time.Nanosecond)) {
+	if !IsAutoConfirmDue(shipped, at.Add(time.Nanosecond), false) {
 		t.Fatal("belum due setelah instan batas, mau due")
+	}
+	// An open dispute stops the count: even a week past the boundary the order is
+	// not due, so the lazy read layer never flips a disputed order to confirmed.
+	if IsAutoConfirmDue(shipped, at.Add(7*24*time.Hour), true) {
+		t.Fatal("due meski ada sengketa terbuka, mau belum (FR-070)")
 	}
 }
 

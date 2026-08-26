@@ -44,8 +44,17 @@ func AutoConfirmAt(shippedAt time.Time) time.Time {
 // IsAutoConfirmDue reports whether a shipped order has passed its auto-confirm
 // instant and so must be closed by the scheduler (FR-068). The boundary is
 // inclusive: at exactly AutoConfirmAt the order is due, which is the instant
-// the read predicate and the job must agree on.
-func IsAutoConfirmDue(shippedAt, now time.Time) bool {
+// the read predicate and the job must agree on. An open dispute halts the count
+// entirely (FR-070): the whole decision of whether an order is due lives here,
+// not half in this function and half in the scheduler query, so the read layer
+// cannot even ask "is this due" without stating whether a dispute is open. That
+// makes it impossible for the two layers to diverge on a disputed order the way
+// they would if the dispute check were a separate conjunction bolted on beside
+// each call site.
+func IsAutoConfirmDue(shippedAt, now time.Time, hasOpenDispute bool) bool {
+	if hasOpenDispute {
+		return false
+	}
 	return !now.Before(AutoConfirmAt(shippedAt))
 }
 
