@@ -49,6 +49,11 @@ const (
 	// near, so two overlapping instances during a deploy rollover must not both
 	// close an order or send the same warning twice.
 	LockKeyAutoConfirm int32 = lockKeyBase + 2
+	// LockKeyLateOrder guards the late-order monitoring job (T070): one tick scans
+	// active orders past their delivery deadline and notifies both parties once, so
+	// two overlapping instances during a deploy rollover must not both send the
+	// late-delivery notice for the same order.
+	LockKeyLateOrder int32 = lockKeyBase + 3
 )
 
 // Job is one unit of scheduled work. Run receives the pinned connection that

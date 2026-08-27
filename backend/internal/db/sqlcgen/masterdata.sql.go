@@ -63,7 +63,7 @@ type DecideItemProposalParams struct {
 }
 
 // DecideItemProposal applies an admin decision to a still-pending proposal
-// (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+// (FR-061, driven by T068). It sets status, admin_note, decided_by, decided_at,
 // and the resulting item_id (non-null only on approval), guarding on the current
 // 'pending' status so a second decision on the same row affects nothing and
 // RETURNING yields no row. The decision_complete and approved_yields_item table
@@ -132,6 +132,41 @@ func (q *Queries) GetItemProposalByID(ctx context.Context, id pgtype.UUID) (GetI
 		&i.ItemID,
 		&i.CreatedAt,
 		&i.ProposerAccountID,
+	)
+	return i, err
+}
+
+const insertCatalogItem = `-- name: InsertCatalogItem :one
+INSERT INTO catalog_item (id, type, name, active, sort_order, created_at)
+VALUES (gen_random_uuid(), $1, $2, true, 1000, $3)
+RETURNING id, type, name, active
+`
+
+type InsertCatalogItemParams struct {
+	Type      ItemType
+	Name      string
+	CreatedAt pgtype.Timestamptz
+}
+
+type InsertCatalogItemRow struct {
+	ID     pgtype.UUID
+	Type   ItemType
+	Name   string
+	Active bool
+}
+
+// InsertCatalogItem adds a new baseline item from the admin surface (FR-059) and
+// returns it. sort_order places new items after the seeded ones. It errors on the
+// item_name_unique_per_type constraint when a same-name item of the type exists,
+// which the handler maps to a validation error.
+func (q *Queries) InsertCatalogItem(ctx context.Context, arg InsertCatalogItemParams) (InsertCatalogItemRow, error) {
+	row := q.db.QueryRow(ctx, insertCatalogItem, arg.Type, arg.Name, arg.CreatedAt)
+	var i InsertCatalogItemRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Active,
 	)
 	return i, err
 }
@@ -216,6 +251,48 @@ func (q *Queries) ListActiveCatalogItems(ctx context.Context, type_ ItemType) ([
 	return items, nil
 }
 
+const listCatalogItemsByType = `-- name: ListCatalogItemsByType :many
+SELECT id, type, name, active FROM catalog_item
+WHERE type = $1
+ORDER BY sort_order, name
+`
+
+type ListCatalogItemsByTypeRow struct {
+	ID     pgtype.UUID
+	Type   ItemType
+	Name   string
+	Active bool
+}
+
+// ListCatalogItemsByType returns every item of one type, active and inactive,
+// for the admin management surface (FR-059). Unlike ListActiveCatalogItems it
+// does not filter on active, so an admin sees deactivated items to reactivate or
+// rename them.
+func (q *Queries) ListCatalogItemsByType(ctx context.Context, type_ ItemType) ([]ListCatalogItemsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, listCatalogItemsByType, type_)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCatalogItemsByTypeRow{}
+	for rows.Next() {
+		var i ListCatalogItemsByTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Name,
+			&i.Active,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCities = `-- name: ListCities :many
 SELECT code, province_code, name FROM city ORDER BY code
 `
@@ -268,6 +345,65 @@ func (q *Queries) ListCitiesByProvince(ctx context.Context, provinceCode string)
 	return items, nil
 }
 
+const listItemProposalsPending = `-- name: ListItemProposalsPending :many
+SELECT p.id, p.type, p.proposed_name, p.status, p.admin_note, p.created_at,
+       bp.business_name AS proposer_name
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.status = 'pending'
+  AND ($2::timestamptz IS NULL
+       OR (p.created_at, p.id) > ($2::timestamptz, $3::uuid))
+ORDER BY p.created_at, p.id
+LIMIT $1
+`
+
+type ListItemProposalsPendingParams struct {
+	Limit          int32
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+}
+
+type ListItemProposalsPendingRow struct {
+	ID           pgtype.UUID
+	Type         ItemType
+	ProposedName string
+	Status       ProposalStatus
+	AdminNote    pgtype.Text
+	CreatedAt    pgtype.Timestamptz
+	ProposerName string
+}
+
+// ListItemProposalsPending returns the pending proposal queue oldest first, with
+// the proposer's business name, keyset paginated by (created_at, id) for a stable
+// opaque cursor (FR-061). Fetches limit+1 to detect a next page.
+func (q *Queries) ListItemProposalsPending(ctx context.Context, arg ListItemProposalsPendingParams) ([]ListItemProposalsPendingRow, error) {
+	rows, err := q.db.Query(ctx, listItemProposalsPending, arg.Limit, arg.AfterCreatedAt, arg.AfterID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListItemProposalsPendingRow{}
+	for rows.Next() {
+		var i ListItemProposalsPendingRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.ProposedName,
+			&i.Status,
+			&i.AdminNote,
+			&i.CreatedAt,
+			&i.ProposerName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProvinces = `-- name: ListProvinces :many
 SELECT code, name FROM province ORDER BY code
 `
@@ -291,6 +427,115 @@ func (q *Queries) ListProvinces(ctx context.Context) ([]Province, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockCatalogItem = `-- name: LockCatalogItem :one
+SELECT id, type, name, active FROM catalog_item
+WHERE id = $1
+FOR UPDATE
+`
+
+type LockCatalogItemRow struct {
+	ID     pgtype.UUID
+	Type   ItemType
+	Name   string
+	Active bool
+}
+
+// LockCatalogItem loads one item FOR UPDATE so a rename or deactivate reads and
+// writes the row under a row lock, matching the decision-path locking pattern.
+func (q *Queries) LockCatalogItem(ctx context.Context, id pgtype.UUID) (LockCatalogItemRow, error) {
+	row := q.db.QueryRow(ctx, lockCatalogItem, id)
+	var i LockCatalogItemRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Active,
+	)
+	return i, err
+}
+
+const lockItemProposal = `-- name: LockItemProposal :one
+SELECT p.id, p.profile_id, p.type, p.proposed_name, p.status, p.admin_note, p.decided_by, p.decided_at, p.item_id, p.created_at, bp.account_id AS proposer_account_id
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.id = $1
+FOR UPDATE OF p
+`
+
+type LockItemProposalRow struct {
+	ID                pgtype.UUID
+	ProfileID         pgtype.UUID
+	Type              ItemType
+	ProposedName      string
+	Status            ProposalStatus
+	AdminNote         pgtype.Text
+	DecidedBy         pgtype.UUID
+	DecidedAt         pgtype.Timestamptz
+	ItemID            pgtype.UUID
+	CreatedAt         pgtype.Timestamptz
+	ProposerAccountID pgtype.UUID
+}
+
+// LockItemProposal loads one proposal FOR UPDATE, joined with the proposer's
+// account id, so the decision path reads the current status under a row lock
+// before deciding, matching the verification decision pattern.
+func (q *Queries) LockItemProposal(ctx context.Context, id pgtype.UUID) (LockItemProposalRow, error) {
+	row := q.db.QueryRow(ctx, lockItemProposal, id)
+	var i LockItemProposalRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProfileID,
+		&i.Type,
+		&i.ProposedName,
+		&i.Status,
+		&i.AdminNote,
+		&i.DecidedBy,
+		&i.DecidedAt,
+		&i.ItemID,
+		&i.CreatedAt,
+		&i.ProposerAccountID,
+	)
+	return i, err
+}
+
+const updateCatalogItem = `-- name: UpdateCatalogItem :one
+UPDATE catalog_item
+SET name = COALESCE($2, name),
+    active = COALESCE($3, active)
+WHERE id = $1
+RETURNING id, type, name, active
+`
+
+type UpdateCatalogItemParams struct {
+	ID     pgtype.UUID
+	Name   pgtype.Text
+	Active pgtype.Bool
+}
+
+type UpdateCatalogItemRow struct {
+	ID     pgtype.UUID
+	Type   ItemType
+	Name   string
+	Active bool
+}
+
+// UpdateCatalogItem applies a rename and/or an active flip to an existing item
+// (FR-059). COALESCE keeps the current value when the caller omits a field, so a
+// rename-only or deactivate-only PATCH leaves the other column untouched.
+// Deactivating only flips active; it never touches listing rows that reference
+// the item, so those listings stay discoverable (FR-060).
+func (q *Queries) UpdateCatalogItem(ctx context.Context, arg UpdateCatalogItemParams) (UpdateCatalogItemRow, error) {
+	row := q.db.QueryRow(ctx, updateCatalogItem, arg.ID, arg.Name, arg.Active)
+	var i UpdateCatalogItemRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Active,
+	)
+	return i, err
 }
 
 const upsertCatalogItem = `-- name: UpsertCatalogItem :exec
@@ -318,6 +563,42 @@ func (q *Queries) UpsertCatalogItem(ctx context.Context, arg UpsertCatalogItemPa
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const upsertCatalogItemReturning = `-- name: UpsertCatalogItemReturning :one
+INSERT INTO catalog_item (id, type, name, active, sort_order, created_at)
+VALUES (gen_random_uuid(), $1, $2, true, 1000, $3)
+ON CONFLICT (type, name) DO UPDATE SET active = true
+RETURNING id, type, name, active
+`
+
+type UpsertCatalogItemReturningParams struct {
+	Type      ItemType
+	Name      string
+	CreatedAt pgtype.Timestamptz
+}
+
+type UpsertCatalogItemReturningRow struct {
+	ID     pgtype.UUID
+	Type   ItemType
+	Name   string
+	Active bool
+}
+
+// UpsertCatalogItemReturning resolves the catalog item an approved proposal
+// yields (FR-061): it inserts the proposed name, or reactivates and returns the
+// existing item when the same (type, name) is already present, and returns the
+// id either way. The decision path needs the id to satisfy approved_yields_item.
+func (q *Queries) UpsertCatalogItemReturning(ctx context.Context, arg UpsertCatalogItemReturningParams) (UpsertCatalogItemReturningRow, error) {
+	row := q.db.QueryRow(ctx, upsertCatalogItemReturning, arg.Type, arg.Name, arg.CreatedAt)
+	var i UpsertCatalogItemReturningRow
+	err := row.Scan(
+		&i.ID,
+		&i.Type,
+		&i.Name,
+		&i.Active,
+	)
+	return i, err
 }
 
 const upsertCity = `-- name: UpsertCity :exec

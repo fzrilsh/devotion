@@ -57,11 +57,19 @@ func (s *Service) queries() *sqlcgen.Queries { return sqlcgen.New(s.pool) }
 func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	business := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer)
 	businessOrAdmin := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer, httpx.RoleAdmin)
+	adminOnly := httpx.RequireRole(auth, httpx.RoleAdmin)
 
 	r.Gated("POST /api/files", business, s.uploadFile)
 	r.Gated("GET /api/files/{fileId}", businessOrAdmin, s.getFile)
 	r.Gated("POST /api/verification", business, s.submit)
 	r.Gated("GET /api/verification", business, s.list)
+
+	// The admin queue and decision are gated to admin alone: a business caller has
+	// no authority to approve or reject another business's identity (FR-007). The
+	// verified badge an approval grants propagates to the profile and to search
+	// (FR-008).
+	r.Gated("GET /api/admin/verification", adminOnly, s.listQueue)
+	r.Gated("POST /api/admin/verification/{requestId}/decision", adminOnly, s.decide)
 }
 
 // resolveProfile maps the authenticated account to its business_profile id. A

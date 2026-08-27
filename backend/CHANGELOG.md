@@ -87,7 +87,114 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
-- Endpoint ulasan dan nilai reputasi turunan (FR-047, FR-048, FR-049, FR-050,
+- Uji cakupan sisi admin (T072, FR-007, FR-050, FR-060, FR-067). Ditinjau lebih
+  dulu bahwa penolakan peran nyata lewat router sudah ada untuk keseluruhan tiga
+  belas endpoint admin (WhatsApp status, tiga rute sengketa, pesanan telat, tiga
+  rute daftar baku, dua rute usulan, dua rute verifikasi, sembunyikan ulasan),
+  sehingga tak ada yang diduplikasi. Uji struktur seperti
+  `TidakMeninggalkanRuteTanpaKeputusanPeran` tidak dihitung sebagai penolakan
+  peran karena hanya memeriksa registrasi rute, bukan mengirim permintaan
+  berperan salah. Satu-satunya celah keputusan mediasi yang belum teruji secara
+  terpisah, cabang `cancelled` dengan catatan kosong, ditutup dengan
+  `TestMediation_ResolveCancelledRequiresNote_FR067` yang membuktikan penolakan
+  422 saat pihak penanggung sudah disebut tetapi catatannya kosong.
+- Mediasi sengketa sisi admin (FR-046, FR-067, FR-072). Tiga endpoint di-gate ke
+  peran admin saja: `GET /api/admin/disputes` mendaftar antrean sengketa sebagai
+  array Dispute telanjang (bukan amplop paginasi), terbaru dulu, dengan filter
+  `status` opsional yang menolak nilai tak dikenal sebagai galat validasi;
+  `POST /api/admin/disputes/{id}/mediate` memindahkan pesanan ke "Dalam Mediasi"
+  dalam satu transaksi, menghentikan hitungan konfirmasi otomatis tujuh hari
+  (FR-070) dengan membiarkan pesanan tetap di himpunan pindaian `shipped`; dan
+  `POST /api/admin/disputes/{id}/resolve` menutup sengketa dengan keputusan admin
+  yang eksplisit. Hasil (`result`) adalah kolom tersimpan, bukan turunan status
+  akhir, karena pesanan `continued` dapat sendiri mencapai `confirmed` sehingga
+  tak terbedakan dari penutupan `confirmed` oleh admin. Cabang `cancelled`
+  mewajibkan admin menentukan pihak yang menanggung (`liable_profile_id` ditulis
+  ke `work_order.cancelled_by_id` sehingga hanya pihak itu masuk pembagi tingkat
+  penyelesaian, FR-072), apakah alokasi dibalik, dan sebuah catatan; pembalikan
+  memakai kembali `reverseAllocationInTx` sehingga hanya ada satu jalur pembalikan.
+  Cabang `continued` mengembalikan pesanan ke status sebelum mediasi yang dibaca
+  dari riwayat status, dan hanya bila status itu `shipped` jam konfirmasi otomatis
+  dimulai ulang dari waktu penutupan mediasi lewat `auto_confirm_base_at` (bukan
+  menimpa `shipped_at`) dengan `confirm_warn_sent_at` direset ke NULL. Cabang
+  `confirmed` mengonfirmasi pesanan atas nama pemberi order dengan
+  `auto_confirmed` tetap false, agar keputusan admin terbedakan dari penutupan
+  sistem tujuh hari. Setiap cabang mencatat baris riwayat dengan admin sebagai
+  pelaku (`by_system=false`) dan memberi tahu kedua pihak. Waktu diambil dari
+  `Clock` yang disuntikkan (Rule 5). Migrasi `018_auto_confirm_base` menambah
+  `work_order.auto_confirm_base_at` (dengan constraint urutan waktu dan indeks
+  `idx_order_auto_confirm` yang membaca `COALESCE(auto_confirm_base_at,
+  shipped_at)`); migrasi `019_dispute_result` menambah enum `dispute_result`,
+  kolom `dispute.result`, dan memperluas `resolution_complete`.
+ `GET /api/admin/late-orders`
+  mendaftar setiap pesanan aktif (accepted, production, completed, shipped) yang
+  tenggat pengirimannya sudah lewat, terbaru dulu, satu halaman keyset sekali
+  jalan, di-gate ke peran admin saja. Dua lapisan seperti konfirmasi otomatis:
+  daftar dihitung saat dibaca dari `order.PastDeadlineCutoff(now)` sehingga selalu
+  mutakhir tanpa menunggu ticker, dan sebuah job penjadwal (`order:late-order`,
+  advisory lock tersendiri) memberi tahu kedua pihak bahwa tenggat telah lewat.
+  Ambang "lewat tenggat" ditulis satu kali di `order.PastDeadlineCutoff`, dipakai
+  kedua lapisan, jadi sebuah pesanan tak mungkin muncul di daftar tapi dilewati
+  job, atau sebaliknya. Kueri menumpang indeks parsial `idx_order_deadline_active`
+  yang sudah ada, bukan menambah indeks baru; himpunan statusnya sama persis
+  dengan predikat indeks itu, jadi pesanan terkonfirmasi, dibatalkan, atau sedang
+  dimediasi otomatis di luar cakupan. Notifikasi idempoten lewat kolom
+  `late_notified_at` dengan penjaga `IS NULL`: dua instance yang tumpang tindih
+  saat rollover deploy masing-masing memberi tahu paling banyak sekali, dan kolom
+  ini tidak di-reset saat mediasi ditutup. Waktu diambil dari `Clock` yang
+  disuntikkan (Rule 5), tak ada `time.Now()` di logika bisnis.
+
+  menyembunyikan satu ulasan yang melanggar aturan, di-gate ke peran admin saja.
+  Menyembunyikan adalah keseluruhan tindakan: baik daftar publik maupun rata-rata
+  rating sudah menyaring `NOT hidden` lewat satu query `SearchReputation`, jadi
+  ulasan lenyap dari keduanya sekaligus tanpa aturan kedua yang bisa menyimpang.
+  Baris dikunci lebih dulu (`FOR UPDATE`) supaya dua admin yang memutuskan ulasan
+  yang sama terurut, dan yang kedua membaca keadaan yang sudah ditetapkan yang
+  pertama, bukan menimpa alasan dan waktunya. Alasan penyembunyian wajib diisi;
+  handler menolak yang kosong atau terlalu pendek dengan galat validasi lebih
+  dulu sebelum constraint `hiding_complete` bicara, jadi admin membaca pesan yang
+  bisa dikutip, bukan galat basis data mentah. Identitas admin (`hidden_by`) dan
+  waktunya (`hidden_at`) tercatat. Test kritis membuktikan tidak ada penyaringan
+  kedua: menyembunyikan satu ulasan mengubah rata-rata di profil maupun di hasil
+  pencarian dan menghapusnya dari daftar publik, keduanya konsisten karena
+  berasal dari satu query.
+- Kelola daftar baku sisi admin (FR-059, FR-060, FR-061, FR-074). `GET /api/admin/master/items`
+  menyajikan seluruh item satu jenis, aktif maupun tidak, untuk permukaan katalog
+  admin; `POST /api/admin/master/items` menambah item baru; `PATCH /api/admin/master/items/{itemId}`
+  mengganti nama atau membalik flag aktif secara terpisah lewat pointer opsional,
+  mengunci baris (`FOR UPDATE`) lebih dulu lalu menerapkan perubahan parsial.
+  Nama duplikat per jenis ditangkap sebagai galat field 422 dari constraint
+  `item_name_unique_per_type`, bukan 500. Kelima rute di-gate ke peran admin saja.
+  Menonaktifkan item hanya membalik flag `active`; baris listing yang memakainya
+  tidak disentuh, dan karena `search.sql` tidak menyaring `catalog_item.active`,
+  listing yang sudah terbit tetap dapat ditemukan lewat pencarian (FR-060). Test
+  kritis membuktikan sisi sebaliknya yang mudah lolos: setelah item dinonaktifkan
+  lewat rute admin, listing yang memakainya tetap `published` dan tetap muncul di
+  `SearchCandidates` dengan skor cocok, bukan sekadar tak bisa dipilih di formulir
+  baru. Permukaan HTTP keputusan usulan item menyusul di sini: `GET /api/admin/proposals`
+  menyajikan antrean usulan `pending` ber-keyset dengan nama usaha pengusul, dan
+  `POST /api/admin/proposals/{proposalId}/decision` menyetujui atau menolak satu
+  usulan. Penolakan wajib menyertakan alasan, ditolak di handler dengan galat
+  validasi lebih dulu sebelum constraint bicara; persetujuan membuat item katalog
+  di transaksi yang sama. Setiap keputusan memberi tahu pengusul lewat notifikasi
+  `item_proposal_decision` yang ditulis di dalam transaksi keputusan (FR-074).
+- Sisi admin verifikasi identitas (FR-007, FR-008). `GET /api/admin/verification`
+  menyajikan antrean pengajuan ber-keyset (`created_at`, `id` turun), dengan
+  filter `status` opsional, di-gate ke peran admin saja. `POST /api/admin/verification/{requestId}/decision`
+  menyetujui atau menolak satu pengajuan yang masih `pending`: keputusan mencatat
+  status, identitas admin (`decided_by`), dan waktunya (`decided_at`) dalam satu
+  transaksi. Baris dikunci lebih dulu (`FOR UPDATE`) supaya dua admin yang
+  memutuskan pengajuan yang sama terurut, dan yang kedua membaca status yang sudah
+  ditetapkan yang pertama. Penolakan wajib menyertakan alasan yang dibaca pemohon;
+  handler menolaknya dengan galat validasi lebih dulu supaya pemohon menerima
+  pesan field, bukan 500 dari CHECK `rejection_needs_reason`. Persetujuan
+  membalik `business_profile.verified` di transaksi yang sama, dan karena
+  `search.sql` sudah memilih `verified`, lencana ikut muncul di profil dan hasil
+  pencarian tanpa perubahan lain. Penolakan tidak menyentuh listing (FR-010,
+  FR-011). Kontrak: label `x-fr` pada `GET /admin/verification` dikoreksi dari
+  `[FR-008, FR-081]` menjadi `[FR-007]` (FR-081 soal pengecualian listing sendiri,
+  tidak berkaitan dengan antrean verifikasi).
+
   FR-071, FR-072, FR-073). `POST /api/work-orders/{workOrderId}/reviews` mencatat
   ulasan satu pihak atas lawan transaksinya: rating 1..5 dan teks opsional sampai
   2000 karakter, hanya pada pesanan yang sudah dikonfirmasi diterima (manual atau

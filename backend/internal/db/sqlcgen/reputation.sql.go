@@ -63,6 +63,38 @@ func (q *Queries) GetReviewForResponse(ctx context.Context, id pgtype.UUID) (Get
 	return i, err
 }
 
+const hideReview = `-- name: HideReview :exec
+UPDATE review
+SET hidden = true,
+    hidden_by = $2,
+    hidden_at = $3,
+    hidden_reason = $4
+WHERE id = $1
+`
+
+type HideReviewParams struct {
+	ID           pgtype.UUID
+	HiddenBy     pgtype.UUID
+	HiddenAt     pgtype.Timestamptz
+	HiddenReason pgtype.Text
+}
+
+// Marks one review hidden with the admin's identity, the moment, and the reason
+// (FR-050). The hiding_complete CHECK enforces that all three accompany hidden;
+// the handler fills them and rejects an empty reason first, so a caller sees a
+// readable validation error rather than a raw constraint violation. Setting
+// hidden true is the whole action: the average and the public list both filter
+// NOT hidden already, so the row leaves both at once with no second rule.
+func (q *Queries) HideReview(ctx context.Context, arg HideReviewParams) error {
+	_, err := q.db.Exec(ctx, hideReview,
+		arg.ID,
+		arg.HiddenBy,
+		arg.HiddenAt,
+		arg.HiddenReason,
+	)
+	return err
+}
+
 const insertReview = `-- name: InsertReview :one
 INSERT INTO review (
     work_order_id, reviewer_id, reviewee_id, rating, text, created_at
@@ -199,4 +231,27 @@ func (q *Queries) ListReviewsForProfile(ctx context.Context, arg ListReviewsForP
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockReviewForHide = `-- name: LockReviewForHide :one
+SELECT id, hidden
+FROM review
+WHERE id = $1
+FOR UPDATE
+`
+
+type LockReviewForHideRow struct {
+	ID     pgtype.UUID
+	Hidden bool
+}
+
+// Locks one review row FOR UPDATE so the hide decision reads its current hidden
+// state and writes the new one without a competing admin racing between the two
+// (mirrors the lock-then-decide pattern the other admin moderation paths use).
+// Returns just enough to decide: the id and whether it is already hidden.
+func (q *Queries) LockReviewForHide(ctx context.Context, id pgtype.UUID) (LockReviewForHideRow, error) {
+	row := q.db.QueryRow(ctx, lockReviewForHide, id)
+	var i LockReviewForHideRow
+	err := row.Scan(&i.ID, &i.Hidden)
+	return i, err
 }

@@ -187,6 +187,7 @@ SELECT
     wo.readiness_week_start,
     wo.status,
     wo.shipped_at,
+    wo.auto_confirm_base_at,
     wo.confirmed_at,
     wo.auto_confirmed,
     wo.cancelled_by_id,
@@ -296,25 +297,31 @@ LIMIT sqlc.arg(page_limit)::int;
 
 -- name: ListShippedDueForAutoConfirm :many
 -- The shipped orders whose 7-day auto-confirm instant has arrived (FR-068),
--- for the in-process ticker to close. shipped_at <= $1 is the due test with $1 =
--- now - AutoConfirmWindow computed by the caller from the injected Clock, so the
--- boundary matches order.IsAutoConfirmDue exactly and no wall clock is read in
--- SQL. Rides idx_order_auto_confirm (shipped_at) WHERE status='shipped'. An order
--- with an open dispute is excluded by the NOT EXISTS guard, so reporting a dispute
--- stops the auto-confirm count without moving the order off 'shipped' (FR-070):
--- the dispute row, not the work-order status, is what halts the clock, and admin
--- moves the order to in_mediation separately (T071). Returns each order's id and
--- both parties' account ids for the closure notice.
+-- for the in-process ticker to close. The due test is on the effective base
+-- COALESCE(auto_confirm_base_at, shipped_at) <= $1 with $1 = now -
+-- AutoConfirmWindow computed by the caller from the injected Clock, so the
+-- boundary matches order.AutoConfirmBase + order.IsAutoConfirmDue exactly and no
+-- wall clock is read in SQL. Normally the base is shipped_at; on an order whose
+-- dispute closed "continued" after shipment it is the mediation-close instant, so
+-- the clock restarts from mediation, not from the original shipment (FR-070,
+-- data-model.md). Rides idx_order_auto_confirm on the same COALESCE expression
+-- WHERE status='shipped'. An order with an open dispute is excluded by the NOT
+-- EXISTS guard, so reporting a dispute stops the auto-confirm count without moving
+-- the order off 'shipped' (FR-070): the dispute row, not the work-order status, is
+-- what halts the clock, and admin moves the order to in_mediation separately
+-- (T071). Returns each order's id and both parties' account ids for the closure
+-- notice.
 SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account
 FROM work_order wo
 JOIN business_profile buyer ON buyer.id = wo.buyer_id
 JOIN business_profile sub   ON sub.id = wo.subcontractor_id
-WHERE wo.status = 'shipped' AND wo.shipped_at <= sqlc.arg(due_before)::timestamptz
+WHERE wo.status = 'shipped'
+  AND COALESCE(wo.auto_confirm_base_at, wo.shipped_at) <= sqlc.arg(due_before)::timestamptz
   AND NOT EXISTS (
         SELECT 1 FROM dispute d
         WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
   )
-ORDER BY wo.shipped_at;
+ORDER BY COALESCE(wo.auto_confirm_base_at, wo.shipped_at);
 
 -- name: AutoConfirmWorkOrder :one
 -- Closes one shipped order as system-confirmed (FR-068): status to 'confirmed',
@@ -337,28 +344,32 @@ RETURNING *;
 
 -- name: ListShippedApproachingAutoConfirm :many
 -- The shipped orders inside the FR-069 warning lead that have not yet been warned:
--- shipped_at is within (warn_after, due_after] so the auto-confirm instant is
--- between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
--- the ticker warns each order once, not on every tick. The caller passes
--- warn_after = now - AutoConfirmWindow + AutoConfirmWarnLead and due_after =
--- now - AutoConfirmWindow, both from the Clock, so the window matches
--- order.IsAutoConfirmApproaching. An order with an open dispute is excluded by the
--- NOT EXISTS guard, so a disputed order is neither warned about nor auto-closed
--- (FR-070). Rides idx_order_auto_confirm. Returns the id, the buyer account (the
--- only party FR-069 warns), and shipped_at so the caller can name the auto-confirm
--- date in the notice.
-SELECT wo.id, buyer.account_id AS buyer_account, wo.shipped_at
+-- the effective base COALESCE(auto_confirm_base_at, shipped_at) is within
+-- (warn_after, due_after] so the auto-confirm instant is between AutoConfirmWarnLead
+-- and now, and confirm_warn_sent_at IS NULL dedups so the ticker warns each order
+-- once, not on every tick. The caller passes warn_after = now - AutoConfirmWindow +
+-- AutoConfirmWarnLead and due_after = now - AutoConfirmWindow, both from the Clock,
+-- so the window matches order.IsAutoConfirmApproaching over the same effective base.
+-- Normally the base is shipped_at; on an order whose dispute closed "continued"
+-- after shipment it is the mediation-close instant, so the warning tracks the
+-- restarted clock (FR-070). An order with an open dispute is excluded by the NOT
+-- EXISTS guard, so a disputed order is neither warned about nor auto-closed
+-- (FR-070). Rides idx_order_auto_confirm on the same COALESCE expression. Returns
+-- the id, the buyer account (the only party FR-069 warns), and the effective base
+-- so the caller can name the auto-confirm date in the notice.
+SELECT wo.id, buyer.account_id AS buyer_account,
+    COALESCE(wo.auto_confirm_base_at, wo.shipped_at)::timestamptz AS auto_confirm_base
 FROM work_order wo
 JOIN business_profile buyer ON buyer.id = wo.buyer_id
 WHERE wo.status = 'shipped'
   AND wo.confirm_warn_sent_at IS NULL
-  AND wo.shipped_at > sqlc.arg(due_before)::timestamptz
-  AND wo.shipped_at <= sqlc.arg(warn_before)::timestamptz
+  AND COALESCE(wo.auto_confirm_base_at, wo.shipped_at) > sqlc.arg(due_before)::timestamptz
+  AND COALESCE(wo.auto_confirm_base_at, wo.shipped_at) <= sqlc.arg(warn_before)::timestamptz
   AND NOT EXISTS (
         SELECT 1 FROM dispute d
         WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
   )
-ORDER BY wo.shipped_at;
+ORDER BY COALESCE(wo.auto_confirm_base_at, wo.shipped_at);
 
 -- name: MarkConfirmWarnSent :exec
 -- Stamps confirm_warn_sent_at so the FR-069 approaching notice is sent to the
@@ -368,6 +379,60 @@ ORDER BY wo.shipped_at;
 UPDATE work_order
 SET confirm_warn_sent_at = $2
 WHERE id = $1 AND confirm_warn_sent_at IS NULL;
+
+-- name: ListLateWorkOrdersForAdmin :many
+-- The active orders whose delivery deadline has passed, newest first, keyset
+-- paginated on (created_at, id) for the admin monitoring list (FR-045). The
+-- status set is exactly idx_order_deadline_active's predicate, so the query rides
+-- that partial index instead of adding a new one: an order counts as late only
+-- while it is still open (accepted, production, completed, shipped); a confirmed
+-- or cancelled order is out even if its deadline has long passed, and an
+-- in-mediation order is excluded because a dispute already has admin attention.
+-- deadline < before_cutoff::date is the past-deadline test with before_cutoff =
+-- order.PastDeadlineCutoff(now), the start of now's WIB day, computed by the
+-- caller from the injected Clock so the boundary matches order.IsPastDeadline and
+-- no wall clock is read in SQL (Rule 5). has_open_dispute rides along so the admin
+-- render reuses listItemView with the same lazy auto-confirm as the party list.
+SELECT wo.*,
+    EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = wo.id AND d.status <> 'resolved'
+    ) AS has_open_dispute
+FROM work_order wo
+WHERE wo.status IN ('accepted', 'production', 'completed', 'shipped')
+  AND wo.deadline < sqlc.arg(before_cutoff)::date
+  AND (
+        sqlc.narg(before_created)::timestamptz IS NULL
+        OR (wo.created_at, wo.id) < (sqlc.narg(before_created)::timestamptz, sqlc.narg(before_id)::uuid)
+    )
+ORDER BY wo.created_at DESC, wo.id DESC
+LIMIT sqlc.arg(page_limit)::int;
+
+-- name: ListLateWorkOrdersToNotify :many
+-- The active orders past their deadline that have not yet had the late-delivery
+-- notice sent, for the in-process ticker to notify (FR-045). It mirrors
+-- ListLateWorkOrdersForAdmin's status set and deadline test (both share
+-- order.PastDeadlineCutoff), adding late_notified_at IS NULL so each late order is
+-- notified once, not on every tick. Returns each order's id and both parties'
+-- account ids, since FR-045 alerts both sides. Rides idx_order_deadline_active.
+SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+WHERE wo.status IN ('accepted', 'production', 'completed', 'shipped')
+  AND wo.deadline < sqlc.arg(before_cutoff)::date
+  AND wo.late_notified_at IS NULL
+ORDER BY wo.deadline;
+
+-- name: MarkLateNotified :exec
+-- Stamps late_notified_at so the FR-045 late-delivery notice is sent once per
+-- order. The IS NULL guard keeps it idempotent if two overlapping ticker
+-- instances both scanned before either stamped (the advisory lock makes that
+-- rare, but the guard removes the race entirely). The stamp is never cleared,
+-- even when mediation later closes, so a resolved late order is not re-notified.
+UPDATE work_order
+SET late_notified_at = $2
+WHERE id = $1 AND late_notified_at IS NULL;
 
 -- name: InsertPaymentRecord :one
 -- Records one party's payment statement on a work order (FR-041). No money amount
@@ -415,4 +480,118 @@ RETURNING *;
 UPDATE work_order
 SET status = 'in_mediation'
 WHERE id = $1 AND status IN ('accepted', 'production', 'completed', 'shipped')
+RETURNING *;
+
+-- name: MarkDisputeInMediation :exec
+-- Marks a reported dispute as in_mediation when the admin takes up the case
+-- (FR-046). Runs in the same transaction as MoveWorkOrderToMediation so an order
+-- in mediation always has its dispute in mediation. The status = 'reported' guard
+-- keeps this from re-opening a dispute the admin already resolved; a resolved
+-- dispute is rejected earlier by the handler's GetDisputeForAdmin status check, so
+-- in practice this only ever advances 'reported' -> 'in_mediation'.
+UPDATE dispute
+SET status = 'in_mediation'
+WHERE id = $1 AND status = 'reported';
+
+-- name: ListDisputesForAdmin :many
+-- The admin dispute queue, newest first, keyset paginated on (created_at, id) so
+-- the order is stable across pages (FR-046). An optional status_filter narrows to
+-- one DisputeStatus (reported / in_mediation / resolved); a null filter returns
+-- every dispute regardless of status. A null before_created is the first page.
+-- The unresolved slice of this list rides idx_dispute_queue(created_at); a status
+-- filter of 'resolved' scans without that partial index, which is acceptable for
+-- an admin-only review list. Returns the full dispute row so the handler renders
+-- the contract Dispute shape (reporter_id -> reporter_profile_id, liable_party_id
+-- -> liable_profile_id) without a second read.
+SELECT * FROM dispute
+WHERE (
+        sqlc.narg(status_filter)::text IS NULL
+        OR status::text = sqlc.narg(status_filter)::text
+    )
+  AND (
+        sqlc.narg(before_created)::timestamptz IS NULL
+        OR (created_at, id) < (sqlc.narg(before_created)::timestamptz, sqlc.narg(before_id)::uuid)
+    )
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(page_limit)::int;
+
+-- name: GetDisputeForAdmin :one
+-- Loads and row-locks one dispute for the mediate and resolve paths (FR-046,
+-- FR-067). FOR UPDATE serializes two admins acting on the same dispute: the second
+-- waits, then sees the resolved status and is rejected by the resolve guard. Keyed
+-- on the dispute id from the path; a missing row is the handler's 404.
+SELECT * FROM dispute WHERE id = $1 FOR UPDATE;
+
+-- name: ResolveDispute :one
+-- Records the admin's mediation decision and closes the dispute (FR-067, FR-072).
+-- status moves to 'resolved'; result is the explicit outcome (cancelled /
+-- continued / confirmed) the resolution_complete CHECK now requires; admin_note
+-- carries the mandated note; allocation_reversed and liable_party_id record
+-- whether capacity was returned and which party bears the cancellation in the
+-- completion rate (FR-072); handled_by is the admin account and resolved_at the
+-- Clock instant. The status <> 'resolved' guard makes a repeat resolve a no-op so
+-- two admins cannot close the same dispute twice. The work-order side effects
+-- (cancel + reversal, restore, or force-confirm) run in the same transaction.
+UPDATE dispute
+SET status = 'resolved',
+    result = $2,
+    allocation_reversed = $3,
+    liable_party_id = $4,
+    admin_note = $5,
+    handled_by = $6,
+    resolved_at = $7
+WHERE id = $1 AND status <> 'resolved'
+RETURNING *;
+
+-- name: GetStatusBeforeMediation :one
+-- The status a work order held immediately before it entered mediation, read from
+-- the old_status of the most recent transition into 'in_mediation' (FR-067). The
+-- 'continued' resolution restores the order to this status. old_status is read
+-- straight off the mediation history row rather than inferred, so a restore lands
+-- on exactly the status the order left, even if it moved through several statuses
+-- earlier in its life. Newest such row wins in case an order was mediated more
+-- than once over its lifetime.
+SELECT old_status
+FROM work_order_status_history
+WHERE work_order_id = $1 AND new_status = 'in_mediation'
+ORDER BY created_at DESC, id DESC
+LIMIT 1;
+
+-- name: RestoreWorkOrderStatus :one
+-- Returns a mediated order to a prior status when a dispute closes 'continued'
+-- (FR-067): the order rejoins its production chain at the status it left. The
+-- status = 'in_mediation' guard means only an order actually in mediation is
+-- restored, so a returned row confirms this call did the move. auto_confirm_base_at
+-- and confirm_warn_sent_at are left untouched here; RestartAutoConfirmClock handles
+-- them separately, and only when the restored status is 'shipped'.
+UPDATE work_order
+SET status = $2
+WHERE id = $1 AND status = 'in_mediation'
+RETURNING *;
+
+-- name: RestartAutoConfirmClock :exec
+-- Restarts the 7-day auto-confirm clock from the mediation-close instant on an
+-- order restored to 'shipped' by a 'continued' resolution (FR-068, data-model.md).
+-- auto_confirm_base_at becomes the mediation-close time, so AutoConfirmBase reads
+-- it instead of shipped_at and the window counts from mediation, not the original
+-- shipment; shipped_at is left as the historical shipment fact. confirm_warn_sent_at
+-- is reset to NULL so the buyer is warned afresh before the new deadline. Called
+-- only on the continued+shipped branch, where the restored status is 'shipped' so
+-- the auto_confirm_base_after_shipped CHECK (base >= shipped_at) holds.
+UPDATE work_order
+SET auto_confirm_base_at = $2, confirm_warn_sent_at = NULL
+WHERE id = $1;
+
+-- name: ForceConfirmWorkOrder :one
+-- Forces a mediated order to 'confirmed' when the admin closes the dispute that way
+-- (FR-067): the admin accepts the order on the buyer's behalf. auto_confirmed stays
+-- false because this is an admin decision, not the system's 7-day closure, so the
+-- two are distinguishable in the trail; confirmed_at is the Clock instant. The
+-- status = 'in_mediation' guard means a returned row confirms this call did the
+-- move. confirmed_at >= shipped_at holds by shipped_before_confirmed when the order
+-- had shipped; an order confirmed from an earlier status has shipped_at NULL and the
+-- CHECK is satisfied vacuously.
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = false, confirmed_at = $2
+WHERE id = $1 AND status = 'in_mediation'
 RETURNING *;

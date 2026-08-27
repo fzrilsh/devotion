@@ -609,6 +609,8 @@ CREATE TABLE work_order (
     confirmed_at        timestamptz,
     auto_confirmed      boolean NOT NULL DEFAULT false,
     confirm_warn_sent_at timestamptz,
+    auto_confirm_base_at timestamptz,
+    late_notified_at    timestamptz,
     cancelled_by_id     uuid REFERENCES business_profile(id),
     cancellation_reason text,
     cancelled_at        timestamptz,
@@ -630,6 +632,10 @@ CREATE TABLE work_order (
     ),
     CONSTRAINT auto_confirm_needs_confirmation CHECK (
         NOT auto_confirmed OR confirmed_at IS NOT NULL
+    ),
+    CONSTRAINT auto_confirm_base_after_shipped CHECK (
+        auto_confirm_base_at IS NULL OR shipped_at IS NULL
+        OR auto_confirm_base_at >= shipped_at
     )
 );
 
@@ -637,7 +643,8 @@ CREATE INDEX idx_order_buyer ON work_order (buyer_id, status);
 CREATE INDEX idx_order_subcon ON work_order (subcontractor_id, status);
 CREATE INDEX idx_order_deadline_active ON work_order (deadline)
     WHERE status IN ('accepted', 'production', 'completed', 'shipped');
-CREATE INDEX idx_order_auto_confirm ON work_order (shipped_at) WHERE status = 'shipped';
+CREATE INDEX idx_order_auto_confirm ON work_order (COALESCE(auto_confirm_base_at, shipped_at))
+    WHERE status = 'shipped';
 CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
     WHERE status = 'shipped' AND confirm_warn_sent_at IS NULL;
 ```
@@ -650,7 +657,11 @@ CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
 
 `two_distinct_parties` adalah lapisan kedua atas larangan request ke diri sendiri: bahkan bila trigger dilewati, pesanan berdua pihak sama tidak dapat terbentuk.
 
-`confirm_warn_sent_at` menandai kapan peringatan tenggat konfirmasi otomatis (FR-069) sudah dikirim ke pemberi order, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam jendela peringatan. Ia tidak direset saat sengketa ditutup tanpa pembatalan: pemberi order sudah pernah diperingatkan, mengirim ulang setelah mediasi hanya membingungkan.
+`confirm_warn_sent_at` menandai kapan peringatan tenggat konfirmasi otomatis (FR-069) sudah dikirim ke pemberi order, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam jendela peringatan. Ia direset ke NULL hanya pada satu kasus: sengketa ditutup dengan hasil `continued` atas pesanan yang sebelumnya sudah `shipped`, sehingga hitungan konfirmasi otomatis dimulai ulang dari waktu mediasi ditutup dan peringatan baru dapat dikirim untuk jendela yang baru. Pada penutupan yang tidak memulai ulang jam itu (dibatalkan, atau dikonfirmasi paksa admin) ia tidak disentuh.
+
+`auto_confirm_base_at` adalah titik mulai jam konfirmasi otomatis tujuh hari (FR-068), normalnya NULL. `shipped_at` adalah fakta historis kapan pesanan dikirim dan tidak pernah bergeser; saat sengketa atas pesanan yang sudah `shipped` ditutup dengan hasil `continued`, jam konfirmasi harus mulai ulang dari saat mediasi ditutup, bukan dari pengiriman asli. Alih-alih menimpa `shipped_at` (yang akan menghapus fakta pengiriman), jalur resolve mengisi `auto_confirm_base_at` dengan waktu penutupan mediasi, dan aritmetika konfirmasi membaca `COALESCE(auto_confirm_base_at, shipped_at)` sebagai basis efektifnya. NULL di tempat lain berarti basisnya `shipped_at`, sehingga pesanan yang tidak pernah dimediasi berperilaku persis seperti sebelumnya. Constraint `auto_confirm_base_after_shipped` menegakkan basis hanya boleh maju dari pengiriman: mediasi selalu terjadi setelah pesanan dikirim, jadi basis yang lebih awal dari `shipped_at` adalah bug urutan waktu. Indeks parsial `idx_order_auto_confirm` mengunci ekspresi `COALESCE(auto_confirm_base_at, shipped_at)` yang sama agar pemindaian penjadwal tetap naik indeks alih-alih menyortir.
+
+`late_notified_at` menandai kapan pemberitahuan pesanan telat (FR-045) sudah dikirim, sehingga pemberitahuan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali setelah deadline terlewat.
 
 Tiga indeks parsial jalur penjadwal R-07: `idx_order_auto_confirm` untuk penutupan otomatis FR-068, `idx_order_confirm_warn` untuk peringatan FR-069 (hanya baris yang belum diperingatkan), `idx_order_deadline_active` untuk FR-045.
 
@@ -672,6 +683,8 @@ accepted ──▶ production ──▶ completed ──▶ shipped ──▶ co
 | `accepted → cancelled` | Kedua pihak | Wajib beralasan; seluruh alokasi dibalik (FR-020, FR-065) |
 | `* → in_mediation` | Admin, saat menengahi sengketa | Sengketa terbuka sudah menghentikan hitungan konfirmasi otomatis lewat penjaga `NOT EXISTS` pada tabel `dispute`; admin memindahkan status saat mengambil kasus (FR-070) |
 | `in_mediation → cancelled` | Admin | Admin menentukan pengembalian alokasi dan pihak penanggung (FR-067) |
+| `in_mediation → confirmed` | Admin | Admin memaksa pesanan diterima; `auto_confirmed` tetap FALSE karena ini bukan penutupan tujuh hari oleh sistem (FR-067) |
+| `in_mediation → status sebelumnya` | Admin | Sengketa ditutup tanpa membatalkan; pesanan kembali ke status terakhir sebelum masuk mediasi, dibaca dari `work_order_status_history` (FR-067, FR-070) |
 
 ```sql
 CREATE TABLE work_order_status_history (
@@ -780,6 +793,7 @@ Pembagi mengecualikan pesanan yang dibatalkan pihak lain, sesuai FR-072. Ambang 
 
 ```sql
 CREATE TYPE dispute_status AS ENUM ('reported', 'in_mediation', 'resolved');
+CREATE TYPE dispute_result AS ENUM ('cancelled', 'continued', 'confirmed');
 
 CREATE TABLE dispute (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -787,6 +801,7 @@ CREATE TABLE dispute (
     reporter_id        uuid NOT NULL REFERENCES business_profile(id) ON DELETE RESTRICT,
     report_body        text NOT NULL,
     status             dispute_status NOT NULL DEFAULT 'reported',
+    result             dispute_result,
     admin_note         text,
     allocation_reversed boolean,
     liable_party_id    uuid REFERENCES business_profile(id),
@@ -797,7 +812,8 @@ CREATE TABLE dispute (
     CONSTRAINT resolution_complete CHECK (
         status <> 'resolved'
         OR (handled_by IS NOT NULL AND resolved_at IS NOT NULL
-            AND allocation_reversed IS NOT NULL AND admin_note IS NOT NULL)
+            AND allocation_reversed IS NOT NULL AND admin_note IS NOT NULL
+            AND result IS NOT NULL)
     )
 );
 
@@ -807,6 +823,8 @@ CREATE INDEX idx_dispute_queue ON dispute (created_at) WHERE status <> 'resolved
 ```
 
 `resolution_complete` menegakkan FR-067: admin tidak dapat menutup mediasi tanpa memutuskan secara eksplisit apakah alokasi dikembalikan dan siapa yang menanggung. Keduanya `NULL` selama sengketa belum selesai, bukan diberi nilai bawaan yang menyesatkan.
+
+`result` merekam apa yang admin putuskan saat menutup sengketa: `cancelled` (pesanan dibatalkan), `continued` (pesanan dilanjutkan sepanjang rantai produksinya), atau `confirmed` (admin memaksa konfirmasi). Ia disimpan eksplisit, bukan diturunkan dari status akhir pesanan, karena pesanan `continued` dapat sendiri mencapai `confirmed` sehingga tak terbedakan dari penutupan `confirmed` oleh admin. `NULL` sampai sengketa selesai, sejalan dengan `allocation_reversed` dan `liable_party_id`, dan `resolution_complete` diperluas agar sengketa yang selesai selalu memuat `result`.
 
 `idx_one_open_dispute` menutup edge case pelaporan berulang untuk menghentikan konfirmasi otomatis berkali-kali. Penanganan sengketa lewat mediasi admin memang jalur yang dipilih dokumen sumber untuk fase awal, karena penanganan legal formal menuntut tim hukum dan asuransi [1].
 
@@ -1071,6 +1089,9 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 014_rate_limit            rate_limit
 015_verification_code     verification_code
 016_confirm_warn_sent     work_order.confirm_warn_sent_at (+ idx_order_confirm_warn)
+017_late_notified         work_order.late_notified_at
+018_auto_confirm_base     work_order.auto_confirm_base_at (+ constraint, idx_order_auto_confirm)
+019_dispute_result        dispute.result (+ dispute_result enum, resolution_complete)
 ```
 
 `item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.

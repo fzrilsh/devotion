@@ -53,4 +53,5 @@ func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	gate := httpx.RequireRole(auth, httpx.RoleBuyer, httpx.RoleSubcontractor)
 	r.Gated("POST /api/work-orders/{workOrderId}/reviews", gate, s.handleCreateReview)
 	r.Public("GET /api/profile/{profileId}/reviews", s.handleListReviews)
+	s.registerAdmin(r, auth)
 }

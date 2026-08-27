@@ -67,7 +67,7 @@ JOIN business_profile bp ON bp.id = p.profile_id
 WHERE p.id = $1;
 
 -- DecideItemProposal applies an admin decision to a still-pending proposal
--- (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+-- (FR-061, driven by T068). It sets status, admin_note, decided_by, decided_at,
 -- and the resulting item_id (non-null only on approval), guarding on the current
 -- 'pending' status so a second decision on the same row affects nothing and
 -- RETURNING yields no row. The decision_complete and approved_yields_item table
@@ -88,3 +88,74 @@ SELECT count(*)::bigint FROM city;
 
 -- name: CountCatalogByType :one
 SELECT count(*)::bigint FROM catalog_item WHERE type = $1;
+
+-- ListCatalogItemsByType returns every item of one type, active and inactive,
+-- for the admin management surface (FR-059). Unlike ListActiveCatalogItems it
+-- does not filter on active, so an admin sees deactivated items to reactivate or
+-- rename them.
+-- name: ListCatalogItemsByType :many
+SELECT id, type, name, active FROM catalog_item
+WHERE type = $1
+ORDER BY sort_order, name;
+
+-- InsertCatalogItem adds a new baseline item from the admin surface (FR-059) and
+-- returns it. sort_order places new items after the seeded ones. It errors on the
+-- item_name_unique_per_type constraint when a same-name item of the type exists,
+-- which the handler maps to a validation error.
+-- name: InsertCatalogItem :one
+INSERT INTO catalog_item (id, type, name, active, sort_order, created_at)
+VALUES (gen_random_uuid(), $1, $2, true, 1000, $3)
+RETURNING id, type, name, active;
+
+-- UpsertCatalogItemReturning resolves the catalog item an approved proposal
+-- yields (FR-061): it inserts the proposed name, or reactivates and returns the
+-- existing item when the same (type, name) is already present, and returns the
+-- id either way. The decision path needs the id to satisfy approved_yields_item.
+-- name: UpsertCatalogItemReturning :one
+INSERT INTO catalog_item (id, type, name, active, sort_order, created_at)
+VALUES (gen_random_uuid(), $1, $2, true, 1000, $3)
+ON CONFLICT (type, name) DO UPDATE SET active = true
+RETURNING id, type, name, active;
+
+-- LockCatalogItem loads one item FOR UPDATE so a rename or deactivate reads and
+-- writes the row under a row lock, matching the decision-path locking pattern.
+-- name: LockCatalogItem :one
+SELECT id, type, name, active FROM catalog_item
+WHERE id = $1
+FOR UPDATE;
+
+-- UpdateCatalogItem applies a rename and/or an active flip to an existing item
+-- (FR-059). COALESCE keeps the current value when the caller omits a field, so a
+-- rename-only or deactivate-only PATCH leaves the other column untouched.
+-- Deactivating only flips active; it never touches listing rows that reference
+-- the item, so those listings stay discoverable (FR-060).
+-- name: UpdateCatalogItem :one
+UPDATE catalog_item
+SET name = COALESCE(sqlc.narg('name'), name),
+    active = COALESCE(sqlc.narg('active'), active)
+WHERE id = $1
+RETURNING id, type, name, active;
+
+-- LockItemProposal loads one proposal FOR UPDATE, joined with the proposer's
+-- account id, so the decision path reads the current status under a row lock
+-- before deciding, matching the verification decision pattern.
+-- name: LockItemProposal :one
+SELECT p.*, bp.account_id AS proposer_account_id
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.id = $1
+FOR UPDATE OF p;
+
+-- ListItemProposalsPending returns the pending proposal queue oldest first, with
+-- the proposer's business name, keyset paginated by (created_at, id) for a stable
+-- opaque cursor (FR-061). Fetches limit+1 to detect a next page.
+-- name: ListItemProposalsPending :many
+SELECT p.id, p.type, p.proposed_name, p.status, p.admin_note, p.created_at,
+       bp.business_name AS proposer_name
+FROM item_proposal p
+JOIN business_profile bp ON bp.id = p.profile_id
+WHERE p.status = 'pending'
+  AND (sqlc.narg('after_created_at')::timestamptz IS NULL
+       OR (p.created_at, p.id) > (sqlc.narg('after_created_at')::timestamptz, sqlc.narg('after_id')::uuid))
+ORDER BY p.created_at, p.id
+LIMIT $1;

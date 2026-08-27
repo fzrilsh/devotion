@@ -111,12 +111,19 @@ type Querier interface {
 	// (FR-011: re-submission is allowed only after a rejection).
 	CreateVerificationRequest(ctx context.Context, arg CreateVerificationRequestParams) (VerificationRequest, error)
 	// DecideItemProposal applies an admin decision to a still-pending proposal
-	// (FR-058, driven by T068). It sets status, admin_note, decided_by, decided_at,
+	// (FR-061, driven by T068). It sets status, admin_note, decided_by, decided_at,
 	// and the resulting item_id (non-null only on approval), guarding on the current
 	// 'pending' status so a second decision on the same row affects nothing and
 	// RETURNING yields no row. The decision_complete and approved_yields_item table
 	// constraints enforce the shape of an approved versus rejected decision.
 	DecideItemProposal(ctx context.Context, arg DecideItemProposalParams) (ItemProposal, error)
+	// DecideVerificationRequest records an admin's approval or rejection: it stamps
+	// status, admin_note, decided_by and decided_at in one statement, only while the
+	// request is still pending (FR-007). The verification_decision_complete and
+	// rejection_needs_reason CHECKs are the storage-level safety net; the handler
+	// rejects a reasonless rejection first so the applicant reads a field error, not
+	// a 500. business_name rides along for the response.
+	DecideVerificationRequest(ctx context.Context, arg DecideVerificationRequestParams) (DecideVerificationRequestRow, error)
 	// DeleteAllSessions removes every session for an account, used when no session
 	// is retained (recovery confirmed without an active caller session).
 	DeleteAllSessions(ctx context.Context, accountID pgtype.UUID) error
@@ -148,6 +155,15 @@ type Querier interface {
 	// edit that would strand a running order is rejected with a 409 that names the
 	// offending week and amount rather than silently corrupting the calendar.
 	FindFutureAllocatedPeriodOverCapacity(ctx context.Context, arg FindFutureAllocatedPeriodOverCapacityParams) (FindFutureAllocatedPeriodOverCapacityRow, error)
+	// Forces a mediated order to 'confirmed' when the admin closes the dispute that way
+	// (FR-067): the admin accepts the order on the buyer's behalf. auto_confirmed stays
+	// false because this is an admin decision, not the system's 7-day closure, so the
+	// two are distinguishable in the trail; confirmed_at is the Clock instant. The
+	// status = 'in_mediation' guard means a returned row confirms this call did the
+	// move. confirmed_at >= shipped_at holds by shipped_before_confirmed when the order
+	// had shipped; an order confirmed from an earlier status has shipped_at NULL and the
+	// CHECK is satisfied vacuously.
+	ForceConfirmWorkOrder(ctx context.Context, arg ForceConfirmWorkOrderParams) (WorkOrder, error)
 	// GetAccountByEmail loads one account by its case-insensitive email. Used by
 	// login and recovery; both must run the rate limit before this lookup.
 	GetAccountByEmail(ctx context.Context, email string) (UserAccount, error)
@@ -168,6 +184,11 @@ type Querier interface {
 	// uses this to reject unknown or unpublished listings (422) and to detect a
 	// listing owned by the searcher's own profile (FR-083) before any insert.
 	GetCandidateListings(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetCandidateListingsRow, error)
+	// Loads and row-locks one dispute for the mediate and resolve paths (FR-046,
+	// FR-067). FOR UPDATE serializes two admins acting on the same dispute: the second
+	// waits, then sees the resolved status and is rejected by the resolve guard. Keyed
+	// on the dispute id from the path; a missing row is the handler's 404.
+	GetDisputeForAdmin(ctx context.Context, id pgtype.UUID) (Dispute, error)
 	// GetItemProposalByID loads one proposal, joined with the proposer's account id
 	// so the decision path knows whom to notify. account_id is the business
 	// profile's owner, the recipient of the item_proposal_decision notification.
@@ -220,6 +241,14 @@ type Querier interface {
 	// GetSessionByTokenHash loads a live session by token hash. The expiry check is
 	// in SQL so an expired row is treated as absent without a second round trip.
 	GetSessionByTokenHash(ctx context.Context, arg GetSessionByTokenHashParams) (Session, error)
+	// The status a work order held immediately before it entered mediation, read from
+	// the old_status of the most recent transition into 'in_mediation' (FR-067). The
+	// 'continued' resolution restores the order to this status. old_status is read
+	// straight off the mediation history row rather than inferred, so a restore lands
+	// on exactly the status the order left, even if it moved through several statuses
+	// earlier in its life. Newest such row wins in case an order was mediated more
+	// than once over its lifetime.
+	GetStatusBeforeMediation(ctx context.Context, workOrderID pgtype.UUID) (NullWorkOrderStatus, error)
 	// GetUploadedFile returns one file row by id. The handler resolves the caller's
 	// profile and admin flag and compares against owner_profile_id before streaming
 	// the bytes, so this query carries no access check of its own (FR-009 is
@@ -234,8 +263,20 @@ type Querier interface {
 	// lazy auto-confirm exactly as the NOT EXISTS guard halts the ticker, so the two
 	// layers never disagree on a disputed order (FR-070).
 	GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetWorkOrderForViewRow, error)
+	// Marks one review hidden with the admin's identity, the moment, and the reason
+	// (FR-050). The hiding_complete CHECK enforces that all three accompany hidden;
+	// the handler fills them and rejects an empty reason first, so a caller sees a
+	// readable validation error rather than a raw constraint violation. Setting
+	// hidden true is the whole action: the average and the public list both filter
+	// NOT hidden already, so the row leaves both at once with no second rule.
+	HideReview(ctx context.Context, arg HideReviewParams) error
 	// One capacity allocation row per used period (FR-077).
 	InsertAllocation(ctx context.Context, arg InsertAllocationParams) (CapacityAllocation, error)
+	// InsertCatalogItem adds a new baseline item from the admin surface (FR-059) and
+	// returns it. sort_order places new items after the seeded ones. It errors on the
+	// item_name_unique_per_type constraint when a same-name item of the type exists,
+	// which the handler maps to a validation error.
+	InsertCatalogItem(ctx context.Context, arg InsertCatalogItemParams) (InsertCatalogItemRow, error)
 	// Opens a dispute on a work order (FR-046). status takes its 'reported' default.
 	// The idx_one_open_dispute partial unique index (work_order_id WHERE status <>
 	// 'resolved') means at most one dispute may be open per order; a second report
@@ -327,17 +368,56 @@ type Querier interface {
 	// to its subcontractor profile for the business name, ordered so a request's
 	// candidates group together deterministically.
 	ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListCandidatesByRequestsRow, error)
+	// ListCatalogItemsByType returns every item of one type, active and inactive,
+	// for the admin management surface (FR-059). Unlike ListActiveCatalogItems it
+	// does not filter on active, so an admin sees deactivated items to reactivate or
+	// rename them.
+	ListCatalogItemsByType(ctx context.Context, type_ ItemType) ([]ListCatalogItemsByTypeRow, error)
 	// ListCities returns every city ordered by code, for GET /regions/cities with no
 	// province filter.
 	ListCities(ctx context.Context) ([]City, error)
 	// ListCitiesByProvince returns the cities of one province, for
 	// GET /regions/cities?province=.
 	ListCitiesByProvince(ctx context.Context, provinceCode string) ([]City, error)
+	// The admin dispute queue, newest first, keyset paginated on (created_at, id) so
+	// the order is stable across pages (FR-046). An optional status_filter narrows to
+	// one DisputeStatus (reported / in_mediation / resolved); a null filter returns
+	// every dispute regardless of status. A null before_created is the first page.
+	// The unresolved slice of this list rides idx_dispute_queue(created_at); a status
+	// filter of 'resolved' scans without that partial index, which is acceptable for
+	// an admin-only review list. Returns the full dispute row so the handler renders
+	// the contract Dispute shape (reporter_id -> reporter_profile_id, liable_party_id
+	// -> liable_profile_id) without a second read.
+	ListDisputesForAdmin(ctx context.Context, arg ListDisputesForAdminParams) ([]Dispute, error)
 	// ListIncomingCandidates returns one keyset page of candidates whose listing the
 	// subcontractor account owns, newest request first (FR-030). An optional status
 	// filter narrows to one candidate_status. The cursor tuple is (created_at, id)
 	// of the request, matching the buyer-side list.
 	ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error)
+	// ListItemProposalsPending returns the pending proposal queue oldest first, with
+	// the proposer's business name, keyset paginated by (created_at, id) for a stable
+	// opaque cursor (FR-061). Fetches limit+1 to detect a next page.
+	ListItemProposalsPending(ctx context.Context, arg ListItemProposalsPendingParams) ([]ListItemProposalsPendingRow, error)
+	// The active orders whose delivery deadline has passed, newest first, keyset
+	// paginated on (created_at, id) for the admin monitoring list (FR-045). The
+	// status set is exactly idx_order_deadline_active's predicate, so the query rides
+	// that partial index instead of adding a new one: an order counts as late only
+	// while it is still open (accepted, production, completed, shipped); a confirmed
+	// or cancelled order is out even if its deadline has long passed, and an
+	// in-mediation order is excluded because a dispute already has admin attention.
+	// deadline < before_cutoff::date is the past-deadline test with before_cutoff =
+	// order.PastDeadlineCutoff(now), the start of now's WIB day, computed by the
+	// caller from the injected Clock so the boundary matches order.IsPastDeadline and
+	// no wall clock is read in SQL (Rule 5). has_open_dispute rides along so the admin
+	// render reuses listItemView with the same lazy auto-confirm as the party list.
+	ListLateWorkOrdersForAdmin(ctx context.Context, arg ListLateWorkOrdersForAdminParams) ([]ListLateWorkOrdersForAdminRow, error)
+	// The active orders past their deadline that have not yet had the late-delivery
+	// notice sent, for the in-process ticker to notify (FR-045). It mirrors
+	// ListLateWorkOrdersForAdmin's status set and deadline test (both share
+	// order.PastDeadlineCutoff), adding late_notified_at IS NULL so each late order is
+	// notified once, not on every tick. Returns each order's id and both parties'
+	// account ids, since FR-045 alerts both sides. Rides idx_order_deadline_active.
+	ListLateWorkOrdersToNotify(ctx context.Context, beforeCutoff pgtype.Date) ([]ListLateWorkOrdersToNotifyRow, error)
 	// ListListingMachines returns the machine items of a listing with their counts.
 	ListListingMachines(ctx context.Context, listingID pgtype.UUID) ([]ListListingMachinesRow, error)
 	// ListListingProducts returns the product items of a listing joined to their
@@ -383,28 +463,44 @@ type Querier interface {
 	// anonymous, and transaction_date names the order the review is about.
 	ListReviewsForProfile(ctx context.Context, arg ListReviewsForProfileParams) ([]ListReviewsForProfileRow, error)
 	// The shipped orders inside the FR-069 warning lead that have not yet been warned:
-	// shipped_at is within (warn_after, due_after] so the auto-confirm instant is
-	// between AutoConfirmWarnLead and now, and confirm_warn_sent_at IS NULL dedups so
-	// the ticker warns each order once, not on every tick. The caller passes
-	// warn_after = now - AutoConfirmWindow + AutoConfirmWarnLead and due_after =
-	// now - AutoConfirmWindow, both from the Clock, so the window matches
-	// order.IsAutoConfirmApproaching. An order with an open dispute is excluded by the
-	// NOT EXISTS guard, so a disputed order is neither warned about nor auto-closed
-	// (FR-070). Rides idx_order_auto_confirm. Returns the id, the buyer account (the
-	// only party FR-069 warns), and shipped_at so the caller can name the auto-confirm
-	// date in the notice.
+	// the effective base COALESCE(auto_confirm_base_at, shipped_at) is within
+	// (warn_after, due_after] so the auto-confirm instant is between AutoConfirmWarnLead
+	// and now, and confirm_warn_sent_at IS NULL dedups so the ticker warns each order
+	// once, not on every tick. The caller passes warn_after = now - AutoConfirmWindow +
+	// AutoConfirmWarnLead and due_after = now - AutoConfirmWindow, both from the Clock,
+	// so the window matches order.IsAutoConfirmApproaching over the same effective base.
+	// Normally the base is shipped_at; on an order whose dispute closed "continued"
+	// after shipment it is the mediation-close instant, so the warning tracks the
+	// restarted clock (FR-070). An order with an open dispute is excluded by the NOT
+	// EXISTS guard, so a disputed order is neither warned about nor auto-closed
+	// (FR-070). Rides idx_order_auto_confirm on the same COALESCE expression. Returns
+	// the id, the buyer account (the only party FR-069 warns), and the effective base
+	// so the caller can name the auto-confirm date in the notice.
 	ListShippedApproachingAutoConfirm(ctx context.Context, arg ListShippedApproachingAutoConfirmParams) ([]ListShippedApproachingAutoConfirmRow, error)
 	// The shipped orders whose 7-day auto-confirm instant has arrived (FR-068),
-	// for the in-process ticker to close. shipped_at <= $1 is the due test with $1 =
-	// now - AutoConfirmWindow computed by the caller from the injected Clock, so the
-	// boundary matches order.IsAutoConfirmDue exactly and no wall clock is read in
-	// SQL. Rides idx_order_auto_confirm (shipped_at) WHERE status='shipped'. An order
-	// with an open dispute is excluded by the NOT EXISTS guard, so reporting a dispute
-	// stops the auto-confirm count without moving the order off 'shipped' (FR-070):
-	// the dispute row, not the work-order status, is what halts the clock, and admin
-	// moves the order to in_mediation separately (T071). Returns each order's id and
-	// both parties' account ids for the closure notice.
+	// for the in-process ticker to close. The due test is on the effective base
+	// COALESCE(auto_confirm_base_at, shipped_at) <= $1 with $1 = now -
+	// AutoConfirmWindow computed by the caller from the injected Clock, so the
+	// boundary matches order.AutoConfirmBase + order.IsAutoConfirmDue exactly and no
+	// wall clock is read in SQL. Normally the base is shipped_at; on an order whose
+	// dispute closed "continued" after shipment it is the mediation-close instant, so
+	// the clock restarts from mediation, not from the original shipment (FR-070,
+	// data-model.md). Rides idx_order_auto_confirm on the same COALESCE expression
+	// WHERE status='shipped'. An order with an open dispute is excluded by the NOT
+	// EXISTS guard, so reporting a dispute stops the auto-confirm count without moving
+	// the order off 'shipped' (FR-070): the dispute row, not the work-order status, is
+	// what halts the clock, and admin moves the order to in_mediation separately
+	// (T071). Returns each order's id and both parties' account ids for the closure
+	// notice.
 	ListShippedDueForAutoConfirm(ctx context.Context, dueBefore pgtype.Timestamptz) ([]ListShippedDueForAutoConfirmRow, error)
+	// ListVerificationQueue returns one keyset page of verification requests for the
+	// admin queue, newest first, joined to business_profile for the business name
+	// the contract's VerificationRequest carries (FR-007). An absent status_filter
+	// lists every status; a present one narrows to it, so the default view is the
+	// pending backlog. A null before_created is the first page; the (created_at, id)
+	// tuple comparison is the stable keyset the opaque cursor rides (FR-008 badge is
+	// granted from the decision this queue feeds, not here).
+	ListVerificationQueue(ctx context.Context, arg ListVerificationQueueParams) ([]ListVerificationQueueRow, error)
 	// ListVerificationRequestsByProfile returns every submission a profile has made,
 	// newest first, joined to business_profile for the business_name the contract's
 	// VerificationRequest carries (the verification_request table has no such
@@ -432,6 +528,13 @@ type Querier interface {
 	// auto-confirm in step with the detail view and the ticker on a disputed order
 	// (FR-070).
 	ListWorkOrdersForParty(ctx context.Context, arg ListWorkOrdersForPartyParams) ([]ListWorkOrdersForPartyRow, error)
+	// LockCatalogItem loads one item FOR UPDATE so a rename or deactivate reads and
+	// writes the row under a row lock, matching the decision-path locking pattern.
+	LockCatalogItem(ctx context.Context, id pgtype.UUID) (LockCatalogItemRow, error)
+	// LockItemProposal loads one proposal FOR UPDATE, joined with the proposer's
+	// account id, so the decision path reads the current status under a row lock
+	// before deciding, matching the verification decision pattern.
+	LockItemProposal(ctx context.Context, id pgtype.UUID) (LockItemProposalRow, error)
 	// Takes a row lock on a listing by its own id, so the accept path can extend the
 	// calendar horizon (FR-088) under the same lock the listing owner's edits take.
 	LockListingByID(ctx context.Context, id pgtype.UUID) (CapacityListing, error)
@@ -454,6 +557,17 @@ type Querier interface {
 	// counting path (otp_address) serializes per source address. Without it, two
 	// new numbers from the same address could both pass the distinct-count check.
 	LockRateLimitKey(ctx context.Context, pgAdvisoryXactLock int64) error
+	// Locks one review row FOR UPDATE so the hide decision reads its current hidden
+	// state and writes the new one without a competing admin racing between the two
+	// (mirrors the lock-then-decide pattern the other admin moderation paths use).
+	// Returns just enough to decide: the id and whether it is already hidden.
+	LockReviewForHide(ctx context.Context, id pgtype.UUID) (LockReviewForHideRow, error)
+	// LockVerificationRequest takes a row lock on the target request so the decision
+	// runs under a lock: two admins deciding the same pending request serialize, and
+	// the second sees the status the first already set. business_name rides along via
+	// a scalar subquery so the decision response carries it without a second round
+	// trip (FR-007).
+	LockVerificationRequest(ctx context.Context, id pgtype.UUID) (LockVerificationRequestRow, error)
 	// Takes a row lock on the work order whose allocation is being reversed, so the
 	// reversal runs under a lock in the same spirit as formation locking the listing.
 	LockWorkOrderForReversal(ctx context.Context, id pgtype.UUID) (WorkOrder, error)
@@ -482,6 +596,19 @@ type Querier interface {
 	// instances both scanned before either stamped (the advisory lock makes that
 	// rare, but the guard removes the race entirely).
 	MarkConfirmWarnSent(ctx context.Context, arg MarkConfirmWarnSentParams) error
+	// Marks a reported dispute as in_mediation when the admin takes up the case
+	// (FR-046). Runs in the same transaction as MoveWorkOrderToMediation so an order
+	// in mediation always has its dispute in mediation. The status = 'reported' guard
+	// keeps this from re-opening a dispute the admin already resolved; a resolved
+	// dispute is rejected earlier by the handler's GetDisputeForAdmin status check, so
+	// in practice this only ever advances 'reported' -> 'in_mediation'.
+	MarkDisputeInMediation(ctx context.Context, id pgtype.UUID) error
+	// Stamps late_notified_at so the FR-045 late-delivery notice is sent once per
+	// order. The IS NULL guard keeps it idempotent if two overlapping ticker
+	// instances both scanned before either stamped (the advisory lock makes that
+	// rare, but the guard removes the race entirely). The stamp is never cleared,
+	// even when mediation later closes, so a resolved late order is not re-notified.
+	MarkLateNotified(ctx context.Context, arg MarkLateNotifiedParams) error
 	// MarkNotificationRead stamps read_at on one notification the caller owns. The
 	// account_id predicate is the ownership check: a caller marking another
 	// account's id affects zero rows, which the handler turns into a 404, so the
@@ -489,6 +616,13 @@ type Querier interface {
 	// the first read time, so re-marking an already-read notification still matches
 	// one row (idempotent 204) instead of a false 404.
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
+	// MarkProfileVerified flips the verified badge on approval (FR-008). It is called
+	// inside the same transaction as DecideVerificationRequest so an approved
+	// decision and the badge it grants land together or not at all. search.sql
+	// already selects verified, so the badge propagates to search results with no
+	// further change; a rejection never touches this, leaving the listing untouched
+	// (FR-010, FR-011).
+	MarkProfileVerified(ctx context.Context, arg MarkProfileVerifiedParams) error
 	// MemberRecorded reports whether member was already recorded under key in the
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
@@ -536,6 +670,32 @@ type Querier interface {
 	// RenewSession slides the expiry forward and records access time, implementing
 	// rolling 7-day renewal on each authenticated request.
 	RenewSession(ctx context.Context, arg RenewSessionParams) error
+	// Records the admin's mediation decision and closes the dispute (FR-067, FR-072).
+	// status moves to 'resolved'; result is the explicit outcome (cancelled /
+	// continued / confirmed) the resolution_complete CHECK now requires; admin_note
+	// carries the mandated note; allocation_reversed and liable_party_id record
+	// whether capacity was returned and which party bears the cancellation in the
+	// completion rate (FR-072); handled_by is the admin account and resolved_at the
+	// Clock instant. The status <> 'resolved' guard makes a repeat resolve a no-op so
+	// two admins cannot close the same dispute twice. The work-order side effects
+	// (cancel + reversal, restore, or force-confirm) run in the same transaction.
+	ResolveDispute(ctx context.Context, arg ResolveDisputeParams) (Dispute, error)
+	// Restarts the 7-day auto-confirm clock from the mediation-close instant on an
+	// order restored to 'shipped' by a 'continued' resolution (FR-068, data-model.md).
+	// auto_confirm_base_at becomes the mediation-close time, so AutoConfirmBase reads
+	// it instead of shipped_at and the window counts from mediation, not the original
+	// shipment; shipped_at is left as the historical shipment fact. confirm_warn_sent_at
+	// is reset to NULL so the buyer is warned afresh before the new deadline. Called
+	// only on the continued+shipped branch, where the restored status is 'shipped' so
+	// the auto_confirm_base_after_shipped CHECK (base >= shipped_at) holds.
+	RestartAutoConfirmClock(ctx context.Context, arg RestartAutoConfirmClockParams) error
+	// Returns a mediated order to a prior status when a dispute closes 'continued'
+	// (FR-067): the order rejoins its production chain at the status it left. The
+	// status = 'in_mediation' guard means only an order actually in mediation is
+	// restored, so a returned row confirms this call did the move. auto_confirm_base_at
+	// and confirm_warn_sent_at are left untouched here; RestartAutoConfirmClock handles
+	// them separately, and only when the restored status is 'shipped'.
+	RestoreWorkOrderStatus(ctx context.Context, arg RestoreWorkOrderStatusParams) (WorkOrder, error)
 	// SearchCandidates ranks published listings against the four hard criteria
 	// (FR-023..FR-025) and returns one keyset page. The query shape follows
 	// data-model.md section 10: score lives in the `ranked` CTE so the keyset WHERE
@@ -600,6 +760,12 @@ type Querier interface {
 	// role to an admin account, so the update fails loudly instead of silently
 	// corrupting the role model.
 	UpdateBusinessRoles(ctx context.Context, arg UpdateBusinessRolesParams) (UserAccount, error)
+	// UpdateCatalogItem applies a rename and/or an active flip to an existing item
+	// (FR-059). COALESCE keeps the current value when the caller omits a field, so a
+	// rename-only or deactivate-only PATCH leaves the other column untouched.
+	// Deactivating only flips active; it never touches listing rows that reference
+	// the item, so those listings stay discoverable (FR-060).
+	UpdateCatalogItem(ctx context.Context, arg UpdateCatalogItemParams) (UpdateCatalogItemRow, error)
 	// UpdateListing writes the owner-editable listing fields. Publication state is
 	// changed through SetListingPublished, not here, so a capacity edit never flips
 	// visibility by accident.
@@ -629,6 +795,11 @@ type Querier interface {
 	// twice without duplicating. created_at is supplied by the caller from the Clock
 	// since the column has no DB default.
 	UpsertCatalogItem(ctx context.Context, arg UpsertCatalogItemParams) error
+	// UpsertCatalogItemReturning resolves the catalog item an approved proposal
+	// yields (FR-061): it inserts the proposed name, or reactivates and returns the
+	// existing item when the same (type, name) is already present, and returns the
+	// id either way. The decision path needs the id to satisfy approved_yields_item.
+	UpsertCatalogItemReturning(ctx context.Context, arg UpsertCatalogItemReturningParams) (UpsertCatalogItemReturningRow, error)
 	// UpsertCity inserts a city or updates its name. The code is already normalized
 	// (dots stripped, four digits) by the seeder before it reaches here, so the
 	// city_code_format and city_belongs_to_province constraints hold.
