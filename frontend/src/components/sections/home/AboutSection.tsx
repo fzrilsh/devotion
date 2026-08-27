@@ -28,20 +28,27 @@ export default function AboutSection() {
         <section className="bg-deep-navy-500 h-full flex items-center justify-center mt-24 scroll-mt-24">
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="mb-8">
-                    <p className="text-sm sm:text-base font-bold tracking-wide text-industrial-orange-500 uppercase">Kenapa Devotion</p>
+                    <p className="text-sm sm:text-base font-bold tracking-wide text-white uppercase">Kenapa Devotion</p>
                     <h1 className="text-4xl max-w-xl text-white mt-4 font-bold leading-tight">Lebih dari sekadar direktori konveksi</h1>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
                     {aboutBenefit.map((item, index) => {
                         const Icon = item.icon;
                         return (
-                            <div className="group transition-all duration-200 hover:-translate-y-0.5 h-full flex flex-col gap-4" key={index}>
-                                <div className="p-4 rounded-xl w-fit bg-industrial-orange-100/20">
-                                    <Icon className="text-white group-hover:text-industrial-orange-500 text-xl" />
+                            <div
+                                key={index}
+                                className="group relative h-full flex flex-col gap-4 rounded-2xl border border-white/10 bg-white p-6 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-industrial-blue-500/40 hover:shadow-[0_20px_40px_-15px_rgba(217,119,87,0.15)]"
+                            >
+                                <div className="relative w-fit">
+                                    <div className="p-4 rounded-xl w-fit bg-industrial-blue-500/10 border border-industrial-blue-500/10 transition-colors duration-300 group-hover:border-industrial-blue-500/30">
+                                        <Icon className="text-deep-navy-500/80 text-xl transition-colors duration-300 group-hover:text-industrial-blue-500" />
+                                    </div>
                                 </div>
-                                <p className="font-bold text-white">{item.title}</p>
-                                <p className="text-sm text-justify text-slate-300 leading-relaxed">{item.description}</p>
+
+                                <p className="font-bold text-deep-navy-500 leading-snug text-xl">{item.title}</p>
+                                <span className="h-px w-6 bg-deep-navy-500/50 transition-all duration-300 group-hover:w-10 group-hover:bg-industrial-blue-500/50" />
+                                <p className="text-sm text-slate-500 leading-relaxed">{item.description}</p>
                             </div>
                         );
                     })}

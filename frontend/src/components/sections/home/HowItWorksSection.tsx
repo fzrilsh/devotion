@@ -34,7 +34,7 @@ export default function HowItWorksSection() {
                 <div className="mb-8">
                     <p className="text-sm sm:text-base font-bold tracking-wide text-deep-navy-500 uppercase">Cara Kerja</p>
                     <h1 className="text-4xl max-w-xl mt-4 font-bold leading-tight">
-                        <span className="text-industrial-orange-500">Empat langkah</span> menuju kerja sama produksi
+                        <span className="text-industrial-blue-500">Empat langkah</span> menuju kerja sama produksi
                     </h1>
                 </div>
 
@@ -48,7 +48,7 @@ export default function HowItWorksSection() {
                                     <div className="p-4 rounded-xl w-fit bg-deep-navy-500">
                                         <step.icon className="text-white text-xl" />
                                     </div>
-                                    <span className="text-industrial-orange-500 text-sm font-semibold tracking-widest">{step.num}</span>
+                                    <span className="text-industrial-blue-500 text-sm font-semibold tracking-widest">{step.num}</span>
                                 </div>
                                 <p className="font-bold">{step.title}</p>
                                 <p className="text-sm text-justify text-slate-500 leading-relaxed">{step.description}</p>

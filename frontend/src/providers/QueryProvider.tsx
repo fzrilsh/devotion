@@ -4,8 +4,9 @@ import type { ReactNode } from "react";
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            retry: 1,
-            refetchOnWindowFocus: false,
+            refetchOnMount: true,
+            refetchOnWindowFocus: true,
+            retry: 3,
         },
     },
 });

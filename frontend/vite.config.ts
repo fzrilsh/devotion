@@ -21,4 +21,14 @@ export default defineConfig({
             "@styles": path.resolve(import.meta.dirname, "./src/styles"),
         },
     },
+    server: {
+        port: 5173,
+        proxy: {
+            "/api": {
+                target: "http://localhost:8080",
+                changeOrigin: true,
+                secure: false,
+            },
+        },
+    },
 });

@@ -18,7 +18,7 @@ export default function Loading({ onComplete }: LoadingProps) {
         >
             <div className="flex flex-col items-center gap-3">
                 <motion.h1 className="text-deep-navy-500 font-extrabold text-4xl" {...fadeIn}>
-                    Devo<span className="text-industrial-orange-500">tion</span>
+                    Devo<span className="text-industrial-blue-500">tion</span>
                 </motion.h1>
 
                 <svg width="240" height="8" viewBox="0 0 240 8" className="overflow-visible">

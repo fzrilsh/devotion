@@ -1,9 +1,14 @@
-import AuthLayout from "@components/layout/AuthLayout";
+import { ApiError } from "@api/client";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRegister } from "@hooks/useAuth";
+import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
-import { useState } from "react";
-import { HiOutlineWrenchScrewdriver, HiOutlineClipboardDocumentCheck, HiOutlineArrowsRightLeft, HiCheck } from "react-icons/hi2";
-import { LuEyeOff, LuEye } from "react-icons/lu";
-import { useNavigate } from "react-router-dom";
+import { registerSchema, type RegisterForm } from "@schemas/auth";
+import { forwardRef, useState, type ReactNode } from "react";
+import { useForm } from "react-hook-form";
+import { HiOutlineArrowsRightLeft, HiOutlineClipboardDocumentCheck, HiOutlineWrenchScrewdriver, HiCheck } from "react-icons/hi2";
+import { LuBuilding2, LuEye, LuEyeOff, LuMail, LuPhone } from "react-icons/lu";
+import { Link, useNavigate } from "react-router-dom";
 
 const roles = [
     {
@@ -26,202 +31,388 @@ const roles = [
     },
 ];
 
-const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-orange-500 focus:ring-2 focus:ring-industrial-orange-500/10";
-const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
+const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
+const labelClassName = "sr-only";
+
+type ValidationError = {
+    field?: string;
+    message?: string;
+};
+
+function normalizePhone(value: string): string {
+    const digits = value.replace(/\D/g, "");
+
+    if (digits.startsWith("0")) {
+        return `+62${digits.slice(1)}`;
+    }
+
+    if (digits.startsWith("62")) {
+        return digits;
+    }
+
+    return digits;
+}
+
+function getProblemMessage(error: unknown): string {
+    if (error instanceof ApiError) {
+        const data = error.data;
+
+        if (typeof data === "object" && data !== null && "detail" in data && typeof data.detail === "string") {
+            if ("errors" in data && Array.isArray(data.errors)) {
+                const fieldMessages = data.errors
+                    .filter((item): item is ValidationError => typeof item === "object" && item !== null)
+                    .map((item) => item.message)
+                    .filter((message): message is string => Boolean(message));
+
+                if (fieldMessages.length > 0) {
+                    return `${data.detail} ${fieldMessages.join(" ")}`;
+                }
+            }
+
+            return data.detail;
+        }
+
+        if (typeof data === "object" && data !== null && "title" in data && typeof data.title === "string") {
+            return data.title;
+        }
+
+        if (error.status === 409) {
+            return "Email atau data akun tersebut sudah terdaftar.";
+        }
+
+        if (error.status === 429) {
+            return "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa saat.";
+        }
+    }
+
+    return "Pendaftaran gagal. Silakan coba lagi.";
+}
+
+const Field = forwardRef<
+    HTMLInputElement,
+    {
+        icon: React.ElementType;
+        id: string;
+        endAdornment?: ReactNode;
+    } & React.InputHTMLAttributes<HTMLInputElement>
+>(({ icon: Icon, id, endAdornment, className, ...props }, ref) => {
+    return (
+        <div className="relative">
+            <Icon aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-slate-400/35" />
+
+            <input ref={ref} id={id} {...props} className={cn(inputClassName, endAdornment ? "pr-11" : "", className ?? "")} />
+
+            {endAdornment}
+        </div>
+    );
+});
 
 export default function Register() {
     const navigate = useNavigate();
+    const registerMutation = useRegister();
+
     const [selectedRole, setSelectedRole] = useState("subkontraktor");
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
-    function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-        event.preventDefault();
-        navigate("/auth/verify-email");
+    const [provinceCode, setProvinceCode] = useState("");
+
+    const { provinces, cities } = useWilayah(provinceCode);
+
+    const {
+        register,
+        handleSubmit,
+        setError,
+        formState: { errors },
+    } = useForm<RegisterForm>({
+        resolver: zodResolver(registerSchema),
+        defaultValues: {
+            email: "",
+            phone: "",
+            business_name: "",
+            city_code: "",
+            password: "",
+            password_confirmation: "",
+            roles: {
+                subcontractor: true,
+                buyer: false,
+            },
+        },
+    });
+
+    function getRoles(role: string) {
+        return {
+            subcontractor: role === "subkontraktor" || role === "keduanya",
+            buyer: role === "pemberi-order" || role === "keduanya",
+        };
+    }
+
+    async function onSubmit(values: RegisterForm) {
+        try {
+            await registerMutation.mutateAsync({
+                email: values.email,
+                phone: normalizePhone(values.phone),
+                password: values.password,
+                business_name: values.business_name,
+                city_code: values.city_code,
+                roles: getRoles(selectedRole),
+            });
+
+            navigate("/auth/login");
+        } catch (error) {
+            setError("root", {
+                message: getProblemMessage(error),
+            });
+        }
     }
 
     return (
-        <AuthLayout>
-            <aside className="px-6 py-6 relative overflow-y-hidden">
-                <div className="bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 h-full w-full justify-between overflow-hidden flex-col gap-4 flex px-12 py-12 rounded-xl">
-                    <svg className="absolute inset-0 w-full h-full opacity-5 pointer-events-none flex items-center justify-center" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
-                                <path className="stroke-slate-300" d="M 64 0 L 0 0 0 64" fill="none" strokeWidth="0.5" />
-                            </pattern>
-                        </defs>
-                        <rect width="100%" height="100%" fill="url(#grid)" />
-                    </svg>
+        <div className="grid min-h-screen bg-white lg:grid-cols-2">
+            <aside className="relative hidden overflow-hidden bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 lg:flex lg:flex-col lg:justify-center lg:p-12">
+                <div aria-hidden className="pointer-events-none absolute inset-0">
+                    <div className="absolute -right-32 -top-32 size-112 rounded-full bg-industrial-blue-500/20 blur-3xl" />
+                    <div className="absolute -bottom-40 -left-24 size-96 rounded-full bg-industrial-blue-500/15 blur-3xl" />
+                    <div className="absolute right-16 top-1/3 size-40 rounded-3xl border border-white/10" />
+                    <div className="absolute bottom-24 right-40 size-24 rounded-full border border-white/10" />
+                    <div className="absolute left-1/3 top-16 size-16 rounded-2xl bg-white/5" />
+                </div>
 
-                    <div className="relative">
-                        <span className="text-sm font-semibold uppercase tracking-[0.2em] text-industrial-orange-400">Account Register</span>
-                    </div>
+                <div className="relative max-w-md">
+                    <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white">Satu platform untuk kapasitas produksi konveksi.</h1>
 
-                    <div className="relative">
-                        <h1 className="text-4xl text-white font-bold">
-                            Ketika kapasitas bertemu <br />
-                            kebutuhan, <span className="text-industrial-orange-500">peluang tumbuh bersama.</span>
-                        </h1>
-                        <p className="mt-5 text-justify max-w-xl text-slate-300">Devotion menghubungkan UMKM konveksi dengan kapasitas produksi menganggur bersama bisnis yang membutuhkan mitra terpercaya.</p>
-
-                        <div className="mt-8 flex items-center gap-3 text-sm text-slate-400">
-                            <div className="h-px w-10 bg-slate-600" />
-                            <span>Pendaftaran cepat dan mudah</span>
-                        </div>
-                    </div>
+                    <p className="mt-4 text-base leading-relaxed text-white/70">Devotion menghubungkan UMKM konveksi dengan kapasitas produksi menganggur bersama bisnis yang membutuhkan mitra terpercaya, dari pencarian hingga pesanan selesai.</p>
                 </div>
             </aside>
-            <section className="flex h-full w-full items-center justify-center px-6 py-6 overflow-y-auto">
-                <form onSubmit={handleSubmit} className="h-full w-full justify-center flex flex-col gap-4">
-                    <div>
-                        <h1 className="text-4xl font-bold">Buat akun Devotion</h1>
-                        <p className="text-slate-500">Bergabung dengan jaringan bisnis yang membantu kapasitas produksi bertemu peluang baru.</p>
-                    </div>
 
-                    <div>
-                        <p className="mb-3 text-sm font-semibold text-slate-500">Saya mendaftar sebagai:</p>
+            <main className="flex items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
+                <div className="w-full max-w-md">
+                    <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Buat akun Devotion</h2>
+                    <p className="mt-2 text-sm text-slate-500">Satu akun untuk mencari subkontraktor terpercaya maupun menawarkan kapasitas produksi Anda kepada pemberi order.</p>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                            {roles.map((role) => {
-                                const Icon = role.icon;
-                                const isSelected = selectedRole === role.id;
+                    <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4" noValidate>
+                        {errors.root?.message ? (
+                            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert" aria-live="polite">
+                                {errors.root.message}
+                            </div>
+                        ) : null}
 
-                                return (
-                                    <button key={role.id} className={cn("border rounded-xl p-4 relative transition-all duration-200", isSelected ? "bg-industrial-orange-100 border-industrial-orange-500" : "border-slate-300")} type="button" onClick={() => setSelectedRole(role.id)}>
-                                        {isSelected && (
-                                            <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full transition-all duration-200 bg-industrial-orange-500 text-white">
-                                                <HiCheck className="h-3 w-3" strokeWidth={2.5} />
-                                            </span>
-                                        )}
+                        <div>
+                            <p className="mb-2 text-sm font-semibold text-slate-700">Saya mendaftar sebagai:</p>
 
-                                        <div className={cn("mb-4 flex h-11 w-11 items-center justify-center rounded-lg transition-all duration-200", isSelected ? "bg-industrial-orange-500 text-white" : "bg-slate-100 text-slate-500")}>
-                                            <Icon className="h-5 w-5" />
-                                        </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                {roles.map((role) => {
+                                    const Icon = role.icon;
+                                    const isSelected = selectedRole === role.id;
 
-                                        <h3 className={cn("font-bold text-left transition-all duration-200", isSelected ? "text-slate-900" : "text-slate-700")}>{role.title}</h3>
-                                        <p className="mt-1 text-sm leading-5 text-slate-500 text-justify">{role.description}</p>
+                                    return (
+                                        <button
+                                            key={role.id}
+                                            type="button"
+                                            disabled={registerMutation.isPending}
+                                            onClick={() => setSelectedRole(role.id)}
+                                            className={cn(
+                                                "relative rounded-xl border p-3.5 text-left transition-all duration-200",
+                                                isSelected ? "border-industrial-blue-500 bg-industrial-blue-100" : "border-slate-300 bg-white hover:border-slate-400",
+                                                registerMutation.isPending && "cursor-not-allowed opacity-70",
+                                            )}
+                                        >
+                                            {isSelected ? (
+                                                <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-industrial-blue-500 text-white">
+                                                    <HiCheck className="h-3 w-3" strokeWidth={2.5} />
+                                                </span>
+                                            ) : null}
+
+                                            <div className={cn("mb-3 flex h-9 w-9 items-center justify-center rounded-lg transition-all duration-200", isSelected ? "bg-industrial-blue-500 text-white" : "bg-slate-100 text-slate-500")}>
+                                                <Icon className="h-5 w-5" />
+                                            </div>
+
+                                            <h3 className={cn("text-sm font-bold", isSelected ? "text-slate-900" : "text-slate-700")}>{role.title}</h3>
+
+                                            <p className="mt-1 text-xs leading-5 text-slate-500">{role.description}</p>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="business-name" className={labelClassName}>
+                                Nama Usaha
+                            </label>
+
+                            <Field
+                                icon={LuBuilding2}
+                                id="business-name"
+                                type="text"
+                                placeholder="Nama usaha"
+                                autoComplete="organization"
+                                disabled={registerMutation.isPending}
+                                className={cn(inputClassName, errors.business_name && "border-red-400 focus:border-red-500 focus:ring-red-500/20")}
+                                {...register("business_name")}
+                            />
+
+                            {errors.business_name?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.business_name.message}</p> : null}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label htmlFor="email" className={labelClassName}>
+                                    Email
+                                </label>
+
+                                <Field icon={LuMail} id="email" type="email" placeholder="Alamat email" autoComplete="email" disabled={registerMutation.isPending} className={cn(inputClassName, errors.email && "border-red-400 focus:border-red-500 focus:ring-red-500/20")} {...register("email")} />
+
+                                {errors.email?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.email.message}</p> : null}
+                            </div>
+
+                            <div>
+                                <label htmlFor="phone" className={labelClassName}>
+                                    Nomor HP
+                                </label>
+
+                                <Field
+                                    icon={LuPhone}
+                                    id="phone"
+                                    type="tel"
+                                    inputMode="tel"
+                                    placeholder="Nomor HP"
+                                    autoComplete="tel"
+                                    disabled={registerMutation.isPending}
+                                    className={cn(inputClassName, errors.phone && "border-red-400 focus:border-red-500 focus:ring-red-500/20")}
+                                    {...register("phone")}
+                                />
+
+                                {errors.phone?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.phone.message}</p> : null}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label htmlFor="province" className={labelClassName}>
+                                    Provinsi
+                                </label>
+
+                                <select
+                                    id="province"
+                                    value={provinceCode}
+                                    disabled={registerMutation.isPending}
+                                    onChange={(event) => {
+                                        setProvinceCode(event.target.value);
+                                    }}
+                                    className={cn(inputClassName, "cursor-pointer pl-4")}
+                                >
+                                    <option value="">Pilih provinsi</option>
+
+                                    {provinces.map((province) => (
+                                        <option key={province.code} value={province.code}>
+                                            {province.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="city" className={labelClassName}>
+                                    Kota / Kabupaten
+                                </label>
+
+                                <select id="city" disabled={registerMutation.isPending || !provinceCode || cities.length === 0} className={cn(inputClassName, "cursor-pointer pl-4", errors.city_code && "border-red-400 focus:border-red-500 focus:ring-red-500/20")} {...register("city_code")}>
+                                    <option value="">Pilih kota / kabupaten</option>
+
+                                    {cities.map((city) => (
+                                        <option key={city.code} value={city.code}>
+                                            {city.name}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {errors.city_code?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.city_code.message}</p> : null}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label htmlFor="password" className={labelClassName}>
+                                    Kata Sandi
+                                </label>
+
+                                <div className="relative">
+                                    <input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Kata sandi"
+                                        autoComplete="new-password"
+                                        disabled={registerMutation.isPending}
+                                        className={cn(inputClassName, "pl-4 pr-11", errors.password && "border-red-400 focus:border-red-500 focus:ring-red-500/20")}
+                                        {...register("password")}
+                                    />
+
+                                    <button
+                                        type="button"
+                                        disabled={registerMutation.isPending}
+                                        onClick={() => setShowPassword((prev) => !prev)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed"
+                                        aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                                    >
+                                        {showPassword ? <LuEyeOff className="h-5 w-5" /> : <LuEye className="h-5 w-5" />}
                                     </button>
-                                );
-                            })}
-                        </div>
-                    </div>
+                                </div>
 
-                    <div>
-                        <label htmlFor="business-name" className={labelClassName}>
-                            Nama Usaha
-                        </label>
+                                {errors.password?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.password.message}</p> : null}
+                            </div>
 
-                        <input id="business-name" name="business_name" type="text" placeholder="Masukkan nama usaha" autoComplete="organization" className={inputClassName} />
-                    </div>
+                            <div>
+                                <label htmlFor="password-confirmation" className={labelClassName}>
+                                    Konfirmasi Kata Sandi
+                                </label>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label htmlFor="email" className={labelClassName}>
-                                Email
-                            </label>
+                                <div className="relative">
+                                    <input
+                                        id="password-confirmation"
+                                        type={showPasswordConfirmation ? "text" : "password"}
+                                        placeholder="Ulangi kata sandi"
+                                        autoComplete="new-password"
+                                        disabled={registerMutation.isPending}
+                                        className={cn(inputClassName, "pl-4 pr-11", errors.password_confirmation && "border-red-400 focus:border-red-500 focus:ring-red-500/20")}
+                                        {...register("password_confirmation")}
+                                    />
 
-                            <input id="email" name="email" type="email" placeholder="contoh@email.com" autoComplete="email" className={inputClassName} />
-                        </div>
+                                    <button
+                                        type="button"
+                                        disabled={registerMutation.isPending}
+                                        onClick={() => setShowPasswordConfirmation((prev) => !prev)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed"
+                                        aria-label={showPasswordConfirmation ? "Sembunyikan konfirmasi kata sandi" : "Tampilkan konfirmasi kata sandi"}
+                                    >
+                                        {showPasswordConfirmation ? <LuEyeOff className="h-5 w-5" /> : <LuEye className="h-5 w-5" />}
+                                    </button>
+                                </div>
 
-                        <div>
-                            <label htmlFor="phone" className={labelClassName}>
-                                Nomor HP
-                            </label>
-
-                            <input id="phone" name="phone" type="tel" placeholder="08xxxxxxxxxx" autoComplete="tel" className={inputClassName} />
-                            <p className="mt-1.5 text-xs text-slate-400">Nomor ini akan digunakan untuk verifikasi.</p>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label htmlFor="province" className={labelClassName}>
-                                Provinsi
-                            </label>
-
-                            <select id="province" name="province" defaultValue="" className={cn(inputClassName, "cursor-pointer")}>
-                                <option value="" disabled>
-                                    Pilih provinsi
-                                </option>
-                                <option value="riau">Riau</option>
-                                <option value="sumatera-barat">Sumatera Barat</option>
-                                <option value="sumatera-utara">Sumatera Utara</option>
-                                <option value="jambi">Jambi</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label htmlFor="city" className={labelClassName}>
-                                Kota / Kabupaten
-                            </label>
-
-                            <select id="city" name="city" defaultValue="" className={cn(inputClassName, "cursor-pointer")}>
-                                <option value="" disabled>
-                                    Pilih kota / kabupaten
-                                </option>
-                                <option value="pekanbaru">Kota Pekanbaru</option>
-                                <option value="dumai">Kota Dumai</option>
-                                <option value="kampar">Kabupaten Kampar</option>
-                                <option value="siak">Kabupaten Siak</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label htmlFor="password" className={labelClassName}>
-                                Kata Sandi
-                            </label>
-
-                            <div className="relative">
-                                <input id="password" name="password" type={showPassword ? "text" : "password"} placeholder="Minimal 8 karakter" autoComplete="new-password" className={cn(inputClassName, "pr-11")} />
-
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword((prev) => !prev)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-slate-600"
-                                    aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
-                                >
-                                    {showPassword ? <LuEyeOff className="h-5 w-5" /> : <LuEye className="h-5 w-5" />}
-                                </button>
+                                {errors.password_confirmation?.message ? <p className="mt-1.5 text-sm text-red-600">{errors.password_confirmation.message}</p> : null}
                             </div>
                         </div>
 
-                        <div>
-                            <label htmlFor="password-confirmation" className={labelClassName}>
-                                Konfirmasi Kata Sandi
-                            </label>
+                        <button
+                            type="submit"
+                            disabled={registerMutation.isPending}
+                            className="w-full cursor-pointer rounded-xl bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 px-4 py-3.5 text-sm font-bold text-white transition-all duration-200 hover:from-deep-navy-600 hover:to-deep-navy-900 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                            {registerMutation.isPending ? "Memproses..." : "Daftar Sekarang"}
+                        </button>
+                    </form>
 
-                            <div className="relative">
-                                <input id="password-confirmation" name="password_confirmation" type={showPasswordConfirmation ? "text" : "password"} placeholder="Ulangi kata sandi" autoComplete="new-password" className={cn(inputClassName, "pr-11")} />
-
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPasswordConfirmation((prev) => !prev)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-slate-600"
-                                    aria-label={showPasswordConfirmation ? "Sembunyikan konfirmasi kata sandi" : "Tampilkan konfirmasi kata sandi"}
-                                >
-                                    {showPasswordConfirmation ? <LuEyeOff className="h-5 w-5" /> : <LuEye className="h-5 w-5" />}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" className="w-full bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 px-4 py-2 rounded-xl text-white font-semibold hover:bg-linear-to-b hover: cursor-pointer">
-                        Daftar Sekarang
-                    </button>
-
-                    <p className="text-sm text-slate-500 text-center mt-2 leading-6">
-                        Dengan mendaftar, Anda menyetujui <span className="text-industrial-orange-500 font-bold">Syarat & Ketentuan</span> serta <span className="text-industrial-orange-500 font-bold">Kebijakan Privasi</span> Devotion.
-                    </p>
-
-                    <p className="text-slate-500 text-center mt-2">
+                    <p className="mt-2 text-center text-sm text-slate-500">
                         Sudah punya akun?{" "}
-                        <a href="/auth/login" className="text-industrial-orange-500 font-bold cursor-pointer">
+                        <Link to="/auth/login" className="font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
                             Masuk
-                        </a>
+                        </Link>
                     </p>
-                </form>
-            </section>
-        </AuthLayout>
+
+                    <p className="mt-6 text-center text-sm leading-6 text-slate-500">
+                        Dengan mendaftar, Anda menyetujui <span className="font-bold text-industrial-blue-500">Syarat & Ketentuan</span> serta <span className="font-bold text-industrial-blue-500">Kebijakan Privasi</span> Devotion.
+                    </p>
+                </div>
+            </main>
+        </div>
     );
 }

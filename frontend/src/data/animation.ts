@@ -218,26 +218,3 @@ export const dropIn = {
         ease: easeOut,
     },
 };
-
-// animation.ts
-// ├── Fade
-// │   ├── fadeIn
-// │   ├── fadeScaleIn
-// │   └── fadeScaleSmall
-// │
-// ├── Slide
-// │   ├── slideUp
-// │   ├── slideDown
-// │   ├── slideLeft
-// │   ├── slideRight
-// │   └── slideScaleIn
-// │
-// └── Special
-//     ├── zoomIn
-//     ├── zoomOut
-//     ├── popIn
-//     ├── blurIn
-//     ├── blurSlideUp
-//     ├── rotateIn
-//     ├── flipIn
-//     └── dropIn

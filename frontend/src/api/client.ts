@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 export class ApiError extends Error {
     status: number;
@@ -13,13 +13,17 @@ export class ApiError extends Error {
 }
 
 export async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
+
+    // JSON bawaan; multipart dibiarkan tanpa Content-Type supaya fetch memasang boundary sendiri.
+    if (!(options.body instanceof FormData)) {
+        headers["Content-Type"] = "application/json";
+    }
+
     const response = await fetch(`${API_BASE_URL}${path}`, {
         ...options,
         credentials: "include",
-        headers: {
-            "Content-Type": "application/json",
-            ...options.headers,
-        },
+        headers,
     });
 
     if (!response.ok) {
@@ -34,6 +38,14 @@ export async function apiClient<T>(path: string, options: RequestInit = {}): Pro
         throw new ApiError(response.status, data);
     }
 
-    if (response.status === 204) return undefined as T;
+    if (response.status === 204 || response.status === 202) {
+        return undefined as T;
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.includes("application/json")) {
+        return undefined as T;
+    }
+
     return response.json();
 }

@@ -29,13 +29,13 @@ export default function HeroSection() {
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center *:content-center">
                     <div className="flex flex-col gap-4">
-                        <p className="text-sm sm:text-base font-bold tracking-wide text-industrial-orange-500 uppercase">Marketplace Subkontrak Konveksi B2B</p>
+                        <p className="text-sm sm:text-base font-bold tracking-wide text-industrial-blue-500 uppercase">Marketplace Subkontrak Konveksi B2B</p>
                         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight">
-                            Temukan kapasitas produksi yang siap membantu bisnis Anda <span className="text-industrial-orange-500">tumbuh.</span>
+                            Temukan kapasitas produksi yang siap membantu bisnis Anda <span className="text-industrial-blue-500">tumbuh.</span>
                         </h1>
                         <p className="text-base sm:text-lg text-slate-500 max-w-lg">Devotion menghubungkan UMKM konveksi yang membutuhkan kapasitas produksi tambahan dengan subkontraktor yang memiliki kapasitas tersedia. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                            <a href="/cari-tukang" className="inline-flex items-center justify-center rounded-xl bg-industrial-orange-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-orange-600 hover:-translate-y-0.5 transition-all duration-200">
+                            <a href="/cari-tukang" className="inline-flex items-center justify-center rounded-xl bg-industrial-blue-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-blue-600 hover:-translate-y-0.5 transition-all duration-200">
                                 Cari SubKontraktor
                             </a>
 
@@ -83,7 +83,7 @@ export default function HeroSection() {
                             </motion.div>
                             <motion.div initial={bottomCardInitial} whileInView={bottomCardWhileInView} transition={swapTransition} className="rounded-md overflow-hidden relative bg-deep-navy-500 min-h-12">
                                 <img src="https://images.unsplash.com/photo-1741275271362-bb17c416dca9?w=720&h=800&fit=crop&auto=format" alt="Pekerja konveksi menjahit di pabrik tekstil" className="w-full h-full object-cover" />
-                                <div className="absolute top-3 right-3 px-3 py-1 rounded-xl text-xs font-bold bg-industrial-orange-500 text-white flex items-center gap-1">
+                                <div className="absolute top-3 right-3 px-3 py-1 rounded-xl text-xs font-bold bg-industrial-blue-500 text-white flex items-center gap-1">
                                     <FaCheck /> Terverifikasi
                                 </div>
                             </motion.div>

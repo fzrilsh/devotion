@@ -36,7 +36,6 @@ export interface paths {
                         "application/json": components["schemas"]["RegisterResponse"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
                 /** @description Email atau nomor HP sudah terdaftar */
                 409: {
                     headers: {
@@ -55,6 +54,7 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                422: components["responses"]["ValidationFailed"];
                 429: components["responses"]["RateLimitExceeded"];
             };
         };
@@ -549,7 +549,7 @@ export interface paths {
                         "application/json": components["schemas"]["MyProfile"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
+                422: components["responses"]["ValidationFailed"];
             };
         };
         post?: never;
@@ -711,7 +711,7 @@ export interface paths {
                         "application/json": components["schemas"]["ItemProposal"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
+                422: components["responses"]["ValidationFailed"];
             };
         };
         delete?: never;
@@ -1035,7 +1035,15 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "LISTING_NOT_FOUND",
+                         *       "detail": "Belum ada listing kapasitas. Buat listing lebih dulu."
+                         *     }
+                         */
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
                 };
             };
         };
@@ -1108,15 +1116,23 @@ export interface paths {
                         "application/json": components["schemas"]["Listing"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
                 403: components["responses"]["Forbidden"];
-                /** @description Sudah punya listing */
+                /** @description Profil ini sudah punya listing */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        /**
+                         * @example {
+                         *       "code": "LISTING_ALREADY_EXISTS",
+                         *       "detail": "Profil ini sudah punya listing. Ubah listing yang ada, bukan membuat baru."
+                         *     }
+                         */
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
                 };
+                422: components["responses"]["ValidationFailed"];
             };
         };
         delete?: never;
@@ -1227,22 +1243,16 @@ export interface paths {
                         "application/json": components["schemas"]["AvailabilityPeriod"][];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
                 /** @description Bertabrakan dengan alokasi pesanan berjalan */
                 409: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        /**
-                         * @example {
-                         *       "code": "PERIOD_ALREADY_ALLOCATED",
-                         *       "detail": "Minggu 24 Agustus 2026 tidak dapat ditandai penuh karena sudah memakai 500 potong untuk pesanan berjalan."
-                         *     }
-                         */
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                422: components["responses"]["ValidationFailed"];
             };
         };
         post?: never;
@@ -2944,7 +2954,17 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
+                /** @description Seluruh ketergantungan sehat */
                 200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Health"];
+                    };
+                };
+                /** @description Setidaknya satu ketergantungan gagal; status degraded */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2976,7 +2996,7 @@ export interface components {
              * @description Kode mesin yang stabil untuk penanganan di klien.
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED";
+            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "LISTING_ALREADY_EXISTS" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED" | "READINESS_AFTER_DEADLINE";
             /** @description Penjelasan bahasa Indonesia yang dapat dikutip pengguna. */
             detail: string;
             instance?: string;
@@ -2996,6 +3016,11 @@ export interface components {
             /** @description Teruskan apa adanya pada permintaan berikutnya. Jangan diurai. */
             next_cursor?: string | null;
         };
+        /**
+         * @description Pendaftaran sekaligus membuat profil usaha dalam satu transaksi, sehingga
+         *     `city_code` wajib dan `GET /api/profile/me` tidak pernah 404. Minimal satu peran
+         *     usaha dipilih saat mendaftar (FR-001).
+         */
         RegisterRequest: {
             /** Format: email */
             email: string;
@@ -3004,10 +3029,15 @@ export interface components {
             /** Format: password */
             password: string;
             business_name: string;
+            /** @description Kode kota/kabupaten tempat usaha */
+            city_code: string;
+            /** @description Minimal satu bernilai true. */
+            roles: {
+                subcontractor: boolean;
+                buyer: boolean;
+            };
         };
         RegisterResponse: {
-            /** Format: uuid */
-            account_id: string;
             email_verification_required: boolean;
             phone_verification_required?: boolean;
         };
@@ -3030,12 +3060,15 @@ export interface components {
             profile_id?: string | null;
             is_admin?: boolean;
         };
+        /**
+         * @description Provinsi tidak dikirim: ia turunan dari `city.province_code`. Batas alamat tidak
+         *     disimpan, jadi tidak ada field `address`. Rentang koordinat menyalin constraint
+         *     `coordinates_within_indonesia` agar koordinat di luar Indonesia menjadi 422, bukan 500.
+         */
         ProfileUpdateRequest: {
             business_name?: string;
             description?: string;
-            province_code?: string;
             city_code?: string;
-            address?: string;
             /** Format: double */
             latitude?: number | null;
             /** Format: double */
@@ -3046,14 +3079,16 @@ export interface components {
             profile_id: string;
             business_name: string;
             description?: string | null;
-            province_code?: string | null;
             city_code?: string | null;
-            address?: string | null;
+            readonly city_name?: string | null;
+            readonly province_code?: string | null;
+            readonly province_name?: string | null;
             /** Format: double */
             latitude?: number | null;
             /** Format: double */
             longitude?: number | null;
-            verification_status: components["schemas"]["VerificationStatus"];
+            identity_verified: boolean;
+            verification_status?: components["schemas"]["VerificationStatus"] | null;
             reputation?: components["schemas"]["Reputation"];
         };
         PublicProfile: {
@@ -3061,10 +3096,17 @@ export interface components {
             profile_id: string;
             business_name: string;
             description?: string | null;
-            province_code?: string | null;
             city_code?: string | null;
+            city_name?: string | null;
+            province_code?: string | null;
+            province_name?: string | null;
+            /** Format: double */
+            latitude?: number | null;
+            /** Format: double */
+            longitude?: number | null;
             /** @description Status verifikasi identitas tidak memengaruhi skor pencarian (FR-034). */
             identity_verified: boolean;
+            listing?: components["schemas"]["Listing"] | null;
             reputation?: components["schemas"]["Reputation"];
         };
         /**
@@ -3142,27 +3184,44 @@ export interface components {
             items: components["schemas"]["VerificationRequest"][];
             pagination: components["schemas"]["Pagination"];
         };
+        /**
+         * @description Satu listing per profil. Kapasitas mingguan (FR-012/FR-014) adalah angka pusat;
+         *     item produk dan mesin adalah tabel gabung, mesin membawa jumlah unit (FR-076).
+         */
         ListingRequest: {
-            /** Format: uuid */
-            product_item_id: string;
-            /** Format: uuid */
-            machine_item_id: string;
+            /** @description Kapasitas produksi per minggu dalam satuan unit produk. */
+            weekly_capacity: number;
             /** @description Hari tenggat kesiapan produksi sejak kesepakatan. */
             readiness_lead_days: number;
-            note?: string;
+            /** @description Item produk daftar baku yang bisa dikerjakan. */
+            product_item_ids: string[];
+            /** @description Mesin yang dimiliki beserta jumlahnya. */
+            machines: {
+                /** Format: uuid */
+                item_id: string;
+                machine_count: number;
+            }[];
         };
         Listing: {
             /** Format: uuid */
             listing_id: string;
             /** Format: uuid */
             profile_id?: string;
-            /** Format: uuid */
-            product_item_id: string;
-            /** Format: uuid */
-            machine_item_id: string;
+            weekly_capacity: number;
             readiness_lead_days: number;
-            note?: string | null;
             published: boolean;
+            /** Format: date-time */
+            calendar_updated_at?: string | null;
+            /**
+             * Format: date
+             * @description Senin terjauh yang sudah punya periode
+             */
+            horizon_until?: string;
+            product_items: components["schemas"]["CatalogItem"][];
+            machines: {
+                item: components["schemas"]["CatalogItem"];
+                machine_count: number;
+            }[];
         };
         PeriodUpdateItem: {
             /**
@@ -3172,6 +3231,11 @@ export interface components {
             week_start: string;
             /** @description Kapasitas dalam satuan unit produk untuk minggu itu. */
             capacity: number;
+            /**
+             * @description Menandai minggu penuh (FR-017); tidak dapat ditandai penuh bila sudah ada alokasi aktif.
+             * @default false
+             */
+            marked_full: boolean;
         };
         AvailabilityPeriod: {
             /** Format: date */
@@ -3179,7 +3243,9 @@ export interface components {
             capacity: number;
             /** @description Sudah dialokasikan ke pesanan */
             allocated: number;
+            /** @description capacity - allocated */
             remaining: number;
+            marked_full: boolean;
         };
         SearchResult: {
             items: components["schemas"]["SearchCandidate"][];
@@ -3188,7 +3254,15 @@ export interface components {
         /**
          * @description Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
          *     jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
-         *     mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-030).
+         *     mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
+         *     Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
+         *     memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
+         *     kapasitas tersisa sampai deadline, jeda kesiapan mulai, serta reputasi (rating
+         *     rata-rata, jumlah pekerjaan selesai, tingkat penyelesaian) yang dihitung saat
+         *     dibaca, tidak disimpan sebagai kolom. Tingkat penyelesaian tunduk pada ambang
+         *     cukup-data reputation.enough_data (FR-073). stale_calendar menandai kalender yang
+         *     tidak diperbarui lebih dari 7 hari; penanda ini informatif dan tidak mengubah
+         *     urutan (FR-021).
          */
         SearchCandidate: {
             /** Format: uuid */
@@ -3197,7 +3271,25 @@ export interface components {
             profile_id: string;
             business_name: string;
             score: number;
+            city_code?: string | null;
+            city_name?: string | null;
+            /** @description Nama jenis mesin yang dimiliki listing (FR-027). */
+            machine_types?: string[];
+            /** @description Kapasitas mingguan listing (FR-027). */
+            weekly_capacity?: number;
+            /**
+             * Format: date
+             * @description Minggu kesiapan mulai
+             */
+            readiness_week?: string;
+            /** @description Jeda kesiapan mulai dalam hari (FR-027). */
+            readiness_lead_days?: number;
             total_capacity_until_deadline?: number;
+            /** @description Jumlah pekerjaan selesai (FR-048). */
+            completed_jobs?: number;
+            reputation?: components["schemas"]["Reputation"];
+            /** @description Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan. */
+            stale_calendar?: boolean;
             /** Format: double */
             distance_km?: number | null;
             identity_verified?: boolean;
@@ -3207,31 +3299,40 @@ export interface components {
                 detail?: string | null;
             }[];
         };
+        /**
+         * @description Satu request dikirim ke beberapa kandidat sekaligus dalam satu tindakan (FR-029),
+         *     jadi listing_ids memuat satu atau lebih listing tujuan. material wajib karena
+         *     setiap request menyebut bahan yang diminta.
+         */
         QuotaRequestCreate: {
-            /** Format: uuid */
-            listing_id: string;
+            /** @description Satu atau lebih listing kandidat tujuan request ini (FR-029). */
+            listing_ids: string[];
             /** Format: uuid */
             product_item_id: string;
             quantity: number;
+            material: string;
             /** Format: date */
             deadline: string;
             note?: string;
         };
         /** @enum {string} */
         CandidateStatus: "awaiting_reply" | "offered" | "rejected" | "expired" | "not_continued" | "agreed";
+        /**
+         * @description Satu request kuota dengan daftar kandidatnya. Status per kandidat ada di
+         *     candidates[].status, bukan di tingkat request, karena satu request dapat
+         *     berada pada status berbeda di tiap kandidat (FR-029, FR-030).
+         */
         QuotaRequestDetail: {
             /** Format: uuid */
             request_id: string;
             /** Format: uuid */
-            listing_id: string;
-            /** Format: uuid */
-            product_item_id?: string;
+            product_item_id: string;
             quantity: number;
+            material: string;
             /** Format: date */
             deadline: string;
             note?: string | null;
-            status: components["schemas"]["CandidateStatus"];
-            candidates?: components["schemas"]["RequestCandidate"][];
+            candidates: components["schemas"]["RequestCandidate"][];
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -3241,10 +3342,16 @@ export interface components {
             /** Format: uuid */
             candidate_id: string;
             /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            listing_id: string;
+            /** Format: uuid */
             profile_id: string;
             business_name?: string;
             status: components["schemas"]["CandidateStatus"];
             latest_offer?: components["schemas"]["Offer"];
+            /** @description Seluruh rantai penawaran kandidat terurut sequence naik, sehingga riwayat ronde sebelumnya tetap terlihat setelah counter-offer (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini. */
+            offers?: components["schemas"]["Offer"][];
         };
         Offer: {
             /** Format: uuid */
@@ -3260,6 +3367,8 @@ export interface components {
              */
             total_price: number;
             readiness_lead_days: number;
+            /** @description Nomor ronde penawaran mulai 1, naik tiap counter-offer, sehingga klien menampilkan ronde berurut tanpa bergantung pada urutan array. */
+            sequence: number;
             note?: string | null;
             /** Format: date-time */
             created_at: string;
@@ -3405,9 +3514,22 @@ export interface components {
         };
         Health: {
             /** @enum {string} */
-            status: "ok";
+            status: "ok" | "degraded";
+            version?: string;
             /** Format: date-time */
-            time?: string;
+            time: string;
+            dependencies: {
+                /** @enum {string} */
+                database: "ok" | "fail";
+                /** @enum {string} */
+                whatsapp: "connected" | "disconnected";
+                storage: {
+                    /** @enum {string} */
+                    status: "ok" | "near_full" | "full";
+                    used_mb: number;
+                    limit_mb: number;
+                };
+            };
         };
     };
     responses: {

@@ -6,7 +6,7 @@ const stats = [
 
 export default function TrustStatsSection() {
     return (
-        <section className="bg-industrial-orange-500 h-full flex items-center justify-center scroll-mt-24 relative">
+        <section className="bg-industrial-blue-500 h-full flex items-center justify-center scroll-mt-24 relative">
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center sm:text-left justify-items-center">
                     {stats.map((stat) => (
