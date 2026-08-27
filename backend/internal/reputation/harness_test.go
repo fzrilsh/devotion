@@ -111,6 +111,31 @@ func subconPrincipal(account pgtype.UUID) *httpx.Principal {
 	}
 }
 
+// adminPrincipal is the admin caller the T069 moderation route requires. The
+// account need not be a seeded row: the route reads only the id off the
+// principal to record hidden_by, and hidden_by references user_account, so a
+// hide test seeds a real admin account and passes its id here.
+func adminPrincipal(account pgtype.UUID) *httpx.Principal {
+	return &httpx.Principal{
+		Roles:   httpx.RoleAdmin,
+		Account: sqlcgen.UserAccount{ID: account},
+	}
+}
+
+// seedAdmin inserts a bare admin account and returns its id, for hidden_by which
+// references user_account.
+func seedAdmin(t *testing.T, pool *pgxpool.Pool, name string) pgtype.UUID {
+	t.Helper()
+	var acc pgtype.UUID
+	if err := pool.QueryRow(context.Background(),
+		`INSERT INTO user_account (email, phone, password_hash, role_admin, created_at, updated_at)
+		 VALUES ($1, $2, 'x', true, $3, $3) RETURNING id`,
+		name+"@contoh.test", nextPhone(), baseTime).Scan(&acc); err != nil {
+		t.Fatalf("seed admin %s: %v", name, err)
+	}
+	return acc
+}
+
 func seedRegion(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()

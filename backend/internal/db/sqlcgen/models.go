@@ -101,6 +101,49 @@ func (ns NullDeliveryStatus) Value() (driver.Value, error) {
 	return string(ns.DeliveryStatus), nil
 }
 
+type DisputeResult string
+
+const (
+	DisputeResultCancelled DisputeResult = "cancelled"
+	DisputeResultContinued DisputeResult = "continued"
+	DisputeResultConfirmed DisputeResult = "confirmed"
+)
+
+func (e *DisputeResult) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DisputeResult(s)
+	case string:
+		*e = DisputeResult(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DisputeResult: %T", src)
+	}
+	return nil
+}
+
+type NullDisputeResult struct {
+	DisputeResult DisputeResult
+	Valid         bool // Valid is true if DisputeResult is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDisputeResult) Scan(value interface{}) error {
+	if value == nil {
+		ns.DisputeResult, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DisputeResult.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDisputeResult) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DisputeResult), nil
+}
+
 type DisputeStatus string
 
 const (
@@ -701,6 +744,7 @@ type Dispute struct {
 	HandledBy          pgtype.UUID
 	ResolvedAt         pgtype.Timestamptz
 	CreatedAt          pgtype.Timestamptz
+	Result             NullDisputeResult
 }
 
 type ItemProposal struct {
@@ -900,6 +944,8 @@ type WorkOrder struct {
 	CancelledAt        pgtype.Timestamptz
 	CreatedAt          pgtype.Timestamptz
 	ConfirmWarnSentAt  pgtype.Timestamptz
+	LateNotifiedAt     pgtype.Timestamptz
+	AutoConfirmBaseAt  pgtype.Timestamptz
 }
 
 type WorkOrderStatusHistory struct {

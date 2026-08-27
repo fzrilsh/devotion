@@ -31,6 +31,30 @@ JOIN business_profile author ON author.id = r.reviewer_id
 JOIN work_order wo           ON wo.id = r.work_order_id
 WHERE r.id = $1;
 
+-- name: LockReviewForHide :one
+-- Locks one review row FOR UPDATE so the hide decision reads its current hidden
+-- state and writes the new one without a competing admin racing between the two
+-- (mirrors the lock-then-decide pattern the other admin moderation paths use).
+-- Returns just enough to decide: the id and whether it is already hidden.
+SELECT id, hidden
+FROM review
+WHERE id = $1
+FOR UPDATE;
+
+-- name: HideReview :exec
+-- Marks one review hidden with the admin's identity, the moment, and the reason
+-- (FR-050). The hiding_complete CHECK enforces that all three accompany hidden;
+-- the handler fills them and rejects an empty reason first, so a caller sees a
+-- readable validation error rather than a raw constraint violation. Setting
+-- hidden true is the whole action: the average and the public list both filter
+-- NOT hidden already, so the row leaves both at once with no second rule.
+UPDATE review
+SET hidden = true,
+    hidden_by = $2,
+    hidden_at = $3,
+    hidden_reason = $4
+WHERE id = $1;
+
 -- name: ListReviewsForProfile :many
 -- One profile's received reviews, newest first, keyset paginated on
 -- (created_at, id) so the order is stable across pages (FR-048). Hidden reviews

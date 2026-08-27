@@ -54,6 +54,8 @@ func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 
 	gate := httpx.RequireRole(auth, httpx.RoleSubcontractor, httpx.RoleBuyer)
 	r.Gated("POST /api/master/proposals", gate, s.handleCreateProposal)
+
+	s.registerAdmin(r, auth)
 }
 
 // catalogItem is the CatalogItem response body. The field names follow the

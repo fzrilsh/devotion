@@ -13,6 +13,12 @@ import (
 // setting, so a misconfigured server cannot silently shift them.
 var jakarta = mustLoadJakarta()
 
+// Jakarta is the application time zone, exported for domain code that must
+// reduce a timestamp to its WIB calendar day (for example the past-deadline
+// predicate). It is the same location every function here uses, so callers
+// cannot pick a different zone and drift from the week boundaries.
+var Jakarta = jakarta
+
 func mustLoadJakarta() *time.Location {
 	loc, err := time.LoadLocation("Asia/Jakarta")
 	if err != nil {

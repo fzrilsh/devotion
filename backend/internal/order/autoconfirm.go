@@ -80,7 +80,9 @@ func (s *Service) sendAutoConfirmWarnings(ctx context.Context, dueBefore, warnBe
 			}
 			// The notice names the date the order will close, computed from the same
 			// AutoConfirmAt the closure uses, so the buyer sees the exact deadline.
-			deadline := platform.FormatDateID(AutoConfirmAt(row.ShippedAt.Time))
+			// The query already returns the effective base (COALESCE of
+			// auto_confirm_base_at and shipped_at), so no further resolution here.
+			deadline := platform.FormatDateID(AutoConfirmAt(row.AutoConfirmBase.Time))
 			link := "/work-orders/" + uuidString(row.ID)
 			return s.notifier.Enqueue(ctx, tx, row.BuyerAccount,
 				sqlcgen.EventTypeConfirmationDueApproaching,

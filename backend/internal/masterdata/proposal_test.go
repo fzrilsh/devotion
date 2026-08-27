@@ -210,9 +210,8 @@ func TestDecideProposal_NotifiesProposer_FR061(t *testing.T) {
 	}
 
 	adminID := seedAccount(t, h.pool, "admin@contoh.test", "628110000010", false)
-	itemID := seedCatalogItem(t, h.pool, sqlcgen.ItemTypeProduct, "Rok Plisket")
 
-	view, err := h.svc.DecideProposal(ctx, proposalID, adminID, true, nil, itemID)
+	view, err := h.svc.DecideProposal(ctx, proposalID, adminID, true, nil)
 	if err != nil {
 		t.Fatalf("DecideProposal: %v", err)
 	}

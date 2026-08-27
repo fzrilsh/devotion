@@ -198,6 +198,7 @@ func runServe(ctx context.Context, args []string) error {
 	sched := scheduler.New(pool, clock, log)
 	sched.Register(notif.DeliverJob())
 	sched.Register(orderSvc.AutoConfirmJob())
+	sched.Register(orderSvc.LateOrderJob())
 	go sched.Start(ctx)
 
 	dist, err := fs.Sub(web.FS, "webdist")

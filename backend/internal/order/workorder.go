@@ -39,6 +39,8 @@ func (s *Service) registerWorkOrder(r *httpx.Router, auth httpx.Authenticator) {
 	s.registerCancel(r, auth)
 	s.registerPayment(r, auth)
 	s.registerDispute(r, auth)
+	s.registerLateOrder(r, auth)
+	s.registerMediation(r, auth)
 }
 
 // handleWorkOrderDetail returns one work order's full detail (FR-038, FR-039). The
@@ -150,7 +152,7 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 	// (FR-068, FR-070).
 	effStatus := row.Status
 	if row.Status == sqlcgen.WorkOrderStatusShipped && row.ShippedAt.Valid &&
-		IsAutoConfirmDue(row.ShippedAt.Time, s.clock.Now(), row.HasOpenDispute) {
+		IsAutoConfirmDue(AutoConfirmBase(row.AutoConfirmBaseAt, row.ShippedAt), s.clock.Now(), row.HasOpenDispute) {
 		effStatus = sqlcgen.WorkOrderStatusConfirmed
 	}
 
@@ -175,7 +177,7 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 	// buyer sees when it will close; once the window has passed the order already
 	// reads as confirmed and the field is dropped (FR-068).
 	if effStatus == sqlcgen.WorkOrderStatusShipped && row.ShippedAt.Valid {
-		at := AutoConfirmAt(row.ShippedAt.Time)
+		at := AutoConfirmAt(AutoConfirmBase(row.AutoConfirmBaseAt, row.ShippedAt))
 		view.AutoConfirmAt = &at
 	}
 	return view, nil
@@ -448,7 +450,7 @@ type workOrderList struct {
 func (s *Service) listItemView(wo sqlcgen.ListWorkOrdersForPartyRow) workOrderView {
 	effStatus := wo.Status
 	if wo.Status == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid &&
-		IsAutoConfirmDue(wo.ShippedAt.Time, s.clock.Now(), wo.HasOpenDispute) {
+		IsAutoConfirmDue(AutoConfirmBase(wo.AutoConfirmBaseAt, wo.ShippedAt), s.clock.Now(), wo.HasOpenDispute) {
 		effStatus = sqlcgen.WorkOrderStatusConfirmed
 	}
 	view := workOrderView{
@@ -467,7 +469,7 @@ func (s *Service) listItemView(wo sqlcgen.ListWorkOrdersForPartyRow) workOrderVi
 		Payments:               []paymentView{},
 	}
 	if effStatus == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid {
-		at := AutoConfirmAt(wo.ShippedAt.Time)
+		at := AutoConfirmAt(AutoConfirmBase(wo.AutoConfirmBaseAt, wo.ShippedAt))
 		view.AutoConfirmAt = &at
 	}
 	return view

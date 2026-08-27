@@ -644,7 +644,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: tambah jenis produk dan pastikan langsung dapat dipilih; setujui dan tolak satu pengajuan verifikasi, pastikan listing tetap tayang pada kedua kasus.
 
-- [ ] T067 [P] [US7] [BE] Verifikasi identitas
+- [x] T067 [P] [US7] [BE] Verifikasi identitas
   **Modul**: `backend/internal/{account,admin}/`
   **FR**: FR-006 sampai FR-011
   **Kemampuan**: pengajuan dengan dua berkas, antrean admin, setujui atau tolak beralasan, lencana, pengajuan ulang setelah penolakan
@@ -652,28 +652,28 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu pengajuan menunggu per profil; penolakan wajib beralasan; listing tetap tayang apa pun keputusannya
   **Hati-hati**: verifikasi **bukan gerbang**. Ini menyimpang dari kriteria penerimaan dokumen sumber yang menempatkan status "Menunggu Verifikasi" pada alur listing [1]; penyimpangannya sudah tercatat di Assumptions spec.
 
-- [ ] T068 [P] [US7] [BE] Pengelolaan daftar baku
+- [x] T068 [P] [US7] [BE] Pengelolaan daftar baku
   **Modul**: `backend/internal/{masterdata,admin}/`
   **FR**: FR-059, FR-060, FR-061
   **Kemampuan**: tambah, ubah nama, nonaktifkan item; keputusan atas usulan pengguna
   **Dependency**: prasyarat T019, T020
   **Selesai bila**: item nonaktif tidak dapat dipilih untuk listing baru, sementara listing yang sudah memakainya tetap utuh dan tetap dapat ditemukan
 
-- [ ] T069 [P] [US7] [BE] Moderasi ulasan
+- [x] T069 [P] [US7] [BE] Moderasi ulasan
   **Modul**: `backend/internal/admin/`
   **FR**: FR-050
   **Kemampuan**: sembunyikan ulasan dengan alasan, tercatat beserta identitas admin dan waktunya
   **Dependency**: prasyarat T020, T062
   **Selesai bila**: ulasan hilang dari profil publik dan rata-rata rating berubah; `alasan_penyembunyian` wajib terisi
 
-- [ ] T070 [P] [US7] [BE] Pemantauan pesanan telat
+- [x] T070 [P] [US7] [BE] Pemantauan pesanan telat
   **Modul**: `backend/internal/admin/` + scheduler
   **FR**: FR-045
   **Kemampuan**: daftar pesanan melewati deadline, notifikasi ke kedua pihak
   **Dependency**: prasyarat T018, T020, T053
   **Selesai bila**: pesanan berstatus Produksi yang melewati deadline muncul di daftar admin
 
-- [ ] T071 [US7] [BE] Mediasi sengketa
+- [x] T071 [US7] [BE] Mediasi sengketa
   **Modul**: `backend/internal/admin/`
   **FR**: FR-046, FR-067
   **Kemampuan**: tandai Dalam Mediasi, baca riwayat lengkap termasuk alokasi kapasitas, catatan pembayaran, dan perbedaan pernyataan; tutup mediasi
@@ -681,7 +681,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: penutupan sebagai dibatalkan **wajib** menyertakan keputusan pengembalian alokasi, pihak penanggung, dan catatan admin; tanpa ketiganya ditolak
   **Hati-hati**: constraint `penyelesaian_lengkap` menegakkan ini di basis data. Antarmuka harus meminta ketiganya secara eksplisit, bukan memberi nilai bawaan. Mediasi admin adalah jalur yang dipilih untuk fase awal karena penanganan sengketa legal formal menuntut tim hukum dan asuransi, dan tanpa escrow, ia kehilangan salah satu daya paksanya [1].
 
-- [ ] T072 [P] [US7] [BE] Test admin
+- [x] T072 [P] [US7] [BE] Test admin
   **Modul**: `backend/internal/admin/`
   **FR**: FR-007, FR-050, FR-060, FR-067
   **Kemampuan**: non-admin ditolak pada setiap endpoint admin; item nonaktif tidak merusak listing; mediasi tanpa keputusan lengkap ditolak; berkas identitas milik usaha lain tidak dapat diakses

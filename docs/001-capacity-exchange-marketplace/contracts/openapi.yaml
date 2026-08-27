@@ -1322,7 +1322,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean pengajuan verifikasi identitas
-      x-fr: [FR-008, FR-081]
+      x-fr: [FR-007]
       parameters:
         - name: status
           in: query
@@ -1340,7 +1340,7 @@ paths:
       tags: [admin]
       summary: Setujui atau tolak pengajuan verifikasi
       description: Penolakan menyertakan alasan yang tampil ke pemohon (FR-008).
-      x-fr: [FR-008]
+      x-fr: [FR-007, FR-008]
       parameters:
         - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1364,7 +1364,7 @@ paths:
     get:
       tags: [admin]
       summary: Kelola daftar baku produk dan mesin
-      x-fr: [FR-057]
+      x-fr: [FR-059]
       parameters:
         - name: kind
           in: query
@@ -1380,7 +1380,7 @@ paths:
     post:
       tags: [admin]
       summary: Tambah item daftar baku
-      x-fr: [FR-057]
+      x-fr: [FR-059]
       requestBody:
         required: true
         content:
@@ -1402,8 +1402,8 @@ paths:
     patch:
       tags: [admin]
       summary: Ubah atau nonaktifkan item daftar baku
-      description: Menonaktifkan item tidak menghapus listing lama yang memakainya (FR-057).
-      x-fr: [FR-057]
+      description: Menonaktifkan item tidak menghapus listing lama yang memakainya, dan listing itu tetap dapat ditemukan lewat pencarian (FR-060).
+      x-fr: [FR-059, FR-060]
       parameters:
         - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1426,7 +1426,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean usulan item dari pengguna
-      x-fr: [FR-058]
+      x-fr: [FR-061]
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -1442,8 +1442,8 @@ paths:
     post:
       tags: [admin]
       summary: Setujui atau tolak usulan item
-      description: Persetujuan memasukkan item ke daftar baku (FR-058).
-      x-fr: [FR-058]
+      description: Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
+      x-fr: [FR-061, FR-074]
       parameters:
         - { name: proposalId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1505,7 +1505,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean sengketa
-      x-fr: [FR-046, FR-071]
+      x-fr: [FR-046]
       parameters:
         - name: status
           in: query
@@ -1524,8 +1524,8 @@ paths:
     post:
       tags: [admin]
       summary: Tandai sengketa masuk mediasi
-      description: Pesanan terkait berpindah ke status "dalam mediasi" (FR-071).
-      x-fr: [FR-071]
+      description: Pesanan terkait berpindah ke status "dalam mediasi" (FR-046).
+      x-fr: [FR-046]
       parameters:
         - { name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1542,8 +1542,8 @@ paths:
       description: |
         Hasil menentukan nasib pesanan dan alokasi kapasitasnya. Bila dibatalkan, seluruh
         alokasi dibalik. Admin menetapkan pihak yang menanggung agar tingkat penyelesaian
-        adil (FR-071, FR-072).
-      x-fr: [FR-071, FR-072]
+        adil (FR-067, FR-072).
+      x-fr: [FR-067, FR-072]
       parameters:
         - { name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:

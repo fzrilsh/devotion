@@ -132,17 +132,25 @@ func (s *Service) createProposal(ctx context.Context, accountID pgtype.UUID, in 
 	return newProposalView(p), nil
 }
 
+// errAlreadyDecided signals a decision attempted on a proposal that is no longer
+// pending. It is raised inside the decision transaction after the row lock
+// reveals a terminal status, rolling the transaction back so a second decision
+// never overwrites the first (the same pattern the verification admin path uses).
+var errAlreadyDecided = errors.New("masterdata: usulan sudah diputuskan")
+
 // DecideProposal applies an admin decision to a pending proposal and notifies
 // the proposer, satisfying the FR-061 done-condition that the proposer is told
 // when their proposal is decided. The decision and the notification row share
 // one transaction (FR-086): the row is written inside tx via notif.Enqueue, so
 // a rolled-back decision leaves no orphan notification, and delivery to email
 // and WhatsApp happens later in the scheduler where a failure cannot fail this
-// transaction. approved carries the resulting catalog item id (required when
-// approved by the approved_yields_item constraint); note is the optional admin
-// reason stored in admin_note. The HTTP admin surface that calls this is T068
-// (FR-058); this method exists now so the notification is testable.
-func (s *Service) DecideProposal(ctx context.Context, proposalID, adminAccountID pgtype.UUID, approved bool, note *string, itemID pgtype.UUID) (proposalView, error) {
+// transaction. On approval the catalog item is resolved (inserted or an existing
+// same-name item reactivated) inside the same transaction so approved_yields_item
+// holds without the caller pre-creating the row. note is the optional admin
+// reason stored in admin_note. The proposal is locked FOR UPDATE first so two
+// admins deciding the same proposal serialize and the second sees the terminal
+// status the first committed, returning errAlreadyDecided.
+func (s *Service) DecideProposal(ctx context.Context, proposalID, adminAccountID pgtype.UUID, approved bool, note *string) (proposalView, error) {
 	status := sqlcgen.ProposalStatusRejected
 	if approved {
 		status = sqlcgen.ProposalStatusApproved
@@ -152,9 +160,28 @@ func (s *Service) DecideProposal(ctx context.Context, proposalID, adminAccountID
 	err := db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 		q := sqlcgen.New(tx)
 
-		loaded, err := q.GetItemProposalByID(ctx, proposalID)
+		loaded, err := q.LockItemProposal(ctx, proposalID)
 		if err != nil {
 			return err
+		}
+		if loaded.Status != sqlcgen.ProposalStatusPending {
+			return errAlreadyDecided
+		}
+
+		// On approval, resolve the catalog item the proposal yields: insert the
+		// proposed name, or reactivate an existing same-name item, and carry its id
+		// so approved_yields_item is satisfied. A rejection leaves item_id null.
+		var itemID pgtype.UUID
+		if approved {
+			item, err := q.UpsertCatalogItemReturning(ctx, sqlcgen.UpsertCatalogItemReturningParams{
+				Type:      loaded.Type,
+				Name:      loaded.ProposedName,
+				CreatedAt: tstz(s.clock.Now()),
+			})
+			if err != nil {
+				return err
+			}
+			itemID = item.ID
 		}
 
 		decided, err := q.DecideItemProposal(ctx, sqlcgen.DecideItemProposalParams{
