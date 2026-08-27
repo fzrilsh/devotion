@@ -523,7 +523,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: jalankan seluruh transisi status; pada pesanan kedua, biarkan status Dikirim melewati tujuh hari dan pastikan tertutup otomatis.
 
-- [ ] T053 [US5] [BE] Mesin keadaan pesanan
+- [x] T053 [US5] [BE] Mesin keadaan pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-038, FR-039, FR-044
   **Kemampuan**: transisi sesuai diagram `data-model.md` §7; riwayat status dengan waktu dan pelaku; penolakan transisi melompat beserta daftar transisi yang diizinkan
@@ -706,7 +706,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 ## Phase 10: Polish dan Penyiapan Demo
 
-- [ ] T075 [BE] Data uji
+- [x] T075 [BE] Data uji
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `seed:test-data` menyiapkan 50 usaha, kandidat 500 potong/minggu jeda 0 hari untuk skenario 3.000 potong, kandidat berjeda 14 dan 21 hari untuk memverifikasi minggu kesiapan, kandidat berkapasitas 200/minggu untuk skenario deadline lima bulan, kalender basi 8 hari, request kedaluwarsa, pesanan Dikirim 6 hari dan 8 hari lalu, pesanan telat, dua pengajuan verifikasi, usaha dengan hanya 2 pesanan; `reset:test-data` memulihkan
   **Dependency**: prasyarat T019, T041, T055, T067

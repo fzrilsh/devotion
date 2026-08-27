@@ -87,6 +87,33 @@ perubahannya.
   sebelum `account.New` agar bisa dibagi. (FR-001)
 
 ### Ditambahkan
+- Subcommand `seed:test-data` dan `reset:test-data` (T075). `seed:test-data`
+  menyiapkan fixture demo deterministik: 50 usaha pengisi untuk paginasi
+  pencarian, empat listing sorotan (kapasitas 500 jeda 0 hari untuk skenario
+  3.000 potong, jeda 14 dan 21 hari untuk minggu kesiapan, kapasitas 200 untuk
+  tenggat lima bulan), satu listing kalender basi 8 hari, satu request kuota
+  kedaluwarsa tanpa kandidat, tiga pesanan terikat tenggat (dikirim 6 hari,
+  dikirim 8 hari, satu telat), dua pengajuan verifikasi menunggu, dan satu usaha
+  dengan hanya dua pesanan selesai sehingga nilai penyelesaian ditahan.
+  `reset:test-data` mengosongkan seluruh tabel fixture lewat satu TRUNCATE
+  CASCADE, menyisakan baris wilayah dan katalog. Baris terikat tenggat ditulis
+  sudah dalam keadaan sasaran (`shipped_at` dipatok Clock.Now() dikurangi 6 atau
+  8 hari), bukan dengan menggeser waktu, sehingga jendela konfirmasi otomatis
+  tujuh hari jatuh di sisi yang benar tanpa menunggu. Kedua perintah menolak
+  berjalan saat APP_ENV=production dan seluruh akun uji memakai domain `.test`.
+  Data uji tidak memuat data pribadi orang sungguhan: nomor telepon dan nomor
+  identitas dibuat sintetis. Uji `_T075` memverifikasi penolakan produksi lewat
+  `guardNotProduction`, kehadiran seluruh fixture, domain `.test`, dan reset yang
+  bersih terhadap skema Postgres terisolasi memakai Clock yang disuntikkan.
+  `seedTestData` memanggil `resetTestData` lebih dulu sehingga dijalankan dua
+  kali tidak menduplikasi, sama seperti idempotensi seed lain lewat upsert; uji
+  `TestSeedTestData_Idempotent_T075` membuktikannya. Pembelahan tenggat pesanan
+  dikirim diperiksa lewat fungsi domain yang sama dengan penjadwal
+  (`order.IsAutoConfirmDue` atas `order.AutoConfirmBase`), bukan query ad-hoc:
+  `TestSeedTestData_ShippedOrderAutoConfirmWindow_FR068` menegaskan pesanan
+  dikirim 6 hari belum jatuh tempo dan yang 8 hari sudah. Kandidat kapasitas 500
+  jeda 0 hari terbukti melewati kriteria kapasitas untuk 3.000 potong deadline
+  delapan minggu lewat `TestSeedTestData_CapacityCandidateMeetsLargeOrder_SC019`.
 - Uji cakupan sisi admin (T072, FR-007, FR-050, FR-060, FR-067). Ditinjau lebih
   dulu bahwa penolakan peran nyata lewat router sudah ada untuk keseluruhan tiga
   belas endpoint admin (WhatsApp status, tiga rute sengketa, pesanan telat, tiga

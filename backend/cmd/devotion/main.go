@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -61,6 +60,3 @@ func usage(w *os.File) {
 		fmt.Fprintln(w, "  "+name)
 	}
 }
-
-// errNotImplemented marks a subcommand whose body arrives in a later branch.
-var errNotImplemented = errors.New("subcommand belum diimplementasikan")
