@@ -6,6 +6,30 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diubah
+- `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
+  pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin
+  membaca riwayat lengkap pesanan yang ia bukan pihaknya, tetapi tidak ada jalan
+  menuju riwayat itu: guard pihak menjawab 404, dan `GET /api/work-orders` selalu
+  kosong untuk admin karena akun admin tidak punya baris `business_profile`.
+  Guard pihak dilonggarkan lewat satu pemeriksaan peran, tanpa path baru dan
+  tanpa tipe respons baru, sehingga tipe TypeScript hasil generate tidak berubah.
+  Akses admin baca saja: `POST /api/work-orders/{workOrderId}/status` tetap
+  khusus subkontraktor, dan admin mengubah keadaan lewat penyelesaian sengketa.
+  Pemanggil lain tetap menerima 404, bukan 403.
+- `GET /api/admin/late-orders` mengembalikan skema ringkas `LateOrderList` berisi
+  `LateOrderSummary`, bukan lagi `WorkOrderList` berisi `WorkOrderDetail`.
+  **Perubahan yang memutus kompatibilitas** bagi kode frontend yang membaca
+  `allocations`, `status_history`, `payments`, `product_item_id`,
+  `readiness_lead_days`, `allowed_transitions`, `self_cancellable`, atau
+  `auto_confirm_at` dari baris daftar telat. Kueri `ListLateWorkOrdersForAdmin`
+  membaca baris pesanan saja, tanpa join ke `business_profile` maupun
+  `quota_request`, jadi lima kolom pertama tidak pernah bisa diisi dan sisanya
+  dikirim sebagai array kosong: bentuk lama menjanjikan data yang tidak ada dan
+  membuat pesanan tampak tanpa riwayat. Ringkasan sekarang memuat delapan kolom
+  yang benar-benar dibaca kueri, dan frontend mengikuti `work_order_id` ke
+  `GET /api/work-orders/{id}` dengan sesi admin yang sama untuk detailnya.
+
 ### Ditambahkan
 - Runbook VPS dilengkapi menjadi 16 langkah utuh (T077): pasang compose,
   menyalakan dan memverifikasi migrasi, seed wilayah dan daftar baku serta
