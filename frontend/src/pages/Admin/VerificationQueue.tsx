@@ -54,7 +54,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
         }
 
         try {
-            await decideMutation.mutateAsync({ requestId: request.request_id, decision, reason: reason.trim() || undefined });
+            await decideMutation.mutateAsync({ requestId: request.request_id, data: { decision, reason: reason.trim() || undefined } });
             setRejectOpen(false);
             setReason("");
         } catch (err) {

@@ -1,10 +1,45 @@
 import Loading from "@components/common/Loading";
 import { useWhatsAppStatus } from "@hooks/useAdmin";
+import QRCode from "qrcode";
+import { useEffect, useState } from "react";
 import { LuMessageCircle, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
 
 export default function AdminWhatsApp() {
     const statusQuery = useWhatsAppStatus();
     const status = statusQuery.data;
+    const [qrResult, setQrResult] = useState<{ value: string; image: string | null; error: boolean } | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const qrValue = status?.qr_code?.trim();
+
+        if (!qrValue || qrValue.startsWith("data:image/")) {
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        QRCode.toDataURL(qrValue, {
+            errorCorrectionLevel: "M",
+            margin: 2,
+            width: 448,
+            color: { dark: "#102a43", light: "#ffffff" },
+        })
+            .then((dataUrl) => {
+                if (!cancelled) setQrResult({ value: qrValue, image: dataUrl, error: false });
+            })
+            .catch(() => {
+                if (!cancelled) setQrResult({ value: qrValue, image: null, error: true });
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status?.qr_code]);
+
+    const qrValue = status?.qr_code?.trim();
+    const qrImage = qrValue?.startsWith("data:image/") ? qrValue : qrResult?.value === qrValue ? qrResult?.image : null;
+    const qrError = qrResult?.value === qrValue && Boolean(qrResult?.error);
 
     return (
         <div className="mx-auto space-y-6">
@@ -62,7 +97,7 @@ export default function AdminWhatsApp() {
 
                             <p className="mt-2 text-xs leading-5 text-slate-500">Pindai kode QR ini dari aplikasi WhatsApp pada perangkat layanan (menu Perangkat Tertaut).</p>
 
-                            <img src={`data:image/png;base64,${status.qr_code}`} alt="Kode QR penautan sesi WhatsApp" className="mx-auto mt-4 size-56 rounded-xl border border-slate-200" />
+                            {qrImage ? <img src={qrImage} alt="Kode QR penautan sesi WhatsApp" className="mx-auto mt-4 size-56 rounded-xl border border-slate-200" /> : qrError ? <p className="mt-4 text-sm text-red-600">Kode QR tidak dapat dibuat. Muat ulang status untuk mencoba lagi.</p> : <p className="mt-4 text-sm text-slate-500">Menyiapkan kode QR...</p>}
 
                             <p className="mt-3 text-[11px] text-slate-400">Kode QR diperbarui otomatis. Halaman ini memuat ulang status tiap 30 detik.</p>
                         </div>

@@ -67,7 +67,7 @@ export default function Incoming() {
 
                         return (
                             <li key={candidate.candidate_id}>
-                                <Link to={`/requests/incoming/${candidate.request_id}`} state={{ candidateId: candidate.candidate_id }} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-industrial-blue-500/30 hover:shadow-md hover:shadow-slate-200">
+                                <Link to={`/requests/incoming/${candidate.candidate_id}`} state={{ candidateId: candidate.candidate_id }} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-industrial-blue-500/30 hover:shadow-md hover:shadow-slate-200">
                                     <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-deep-navy-500/10 text-deep-navy-600">
                                         <LuSend className="size-5" aria-hidden />
                                     </span>

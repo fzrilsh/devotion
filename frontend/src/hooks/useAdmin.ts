@@ -1,4 +1,4 @@
-import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getProfileReviews, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, resolveDispute, updateMasterItem, type DisputeResult, type DisputeStatus, type VerificationStatus } from "@api/admin";
+import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getProfileReviews, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const adminKeys = {
@@ -29,7 +29,7 @@ export function useDecideVerification() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ requestId, decision, reason }: { requestId: string; decision: "approved" | "rejected"; reason?: string }) => decideVerification(requestId, { decision, reason }),
+        mutationFn: ({ requestId, data }: { requestId: string; data: VerificationDecisionRequest }) => decideVerification(requestId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "verification"] });
         },
@@ -48,7 +48,7 @@ export function useDecideProposal() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ proposalId, decision, reason }: { proposalId: string; decision: "approved" | "rejected"; reason?: string }) => decideProposal(proposalId, { decision, reason }),
+        mutationFn: ({ proposalId, data }: { proposalId: string; data: ProposalDecisionRequest }) => decideProposal(proposalId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: adminKeys.proposals });
             queryClient.invalidateQueries({ queryKey: ["admin", "master-items"] });
@@ -79,7 +79,7 @@ export function useResolveDispute() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ disputeId, data }: { disputeId: string; data: { result: DisputeResult; allocation_reversed?: boolean; liable_profile_id?: string | null; note?: string } }) => resolveDispute(disputeId, data),
+        mutationFn: ({ disputeId, data }: { disputeId: string; data: DisputeResolutionRequest }) => resolveDispute(disputeId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "disputes"] });
             queryClient.invalidateQueries({ queryKey: adminKeys.lateOrders });
@@ -108,7 +108,7 @@ export function useCreateMasterItem() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: { kind: "product" | "machine"; name: string }) => createMasterItem(data),
+        mutationFn: (data: MasterItemCreateRequest) => createMasterItem(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "master-items"] });
         },
@@ -119,7 +119,7 @@ export function useUpdateMasterItem() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ itemId, data }: { itemId: string; data: { name?: string; active?: boolean } }) => updateMasterItem(itemId, data),
+        mutationFn: ({ itemId, data }: { itemId: string; data: MasterItemUpdateRequest }) => updateMasterItem(itemId, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["admin", "master-items"] });
         },

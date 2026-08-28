@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getMyProfile, getPublicProfile, updateMyProfile, type ProfileUpdateRequest } from "@api/profile";
+import { useAuth } from "@hooks/useAuth";
 
 const profileKeys = {
     me: ["profile", "me"] as const,
@@ -7,9 +8,12 @@ const profileKeys = {
 };
 
 export function useMyProfile() {
+    const { user } = useAuth();
+
     return useQuery({
         queryKey: profileKeys.me,
         queryFn: getMyProfile,
+        enabled: Boolean(user && !user.is_admin),
         staleTime: 5 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
         retry: false,

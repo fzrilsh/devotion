@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { components } from "./types";
+import type { components, paths } from "./types";
 
 export type VerificationRequest = components["schemas"]["VerificationRequest"];
 export type VerificationRequestList = components["schemas"]["VerificationRequestList"];
@@ -12,7 +12,29 @@ export type CatalogItem = components["schemas"]["CatalogItem"];
 export type Review = components["schemas"]["Review"];
 export type ReviewList = components["schemas"]["ReviewList"];
 export type WhatsAppStatus = components["schemas"]["WhatsAppStatus"];
-export type DisputeResult = "cancelled" | "continued" | "confirmed";
+export type DisputeResult = Exclude<components["schemas"]["Dispute"]["result"], null | undefined>;
+
+type VerificationDecision = NonNullable<paths["/admin/verification/{requestId}/decision"]["post"]>["requestBody"];
+type ProposalDecision = NonNullable<paths["/admin/proposals/{proposalId}/decision"]["post"]>["requestBody"];
+type MasterItemCreate = NonNullable<paths["/admin/master/items"]["post"]>["requestBody"];
+type MasterItemUpdate = NonNullable<paths["/admin/master/items/{itemId}"]["patch"]>["requestBody"];
+type DisputeResolution = NonNullable<paths["/admin/disputes/{disputeId}/resolve"]["post"]>["requestBody"];
+
+type JsonBody<T> = T extends { content: { "application/json": infer Body } } ? Body : never;
+
+export type VerificationDecisionRequest = JsonBody<VerificationDecision>;
+export type ProposalDecisionRequest = JsonBody<ProposalDecision>;
+export type MasterItemCreateRequest = JsonBody<MasterItemCreate>;
+export type MasterItemUpdateRequest = JsonBody<MasterItemUpdate>;
+export type DisputeResolutionRequest = JsonBody<DisputeResolution>;
+
+function extractItems<T>(response: T[] | { items?: T[]; data?: T[] }): T[] {
+    if (Array.isArray(response)) {
+        return response;
+    }
+
+    return response.items ?? response.data ?? [];
+}
 
 export async function getVerificationQueue(params?: { status?: VerificationStatus; cursor?: string }): Promise<VerificationRequestList> {
     const searchParams = new URLSearchParams();
@@ -39,7 +61,9 @@ export async function getItemProposals(params?: { cursor?: string }): Promise<It
 
     const query = searchParams.toString();
 
-    return apiClient<ItemProposal[]>(`/admin/proposals${query ? `?${query}` : ""}`);
+    const response = await apiClient<ItemProposal[] | { items?: ItemProposal[]; data?: ItemProposal[] }>(`/admin/proposals${query ? `?${query}` : ""}`);
+
+    return extractItems(response);
 }
 
 export async function getDisputes(params?: { status?: DisputeStatus; cursor?: string }): Promise<Dispute[]> {
@@ -55,7 +79,9 @@ export async function getDisputes(params?: { status?: DisputeStatus; cursor?: st
 
     const query = searchParams.toString();
 
-    return apiClient<Dispute[]>(`/admin/disputes${query ? `?${query}` : ""}`);
+    const response = await apiClient<Dispute[] | { items?: Dispute[]; data?: Dispute[] }>(`/admin/disputes${query ? `?${query}` : ""}`);
+
+    return extractItems(response);
 }
 
 export async function getLateOrders(params?: { cursor?: string }): Promise<WorkOrderList> {
@@ -70,26 +96,28 @@ export async function getLateOrders(params?: { cursor?: string }): Promise<WorkO
     return apiClient<WorkOrderList>(`/admin/late-orders${query ? `?${query}` : ""}`);
 }
 
-export async function decideVerification(requestId: string, data: { decision: "approved" | "rejected"; reason?: string }): Promise<VerificationRequest> {
-    return apiClient<VerificationRequest>(`/admin/verification/${requestId}/decision`, { method: "POST", body: JSON.stringify(data) });
+export async function decideVerification(requestId: string, data: VerificationDecisionRequest): Promise<VerificationRequest> {
+    return apiClient<VerificationRequest>(`/admin/verification/${encodeURIComponent(requestId)}/decision`, { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function getMasterItems(kind?: "product" | "machine"): Promise<CatalogItem[]> {
-    const query = kind ? `?kind=${kind}` : "";
+    const searchParams = new URLSearchParams();
+    if (kind) searchParams.set("kind", kind);
+    const query = searchParams.toString();
 
-    return apiClient<CatalogItem[]>(`/admin/master/items${query}`);
+    return apiClient<CatalogItem[]>(`/admin/master/items${query ? `?${query}` : ""}`);
 }
 
-export async function createMasterItem(data: { kind: "product" | "machine"; name: string }): Promise<CatalogItem> {
+export async function createMasterItem(data: MasterItemCreateRequest): Promise<CatalogItem> {
     return apiClient<CatalogItem>("/admin/master/items", { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function updateMasterItem(itemId: string, data: { name?: string; active?: boolean }): Promise<CatalogItem> {
-    return apiClient<CatalogItem>(`/admin/master/items/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
+export async function updateMasterItem(itemId: string, data: MasterItemUpdateRequest): Promise<CatalogItem> {
+    return apiClient<CatalogItem>(`/admin/master/items/${encodeURIComponent(itemId)}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
-export async function decideProposal(proposalId: string, data: { decision: "approved" | "rejected"; reason?: string }): Promise<ItemProposal> {
-    return apiClient<ItemProposal>(`/admin/proposals/${proposalId}/decision`, { method: "POST", body: JSON.stringify(data) });
+export async function decideProposal(proposalId: string, data: ProposalDecisionRequest): Promise<ItemProposal> {
+    return apiClient<ItemProposal>(`/admin/proposals/${encodeURIComponent(proposalId)}/decision`, { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function getProfileReviews(profileId: string, cursor?: string): Promise<ReviewList> {
@@ -105,15 +133,15 @@ export async function getProfileReviews(profileId: string, cursor?: string): Pro
 }
 
 export async function hideReview(reviewId: string, reason: string): Promise<Review> {
-    return apiClient<Review>(`/admin/reviews/${reviewId}/hide`, { method: "POST", body: JSON.stringify({ reason }) });
+    return apiClient<Review>(`/admin/reviews/${encodeURIComponent(reviewId)}/hide`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
 export async function mediateDispute(disputeId: string): Promise<Dispute> {
-    return apiClient<Dispute>(`/admin/disputes/${disputeId}/mediate`, { method: "POST" });
+    return apiClient<Dispute>(`/admin/disputes/${encodeURIComponent(disputeId)}/mediate`, { method: "POST" });
 }
 
-export async function resolveDispute(disputeId: string, data: { result: DisputeResult; allocation_reversed?: boolean; liable_profile_id?: string | null; note?: string }): Promise<Dispute> {
-    return apiClient<Dispute>(`/admin/disputes/${disputeId}/resolve`, { method: "POST", body: JSON.stringify(data) });
+export async function resolveDispute(disputeId: string, data: DisputeResolutionRequest): Promise<Dispute> {
+    return apiClient<Dispute>(`/admin/disputes/${encodeURIComponent(disputeId)}/resolve`, { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function getWhatsAppStatus(): Promise<WhatsAppStatus> {

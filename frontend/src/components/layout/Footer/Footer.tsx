@@ -42,13 +42,10 @@ export default function Footer() {
                 {/* Identitas */}
                 <div>
                     <Link to="/" className="flex items-center gap-2.5">
-                        <span className="grid size-9 place-items-center rounded-xl bg-industrial-blue-500 text-sm font-extrabold text-white">D</span>
                         <span className="text-lg font-bold tracking-tight text-white">Devotion</span>
                     </Link>
 
-                    <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Platform capacity exchange yang mempertemukan UMKM konveksi dengan kapasitas produksi menganggur bersama bisnis yang membutuhkan mitra produksi terpercaya.</p>
-
-                    <p className="mt-4 text-xs leading-5 text-slate-500">Pembayaran dilakukan langsung antar pihak. Devotion tidak menahan maupun memproses dana pengguna.</p>
+                    <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Devotion menghubungkan UMKM konveksi dengan subkontraktor terpercaya yang siap memenuhi kebutuhan produksi Anda. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                 </div>
 
                 {/* Jelajah (anchor di beranda) */}

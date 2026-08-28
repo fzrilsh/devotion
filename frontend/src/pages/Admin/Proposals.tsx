@@ -54,7 +54,7 @@ function ProposalCard({ proposal }: { proposal: ItemProposal }) {
         }
 
         try {
-            await decideMutation.mutateAsync({ proposalId: proposal.proposal_id, decision, reason: reason.trim() || undefined });
+            await decideMutation.mutateAsync({ proposalId: proposal.proposal_id, data: { decision, reason: reason.trim() || undefined } });
             setRejectOpen(false);
             setReason("");
         } catch (err) {

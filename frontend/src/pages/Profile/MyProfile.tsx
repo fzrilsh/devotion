@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
 import LocationMap from "@components/common/LocationMap";
+import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
 import LocationPicker from "@components/common/LocationPicker";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@hooks/useAuth";
@@ -147,6 +148,7 @@ function AdminProfile() {
 
 export default function MyProfile() {
     const { user, isLoading: authLoading } = useAuth();
+    const { needsVerification } = useAccountVerification();
     const [provinceCode, setProvinceCode] = useState("");
     const { provinces, cities } = useWilayah(provinceCode);
 
@@ -230,7 +232,7 @@ export default function MyProfile() {
             <div className="flex items-center justify-between">
                 <h1 className="text-xl font-bold text-slate-900">Profil Usaha</h1>
 
-                {!editMode ? (
+                {!editMode && !needsVerification ? (
                     <button type="button" onClick={() => setEditMode(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-industrial-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-industrial-blue-600">
                         <LuPencil className="size-4" aria-hidden />
                         Edit Profil
@@ -274,7 +276,9 @@ export default function MyProfile() {
                 </div>
             ) : null}
 
-            {editMode ? (
+            {editMode && needsVerification ? (
+                <VerificationGate action="mengubah profil usaha" />
+            ) : editMode ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6">
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                         {errors.root?.message && (

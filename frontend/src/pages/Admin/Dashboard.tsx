@@ -8,7 +8,17 @@ import { Link } from "react-router-dom";
 function formatDate(isoDate?: string | null): string {
     if (!isoDate) return "-";
 
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
+    const normalized = isoDate.trim().replace(" ", "T");
+    const date = new Date(normalized);
+
+    if (Number.isNaN(date.getTime())) return "-";
+
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Jakarta",
+    }).format(date);
 }
 
 function QueueCard({ title, description, count, tone, icon: Icon, to }: { title: string; description: string; count: number; tone: "blue" | "amber" | "red" | "violet"; icon: React.ElementType; to: string }) {
@@ -81,6 +91,16 @@ const disputeStatusMeta: Record<Dispute["status"], { label: string; className: s
     resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
 };
 
+function todayLabel(): string {
+    const today = new Date();
+    const hari = today.toLocaleDateString("id-ID", { weekday: "long" });
+    const day = today.getDate();
+    const month = today.toLocaleString("id-ID", { month: "long" });
+    const year = today.getFullYear();
+
+    return `${hari}, ${day} ${month} ${year}`;
+}
+
 export default function AdminDashboard() {
     const verificationQuery = useVerificationQueue("pending");
     const proposalsQuery = useItemProposals();
@@ -95,6 +115,7 @@ export default function AdminDashboard() {
     return (
         <div className="space-y-6">
             <div>
+                <p className="text-xs font-semibold text-deep-navy-300 uppercase tracking-widest mb-1">{todayLabel()}</p>
                 <h1 className="text-xl font-bold text-slate-900">Dasbor Admin</h1>
                 <p className="mt-1 text-sm text-slate-500">Ringkasan antrean moderasi dan pengawasan platform.</p>
             </div>
@@ -169,9 +190,7 @@ export default function AdminDashboard() {
 
             <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-50 p-4">
                 <LuTriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden />
-                <p className="text-xs leading-5 text-amber-800">
-                    Pesanan yang melewati tenggat kesiapan dan sengketa yang terbuka memengaruhi reputasi kedua pihak. Tinjau antrean di atas secara berkala agar penyelesaian tidak tertunda.
-                </p>
+                <p className="text-xs leading-5 text-amber-800">Pesanan yang melewati tenggat kesiapan dan sengketa yang terbuka memengaruhi reputasi kedua pihak. Tinjau antrean di atas secara berkala agar penyelesaian tidak tertunda.</p>
             </div>
         </div>
     );

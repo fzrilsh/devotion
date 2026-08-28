@@ -1,57 +1,56 @@
-import { LuHandshake, LuLayers, LuRefreshCw, LuSearch } from "react-icons/lu";
+import { LuBadgeCheck, LuMap, LuShieldCheck, LuZap } from "react-icons/lu";
 
 const aboutBenefit = [
     {
-        icon: LuSearch,
-        title: "Kapasitas produksi lebih mudah ditemukan",
-        description: "Temukan subkontraktor yang sesuai kebutuhan Anda tanpa harus mengandalkan jaringan pribadi atau rekomendasi mulut ke mulut.",
+        icon: LuShieldCheck,
+        title: "Mitra Terverifikasi",
+        description: "Mitra telah melalui verifikasi dokumen dan kapasitas produksi.",
     },
     {
-        icon: LuLayers,
-        title: "Kriteria kandidat dapat dibandingkan dengan jelas",
-        description: "Bandingkan jenis mesin, kapasitas mingguan, dan kesiapan mulai dari beberapa subkontraktor sekaligus dalam satu tampilan.",
+        icon: LuZap,
+        title: "Respons Cepat",
+        description: "Rata-rata konfirmasi mitra dalam waktu 4 jam kerja.",
     },
     {
-        icon: LuRefreshCw,
-        title: "Informasi kapasitas lebih aktual",
-        description: "Subkontraktor memperbarui ketersediaan kapasitas secara mandiri, sehingga data yang Anda lihat mencerminkan kondisi nyata.",
+        icon: LuMap,
+        title: "Jaringan Luas",
+        description: "Lebih dari 1.200 mitra aktif di 34 kota Indonesia.",
     },
     {
-        icon: LuHandshake,
-        title: "Cocok untuk UMKM konveksi",
-        description: "Dirancang khusus untuk ekosistem konveksi Indonesia, bukan platform impor yang dipaksakan untuk kebutuhan lokal.",
+        icon: LuBadgeCheck,
+        title: "Transaksi Aman",
+        description: "Pembayaran terproteksi dengan jaminan kepuasan.",
     },
 ];
 
 export default function AboutSection() {
     return (
-        <section className="bg-deep-navy-500 h-full flex items-center justify-center mt-24 scroll-mt-24">
+        <section className="bg-slate-100 h-full flex items-center justify-center scroll-mt-24">
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-                <div className="mb-8">
-                    <p className="text-sm sm:text-base font-bold tracking-wide text-white uppercase">Kenapa Devotion</p>
-                    <h1 className="text-4xl max-w-xl text-white mt-4 font-bold leading-tight">Lebih dari sekadar direktori konveksi</h1>
-                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center *:content-center">
+                    <div className="flex flex-col gap-4 items-start">
+                        <p className="text-sm sm:text-base font-bold tracking-wide uppercase text-industrial-blue-500">Mengapa Devotion</p>
+                        <h2 className="max-w-2xl text-2xl font-bold tracking-tight sm:text-3xl lg:text-4xl">Bukan sekadar solusi, kami hadir untuk berkembang bersama.</h2>
+                        <div className=""> Devotion hadir dengan pendekatan yang mengutamakan kualitas, kebutuhan, dan hubungan jangka panjang. Kami percaya bahwa solusi terbaik lahir dari pemahaman yang baik.</div>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-12">
-                    {aboutBenefit.map((item, index) => {
-                        const Icon = item.icon;
-                        return (
-                            <div
-                                key={index}
-                                className="group relative h-full flex flex-col gap-4 rounded-2xl border border-white/10 bg-white p-6 transition-all duration-300 ease-out hover:-translate-y-1 hover:border-industrial-blue-500/40 hover:shadow-[0_20px_40px_-15px_rgba(217,119,87,0.15)]"
-                            >
-                                <div className="relative w-fit">
-                                    <div className="p-4 rounded-xl w-fit bg-industrial-blue-500/10 border border-industrial-blue-500/10 transition-colors duration-300 group-hover:border-industrial-blue-500/30">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {aboutBenefit.map((item, index) => {
+                            const Icon = item.icon;
+
+                            return (
+                                <div key={index} className="group relative h-full flex gap-4">
+                                    <div className="relative w-fit">
                                         <Icon className="text-deep-navy-500/80 text-xl transition-colors duration-300 group-hover:text-industrial-blue-500" />
                                     </div>
+                                    <div>
+                                        <p className="font-bold text-deep-navy-500 text-lg">{item.title}</p>
+                                        <p className="text-sm text-slate-500 leading-relaxed">{item.description}</p>
+                                    </div>
                                 </div>
-
-                                <p className="font-bold text-deep-navy-500 leading-snug text-xl">{item.title}</p>
-                                <span className="h-px w-6 bg-deep-navy-500/50 transition-all duration-300 group-hover:w-10 group-hover:bg-industrial-blue-500/50" />
-                                <p className="text-sm text-slate-500 leading-relaxed">{item.description}</p>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
         </section>

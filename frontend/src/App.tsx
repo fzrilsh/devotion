@@ -91,7 +91,7 @@ export default function App() {
                 </Route>
 
                 {/* ===== BUYER + SUBCONTRACTOR ===== */}
-                <Route element={<ProtectedRoute allowedRoles={["buyer", "subcontractor"]} />}>
+                <Route element={<ProtectedRoute allowedRoles={["buyer", "subcontractor", "is_admin"]} />}>
                     <Route element={<AppLayout />}>
                         <Route path="/orders" element={<WorkOrderList />} />
                         <Route path="/orders/:workOrderId" element={<WorkOrderDetail />} />
@@ -99,7 +99,7 @@ export default function App() {
                 </Route>
 
                 {/* ===== SUBCONTRACTOR ONLY ===== */}
-                <Route element={<ProtectedRoute allowedRoles={["subcontractor"]} redirectTo="/profile/me" />}>
+                <Route element={<ProtectedRoute allowedRoles={["subcontractor", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
                         <Route path="/listing" element={<Listing />} />
                         <Route path="/listing/calendar" element={<ListingCalendar />} />
@@ -109,7 +109,7 @@ export default function App() {
                 </Route>
 
                 {/* ===== BUYER ONLY ===== */}
-                <Route element={<ProtectedRoute allowedRoles={["buyer"]} redirectTo="/profile/me" />}>
+                <Route element={<ProtectedRoute allowedRoles={["buyer", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
                         <Route path="/search" element={<Search />} />
                         <Route path="/quota-requests/new" element={<CreateQuotaRequest />} />

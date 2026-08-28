@@ -78,7 +78,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RegisterResponse' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '409':
           description: Email atau nomor HP sudah terdaftar
           content:
@@ -292,6 +292,17 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MyProfile' }
         '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '403':
+          description: Akun admin tidak memiliki profil usaha
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/forbidden'
+                title: Tidak berwenang
+                status: 403
+                code: FORBIDDEN
+                detail: Akun admin tidak memiliki profil usaha.
     put:
       tags: [profile]
       summary: Ubah profil usaha
@@ -309,7 +320,19 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/MyProfile' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '403':
+          description: Akun admin tidak memiliki profil usaha
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/forbidden'
+                title: Tidak berwenang
+                status: 403
+                code: FORBIDDEN
+                detail: Akun admin tidak memiliki profil usaha.
+        '422': { $ref: '#/components/responses/ValidationFailed' }
 
   /profile/{profileId}:
     get:
@@ -382,7 +405,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ItemProposal' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
 
   /regions/provinces:
     get:
@@ -536,7 +559,14 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Listing' }
-        '404': { description: Belum punya listing }
+        '404':
+          description: Belum punya listing
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                code: LISTING_NOT_FOUND
+                detail: Belum ada listing kapasitas. Buat listing lebih dulu.
     post:
       tags: [listing]
       summary: Buat listing kapasitas
@@ -555,9 +585,16 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Listing' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { description: Sudah punya listing }
+        '409':
+          description: Profil ini sudah punya listing
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                code: LISTING_ALREADY_EXISTS
+                detail: Profil ini sudah punya listing. Ubah listing yang ada, bukan membuat baru.
     put:
       tags: [listing]
       summary: Ubah listing kapasitas
@@ -650,17 +687,27 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/AvailabilityPeriod' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '409':
           description: Bertabrakan dengan alokasi pesanan berjalan
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
-              example:
-                code: PERIOD_ALREADY_ALLOCATED
-                detail: >-
-                  Minggu 24 Agustus 2026 tidak dapat ditandai penuh karena sudah memakai
-                  500 potong untuk pesanan berjalan.
+              examples:
+                periodMarkedFull:
+                  summary: Minggu ditandai penuh padahal sudah ada alokasi
+                  value:
+                    code: PERIOD_ALREADY_ALLOCATED
+                    detail: >-
+                      Minggu 24 Agustus 2026 tidak dapat ditandai penuh karena sudah memakai
+                      500 potong untuk pesanan berjalan.
+                capacityBelowAllocated:
+                  summary: Kapasitas diturunkan di bawah yang sudah terpakai
+                  value:
+                    code: CAPACITY_ALREADY_ALLOCATED
+                    detail: >-
+                      Kapasitas minggu 24 Agustus 2026 tidak dapat diturunkan ke 300 potong.
+                      Sudah memakai 500 potong untuk pesanan berjalan.
   # ─────────────────────────── search ───────────────────────────
 
   /search:
@@ -1275,7 +1322,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean pengajuan verifikasi identitas
-      x-fr: [FR-008, FR-081]
+      x-fr: [FR-007]
       parameters:
         - name: status
           in: query
@@ -1293,7 +1340,7 @@ paths:
       tags: [admin]
       summary: Setujui atau tolak pengajuan verifikasi
       description: Penolakan menyertakan alasan yang tampil ke pemohon (FR-008).
-      x-fr: [FR-008]
+      x-fr: [FR-007, FR-008]
       parameters:
         - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1317,7 +1364,7 @@ paths:
     get:
       tags: [admin]
       summary: Kelola daftar baku produk dan mesin
-      x-fr: [FR-057]
+      x-fr: [FR-059]
       parameters:
         - name: kind
           in: query
@@ -1333,7 +1380,7 @@ paths:
     post:
       tags: [admin]
       summary: Tambah item daftar baku
-      x-fr: [FR-057]
+      x-fr: [FR-059]
       requestBody:
         required: true
         content:
@@ -1355,8 +1402,8 @@ paths:
     patch:
       tags: [admin]
       summary: Ubah atau nonaktifkan item daftar baku
-      description: Menonaktifkan item tidak menghapus listing lama yang memakainya (FR-057).
-      x-fr: [FR-057]
+      description: Menonaktifkan item tidak menghapus listing lama yang memakainya, dan listing itu tetap dapat ditemukan lewat pencarian (FR-060).
+      x-fr: [FR-059, FR-060]
       parameters:
         - { name: itemId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1379,7 +1426,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean usulan item dari pengguna
-      x-fr: [FR-058]
+      x-fr: [FR-061]
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -1395,8 +1442,8 @@ paths:
     post:
       tags: [admin]
       summary: Setujui atau tolak usulan item
-      description: Persetujuan memasukkan item ke daftar baku (FR-058).
-      x-fr: [FR-058]
+      description: Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
+      x-fr: [FR-061, FR-074]
       parameters:
         - { name: proposalId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1458,7 +1505,7 @@ paths:
     get:
       tags: [admin]
       summary: Antrean sengketa
-      x-fr: [FR-046, FR-071]
+      x-fr: [FR-046]
       parameters:
         - name: status
           in: query
@@ -1477,8 +1524,8 @@ paths:
     post:
       tags: [admin]
       summary: Tandai sengketa masuk mediasi
-      description: Pesanan terkait berpindah ke status "dalam mediasi" (FR-071).
-      x-fr: [FR-071]
+      description: Pesanan terkait berpindah ke status "dalam mediasi" (FR-046).
+      x-fr: [FR-046]
       parameters:
         - { name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1495,8 +1542,8 @@ paths:
       description: |
         Hasil menentukan nasib pesanan dan alokasi kapasitasnya. Bila dibatalkan, seluruh
         alokasi dibalik. Admin menetapkan pihak yang menanggung agar tingkat penyelesaian
-        adil (FR-071, FR-072).
-      x-fr: [FR-071, FR-072]
+        adil (FR-067, FR-072).
+      x-fr: [FR-067, FR-072]
       parameters:
         - { name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }
       requestBody:
@@ -1542,6 +1589,22 @@ paths:
       security: []
       responses:
         '200':
+          description: |
+            Instance dapat melayani. status "ok" bila seluruh ketergantungan sehat.
+            status "degraded" bila WhatsApp terputus (whatsapp: disconnected): kanal
+            kode dan notifikasi terganggu, tetapi platform tetap melayani. Ini tidak
+            menghasilkan 503 karena pemulihan sesi WhatsApp menuntut pemindaian QR
+            manual lewat halaman admin, jadi me-restart container tidak menolong dan
+            hanya akan memicu restart loop. Pemantau uptime tetap dapat memberi alert
+            dari isi dependencies.whatsapp.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: |
+            Instance tidak dapat melayani dan layak di-restart atau ditarik dari
+            rotasi; status degraded. Hanya dipicu oleh basis data gagal
+            (database: fail) atau penyimpanan penuh (storage.status: full).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
@@ -1655,6 +1718,7 @@ components:
             - UNSUPPORTED_FILE_TYPE
             - STORAGE_QUOTA_FULL
             - LISTING_NOT_FOUND
+            - LISTING_ALREADY_EXISTS
             - CAPACITY_ALREADY_ALLOCATED
             - PERIOD_ALREADY_ALLOCATED
             - SELF_REQUEST
@@ -1666,6 +1730,9 @@ components:
             - CANCELLATION_AFTER_PRODUCTION
             - WORK_ORDER_NOT_COMPLETED
             - REVIEW_ALREADY_SUBMITTED
+            - READINESS_AFTER_DEADLINE
+            - PAYMENT_STATEMENT_EXISTS
+            - DISPUTE_ALREADY_OPEN
         detail:
           type: string
           description: Penjelasan bahasa Indonesia yang dapat dikutip pengguna.
@@ -1700,18 +1767,29 @@ components:
 
     RegisterRequest:
       type: object
-      required: [email, phone, password, business_name]
+      description: |
+        Pendaftaran sekaligus membuat profil usaha dalam satu transaksi, sehingga
+        `city_code` wajib dan `GET /api/profile/me` tidak pernah 404. Minimal satu peran
+        usaha dipilih saat mendaftar (FR-001).
+      required: [email, phone, password, business_name, city_code, roles]
       properties:
         email: { type: string, format: email }
         phone: { type: string, description: Nomor telepon format E.164 Indonesia }
         password: { type: string, format: password, minLength: 8 }
-        business_name: { type: string, minLength: 2, maxLength: 150 }
+        business_name: { type: string, minLength: 3, maxLength: 150 }
+        city_code: { type: string, pattern: '^[0-9]{4}$', description: Kode kota/kabupaten tempat usaha }
+        roles:
+          type: object
+          required: [subcontractor, buyer]
+          description: Minimal satu bernilai true.
+          properties:
+            subcontractor: { type: boolean }
+            buyer: { type: boolean }
 
     RegisterResponse:
       type: object
-      required: [account_id, email_verification_required]
+      required: [email_verification_required]
       properties:
-        account_id: { type: string, format: uuid }
         email_verification_required: { type: boolean }
         phone_verification_required: { type: boolean }
 
@@ -1742,28 +1820,32 @@ components:
 
     ProfileUpdateRequest:
       type: object
+      description: |
+        Provinsi tidak dikirim: ia turunan dari `city.province_code`. Batas alamat tidak
+        disimpan, jadi tidak ada field `address`. Rentang koordinat menyalin constraint
+        `coordinates_within_indonesia` agar koordinat di luar Indonesia menjadi 422, bukan 500.
       properties:
-        business_name: { type: string, minLength: 2, maxLength: 150 }
+        business_name: { type: string, minLength: 3, maxLength: 150 }
         description: { type: string, maxLength: 2000 }
-        province_code: { type: string }
-        city_code: { type: string }
-        address: { type: string, maxLength: 500 }
-        latitude: { type: number, format: double, nullable: true }
-        longitude: { type: number, format: double, nullable: true }
+        city_code: { type: string, pattern: '^[0-9]{4}$' }
+        latitude: { type: number, format: double, nullable: true, minimum: -11.5, maximum: 6.5 }
+        longitude: { type: number, format: double, nullable: true, minimum: 94.5, maximum: 141.5 }
 
     MyProfile:
       type: object
-      required: [profile_id, business_name, verification_status]
+      required: [profile_id, business_name, identity_verified]
       properties:
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         description: { type: string, nullable: true }
-        province_code: { type: string, nullable: true }
         city_code: { type: string, nullable: true }
-        address: { type: string, nullable: true }
+        city_name: { type: string, nullable: true, readOnly: true }
+        province_code: { type: string, nullable: true, readOnly: true }
+        province_name: { type: string, nullable: true, readOnly: true }
         latitude: { type: number, format: double, nullable: true }
         longitude: { type: number, format: double, nullable: true }
-        verification_status: { $ref: '#/components/schemas/VerificationStatus' }
+        identity_verified: { type: boolean }
+        verification_status: { allOf: [ { $ref: '#/components/schemas/VerificationStatus' } ], nullable: true }
         reputation: { $ref: '#/components/schemas/Reputation' }
 
     PublicProfile:
@@ -1773,11 +1855,16 @@ components:
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         description: { type: string, nullable: true }
-        province_code: { type: string, nullable: true }
         city_code: { type: string, nullable: true }
+        city_name: { type: string, nullable: true }
+        province_code: { type: string, nullable: true }
+        province_name: { type: string, nullable: true }
+        latitude: { type: number, format: double, nullable: true }
+        longitude: { type: number, format: double, nullable: true }
         identity_verified:
           type: boolean
           description: Status verifikasi identitas tidak memengaruhi skor pencarian (FR-034).
+        listing: { allOf: [ { $ref: '#/components/schemas/Listing' } ], nullable: true }
         reputation: { $ref: '#/components/schemas/Reputation' }
 
     Reputation:
@@ -1875,27 +1962,58 @@ components:
 
     ListingRequest:
       type: object
-      required: [product_item_id, machine_item_id, readiness_lead_days]
+      description: |
+        Satu listing per profil. Kapasitas mingguan (FR-012/FR-014) adalah angka pusat;
+        item produk dan mesin adalah tabel gabung, mesin membawa jumlah unit (FR-076).
+      required: [weekly_capacity, readiness_lead_days, product_item_ids, machines]
       properties:
-        product_item_id: { type: string, format: uuid }
-        machine_item_id: { type: string, format: uuid }
+        weekly_capacity:
+          type: integer
+          minimum: 1
+          description: Kapasitas produksi per minggu dalam satuan unit produk.
         readiness_lead_days:
           type: integer
           minimum: 0
+          maximum: 365
           description: Hari tenggat kesiapan produksi sejak kesepakatan.
-        note: { type: string, maxLength: 1000 }
+        product_item_ids:
+          type: array
+          minItems: 1
+          items: { type: string, format: uuid }
+          description: Item produk daftar baku yang bisa dikerjakan.
+        machines:
+          type: array
+          minItems: 1
+          description: Mesin yang dimiliki beserta jumlahnya.
+          items:
+            type: object
+            required: [item_id, machine_count]
+            properties:
+              item_id: { type: string, format: uuid }
+              machine_count: { type: integer, minimum: 1 }
 
     Listing:
       type: object
-      required: [listing_id, product_item_id, machine_item_id, readiness_lead_days, published]
+      required: [listing_id, weekly_capacity, readiness_lead_days, published, product_items, machines]
       properties:
         listing_id: { type: string, format: uuid }
         profile_id: { type: string, format: uuid }
-        product_item_id: { type: string, format: uuid }
-        machine_item_id: { type: string, format: uuid }
+        weekly_capacity: { type: integer }
         readiness_lead_days: { type: integer }
-        note: { type: string, nullable: true }
         published: { type: boolean }
+        calendar_updated_at: { type: string, format: date-time, nullable: true }
+        horizon_until: { type: string, format: date, description: Senin terjauh yang sudah punya periode }
+        product_items:
+          type: array
+          items: { $ref: '#/components/schemas/CatalogItem' }
+        machines:
+          type: array
+          items:
+            type: object
+            required: [item, machine_count]
+            properties:
+              item: { $ref: '#/components/schemas/CatalogItem' }
+              machine_count: { type: integer }
 
     PeriodUpdateItem:
       type: object
@@ -1909,15 +2027,20 @@ components:
           type: integer
           minimum: 0
           description: Kapasitas dalam satuan unit produk untuk minggu itu.
+        marked_full:
+          type: boolean
+          default: false
+          description: Menandai minggu penuh (FR-017); tidak dapat ditandai penuh bila sudah ada alokasi aktif.
 
     AvailabilityPeriod:
       type: object
-      required: [week_start, capacity, allocated, remaining]
+      required: [week_start, capacity, allocated, remaining, marked_full]
       properties:
         week_start: { type: string, format: date }
         capacity: { type: integer }
         allocated: { type: integer, description: Sudah dialokasikan ke pesanan }
-        remaining: { type: integer }
+        remaining: { type: integer, description: capacity - allocated, dipaksa 0 saat marked_full }
+        marked_full: { type: boolean }
 
     # ── search ──
 
@@ -1935,14 +2058,36 @@ components:
       description: |
         Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
         jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
-        mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-030).
+        mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
+        Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
+        memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
+        kapasitas tersisa sampai deadline, jeda kesiapan mulai, serta reputasi (rating
+        rata-rata, jumlah pekerjaan selesai, tingkat penyelesaian) yang dihitung saat
+        dibaca, tidak disimpan sebagai kolom. Tingkat penyelesaian tunduk pada ambang
+        cukup-data reputation.enough_data (FR-073). stale_calendar menandai kalender yang
+        tidak diperbarui lebih dari 7 hari; penanda ini informatif dan tidak mengubah
+        urutan (FR-021).
       required: [listing_id, profile_id, business_name, score, criteria]
       properties:
         listing_id: { type: string, format: uuid }
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         score: { type: integer }
+        city_code: { type: string, nullable: true }
+        city_name: { type: string, nullable: true }
+        machine_types:
+          type: array
+          description: Nama jenis mesin yang dimiliki listing (FR-027).
+          items: { type: string }
+        weekly_capacity: { type: integer, description: Kapasitas mingguan listing (FR-027). }
+        readiness_week: { type: string, format: date, description: Minggu kesiapan mulai, Senin WIB. }
+        readiness_lead_days: { type: integer, description: Jeda kesiapan mulai dalam hari (FR-027). }
         total_capacity_until_deadline: { type: integer }
+        completed_jobs: { type: integer, description: Jumlah pekerjaan selesai (FR-048). }
+        reputation: { $ref: '#/components/schemas/Reputation' }
+        stale_calendar:
+          type: boolean
+          description: Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan.
         distance_km: { type: number, format: double, nullable: true }
         identity_verified: { type: boolean }
         criteria:
@@ -1958,11 +2103,20 @@ components:
 
     QuotaRequestCreate:
       type: object
-      required: [listing_id, product_item_id, quantity, deadline]
+      description: |
+        Satu request dikirim ke beberapa kandidat sekaligus dalam satu tindakan (FR-029),
+        jadi listing_ids memuat satu atau lebih listing tujuan. material wajib karena
+        setiap request menyebut bahan yang diminta.
+      required: [listing_ids, product_item_id, quantity, material, deadline]
       properties:
-        listing_id: { type: string, format: uuid }
+        listing_ids:
+          type: array
+          minItems: 1
+          description: Satu atau lebih listing kandidat tujuan request ini (FR-029).
+          items: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer, minimum: 1 }
+        material: { type: string, minLength: 1, maxLength: 200 }
         deadline: { type: string, format: date }
         note: { type: string, maxLength: 1000 }
 
@@ -1972,15 +2126,18 @@ components:
 
     QuotaRequestDetail:
       type: object
-      required: [request_id, listing_id, quantity, deadline, status, created_at]
+      description: |
+        Satu request kuota dengan daftar kandidatnya. Status per kandidat ada di
+        candidates[].status, bukan di tingkat request, karena satu request dapat
+        berada pada status berbeda di tiap kandidat (FR-029, FR-030).
+      required: [request_id, product_item_id, quantity, material, deadline, candidates, created_at]
       properties:
         request_id: { type: string, format: uuid }
-        listing_id: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer }
+        material: { type: string }
         deadline: { type: string, format: date }
         note: { type: string, nullable: true }
-        status: { $ref: '#/components/schemas/CandidateStatus' }
         candidates:
           type: array
           items: { $ref: '#/components/schemas/RequestCandidate' }
@@ -1989,17 +2146,22 @@ components:
 
     RequestCandidate:
       type: object
-      required: [candidate_id, profile_id, status]
+      required: [candidate_id, listing_id, profile_id, status]
       properties:
         candidate_id: { type: string, format: uuid }
+        listing_id: { type: string, format: uuid }
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
         latest_offer: { $ref: '#/components/schemas/Offer' }
+        offers:
+          type: array
+          description: Seluruh rantai penawaran kandidat terurut sequence naik, sehingga riwayat ronde sebelumnya tetap terlihat setelah counter-offer (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          items: { $ref: '#/components/schemas/Offer' }
 
     Offer:
       type: object
-      required: [offer_id, party, total_price, readiness_lead_days, created_at]
+      required: [offer_id, party, total_price, readiness_lead_days, sequence, created_at]
       properties:
         offer_id: { type: string, format: uuid }
         party:
@@ -2011,6 +2173,9 @@ components:
           format: int64
           description: Rupiah bilangan bulat penuh (FR-018). Tanpa pecahan.
         readiness_lead_days: { type: integer }
+        sequence:
+          type: integer
+          description: Nomor ronde penawaran mulai 1, naik tiap counter-offer, sehingga klien menampilkan ronde berurut tanpa bergantung pada urutan array.
         note: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
 
@@ -2210,7 +2375,21 @@ components:
 
     Health:
       type: object
-      required: [status]
+      required: [status, time, dependencies]
       properties:
-        status: { type: string, enum: [ok] }
+        status: { type: string, enum: [ok, degraded] }
+        version: { type: string }
         time: { type: string, format: date-time }
+        dependencies:
+          type: object
+          required: [database, whatsapp, storage]
+          properties:
+            database: { type: string, enum: [ok, fail] }
+            whatsapp: { type: string, enum: [connected, disconnected] }
+            storage:
+              type: object
+              required: [status, used_mb, limit_mb]
+              properties:
+                status: { type: string, enum: [ok, near_full, full] }
+                used_mb: { type: integer }
+                limit_mb: { type: integer }

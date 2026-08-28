@@ -3,7 +3,7 @@ import type { components } from "./types";
 
 export type UploadedFile = components["schemas"]["UploadedFile"];
 
-export async function uploadFile(file: File, kind: "identity_document" | "location_photo"): Promise<UploadedFile> {
+export async function uploadFile(kind: "identity_document" | "location_photo", file: File): Promise<UploadedFile> {
     const formData = new FormData();
     formData.append("kind", kind);
     formData.append("file", file);

@@ -1,5 +1,6 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
+import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
 import { useMasterProducts } from "@hooks/useListing";
 import { useCreateQuotaRequest } from "@hooks/useQuota";
 import { useEffect, useState } from "react";
@@ -38,6 +39,7 @@ export default function Create() {
 
     const productsQuery = useMasterProducts();
     const createMutation = useCreateQuotaRequest();
+    const { needsVerification } = useAccountVerification();
 
     const [productItemId, setProductItemId] = useState(state.productItemId ?? "");
     const [quantity, setQuantity] = useState(state.quantity != null ? String(state.quantity) : "");
@@ -131,7 +133,10 @@ export default function Create() {
                 <p className="mt-3 text-xs leading-5 text-slate-500">Batas waktu balasan 72 jam ditetapkan sistem sejak request dikirim.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+            {needsVerification ? (
+                <VerificationGate action="mengirim request kuota" />
+            ) : (
+                <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
                 {errorMessage ? (
                     <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert" aria-live="polite">
                         {errorMessage}
@@ -186,7 +191,8 @@ export default function Create() {
                     <LuSend className="size-4" aria-hidden />
                     {createMutation.isPending ? "Mengirim..." : `Kirim ke ${listingIds.length} Kandidat`}
                 </button>
-            </form>
+                </form>
+            )}
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <LuTriangleAlert className="mt-0.5 size-5 shrink-0 text-industrial-blue-500" aria-hidden />

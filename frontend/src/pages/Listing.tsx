@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import type { CatalogItem } from "@api/listing";
 import Loading from "@components/common/Loading";
+import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useCreateListing, useListingVisibility, useMasterMachines, useMasterProducts, useMyListing, useProposeMasterItem, useUpdateListing } from "@hooks/useListing";
 import { cn } from "@lib/utils";
@@ -241,6 +242,7 @@ export default function Listing() {
     const productsQuery = useMasterProducts();
     const machinesQuery = useMasterMachines();
     const visibilityMutation = useListingVisibility();
+    const { needsVerification } = useAccountVerification();
     const [editMode, setEditMode] = useState(false);
 
     if (listingQuery.isLoading || productsQuery.isLoading || machinesQuery.isLoading) {
@@ -250,6 +252,7 @@ export default function Listing() {
     const listing = listingQuery.data ?? null;
     const notFound = listingQuery.error instanceof ApiError && listingQuery.error.status === 404;
     const loadError = listingQuery.isError && !notFound;
+    const blocked = needsVerification && !listing;
 
     const products = (productsQuery.data ?? []).filter((item) => item.active);
     const machines = (machinesQuery.data ?? []).filter((item) => item.active);
@@ -277,7 +280,7 @@ export default function Listing() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {listing && !editMode ? (
+                    {listing && !editMode && !needsVerification ? (
                         <button type="button" onClick={() => setEditMode(true)} className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-industrial-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                             <LuPencil className="size-4" aria-hidden />
                             Edit Listing
@@ -295,8 +298,14 @@ export default function Listing() {
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
                     <p className="text-sm font-semibold text-red-700">Listing tidak dapat dimuat. Coba muat ulang halaman.</p>
                 </div>
+            ) : blocked ? (
+                <VerificationGate action="membuat listing kapasitas" />
             ) : !listing || editMode ? (
-                <ListingFormCard products={products} machines={machines} defaultValues={formDefaults} isEdit={Boolean(listing)} onCancel={() => setEditMode(false)} onSaved={() => setEditMode(false)} />
+                needsVerification ? (
+                    <VerificationGate action="mengubah listing kapasitas" />
+                ) : (
+                    <ListingFormCard products={products} machines={machines} defaultValues={formDefaults} isEdit={Boolean(listing)} onCancel={() => setEditMode(false)} onSaved={() => setEditMode(false)} />
+                )
             ) : (
                 <div className="space-y-6">
                     <div className={cn("flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between", listing.published ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50")}>

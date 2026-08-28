@@ -10,16 +10,42 @@ export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; class
     in_mediation: { label: "Mediasi", className: "bg-amber-500/10 text-amber-600" },
 };
 
-export function formatDateId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
+function parseSafeDate(value?: string | null): Date | null {
+    if (!value) return null;
 
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+    const date = new Date(normalized);
+
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function formatDateId(isoDate?: string | null): string {
+    const date = parseSafeDate(isoDate);
+    if (!date) return "-";
+
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Asia/Jakarta",
+    }).format(date);
 }
 
 export function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
+    const date = parseSafeDate(isoDate);
+    if (!date) return "-";
 
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
+    return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Jakarta",
+    }).format(date);
 }
 
 export function formatRupiah(amount?: number | null): string {

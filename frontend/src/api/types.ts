@@ -521,6 +521,24 @@ export interface paths {
                     };
                 };
                 401: components["responses"]["NotAuthenticated"];
+                /** @description Akun admin tidak memiliki profil usaha */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "type": "https://devotion/errors/forbidden",
+                         *       "title": "Tidak berwenang",
+                         *       "status": 403,
+                         *       "code": "FORBIDDEN",
+                         *       "detail": "Akun admin tidak memiliki profil usaha."
+                         *     }
+                         */
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
             };
         };
         /**
@@ -547,6 +565,25 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["MyProfile"];
+                    };
+                };
+                401: components["responses"]["NotAuthenticated"];
+                /** @description Akun admin tidak memiliki profil usaha */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "type": "https://devotion/errors/forbidden",
+                         *       "title": "Tidak berwenang",
+                         *       "status": 403,
+                         *       "code": "FORBIDDEN",
+                         *       "detail": "Akun admin tidak memiliki profil usaha."
+                         *     }
+                         */
+                        "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
                 422: components["responses"]["ValidationFailed"];
@@ -2558,7 +2595,7 @@ export interface paths {
         head?: never;
         /**
          * Ubah atau nonaktifkan item daftar baku
-         * @description Menonaktifkan item tidak menghapus listing lama yang memakainya (FR-057).
+         * @description Menonaktifkan item tidak menghapus listing lama yang memakainya, dan listing itu tetap dapat ditemukan lewat pencarian (FR-060).
          */
         patch: {
             parameters: {
@@ -2640,7 +2677,7 @@ export interface paths {
         put?: never;
         /**
          * Setujui atau tolak usulan item
-         * @description Persetujuan memasukkan item ke daftar baku (FR-058).
+         * @description Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
          */
         post: {
             parameters: {
@@ -2813,7 +2850,7 @@ export interface paths {
         put?: never;
         /**
          * Tandai sengketa masuk mediasi
-         * @description Pesanan terkait berpindah ke status "dalam mediasi" (FR-071).
+         * @description Pesanan terkait berpindah ke status "dalam mediasi" (FR-046).
          */
         post: {
             parameters: {
@@ -2856,7 +2893,7 @@ export interface paths {
          * Putuskan hasil sengketa
          * @description Hasil menentukan nasib pesanan dan alokasi kapasitasnya. Bila dibatalkan, seluruh
          *     alokasi dibalik. Admin menetapkan pihak yang menanggung agar tingkat penyelesaian
-         *     adil (FR-071, FR-072).
+         *     adil (FR-067, FR-072).
          */
         post: {
             parameters: {
@@ -2954,7 +2991,15 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Seluruh ketergantungan sehat */
+                /**
+                 * @description Instance dapat melayani. status "ok" bila seluruh ketergantungan sehat.
+                 *     status "degraded" bila WhatsApp terputus (whatsapp: disconnected): kanal
+                 *     kode dan notifikasi terganggu, tetapi platform tetap melayani. Ini tidak
+                 *     menghasilkan 503 karena pemulihan sesi WhatsApp menuntut pemindaian QR
+                 *     manual lewat halaman admin, jadi me-restart container tidak menolong dan
+                 *     hanya akan memicu restart loop. Pemantau uptime tetap dapat memberi alert
+                 *     dari isi dependencies.whatsapp.
+                 */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2963,7 +3008,11 @@ export interface paths {
                         "application/json": components["schemas"]["Health"];
                     };
                 };
-                /** @description Setidaknya satu ketergantungan gagal; status degraded */
+                /**
+                 * @description Instance tidak dapat melayani dan layak di-restart atau ditarik dari
+                 *     rotasi; status degraded. Hanya dipicu oleh basis data gagal
+                 *     (database: fail) atau penyimpanan penuh (storage.status: full).
+                 */
                 503: {
                     headers: {
                         [name: string]: unknown;
@@ -2996,7 +3045,7 @@ export interface components {
              * @description Kode mesin yang stabil untuk penanganan di klien.
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "LISTING_ALREADY_EXISTS" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED" | "READINESS_AFTER_DEADLINE";
+            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "LISTING_ALREADY_EXISTS" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED" | "READINESS_AFTER_DEADLINE" | "PAYMENT_STATEMENT_EXISTS" | "DISPUTE_ALREADY_OPEN";
             /** @description Penjelasan bahasa Indonesia yang dapat dikutip pengguna. */
             detail: string;
             instance?: string;
@@ -3341,8 +3390,6 @@ export interface components {
         RequestCandidate: {
             /** Format: uuid */
             candidate_id: string;
-            /** Format: uuid */
-            request_id: string;
             /** Format: uuid */
             listing_id: string;
             /** Format: uuid */
