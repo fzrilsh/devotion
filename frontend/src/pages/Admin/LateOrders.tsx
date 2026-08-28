@@ -27,7 +27,7 @@ export default function AdminLateOrders() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada pesanan yang melewati tenggat. Semua pesanan berjalan sesuai jadwal.</p>
                 </div>
             ) : (
-                <ul className="space-y-3">
+                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {orders.map((order) => {
                         const meta = workOrderStatusMeta[order.status];
 
@@ -40,17 +40,21 @@ export default function AdminLateOrders() {
 
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <p className="text-sm font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
+                                            <p className="text-base font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
                                             <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${meta.className}`}>{meta.label}</span>
                                         </div>
 
-                                        <p className="mt-1 text-xs text-slate-400">
+                                        <p className="mt-1 text-sm text-slate-400">
                                             Tenggat kesiapan {formatDateId(order.readiness_deadline ?? order.deadline)}
-                                            {order.total_price != null ? ` · Nilai ${formatRupiah(order.total_price)}` : ""}
+                                            <br />
+                                            {order.total_price != null ? `Nilai ${formatRupiah(order.total_price)}` : ""}
                                         </p>
                                     </div>
 
-                                    <LuArrowRight className="size-4 shrink-0 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-amber-500" aria-hidden />
+                                    <div className="flex shrink-0 items-center gap-1 text-sm font-semibold text-slate-500 transition-colors group-hover:text-slate-700">
+                                        Detail
+                                        <LuArrowRight className="size-4" aria-hidden />
+                                    </div>
                                 </Link>
                             </li>
                         );

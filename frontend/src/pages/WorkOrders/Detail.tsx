@@ -1,12 +1,13 @@
 import { ApiError } from "@api/client";
 import type { WorkOrderDetail } from "@api/workOrders";
 import Loading from "@components/common/Loading";
+import { useAuth } from "@hooks/useAuth";
 import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuPackage, LuShieldAlert, LuStar, LuTriangleAlert } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
-import { formatDateId, formatDateTimeId, formatRupiah, workOrderStatusMeta } from "./meta";
+import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
@@ -66,6 +67,7 @@ const statusActions: { status: "production" | "completed" | "shipped"; label: st
 
 export default function Detail() {
     const { workOrderId = "" } = useParams();
+    const { user } = useAuth();
     const orderQuery = useWorkOrder(workOrderId);
 
     const changeStatus = useChangeWorkOrderStatus(workOrderId);
@@ -128,6 +130,7 @@ export default function Detail() {
 
     const order: WorkOrderDetail = orderQuery.data;
     const meta = workOrderStatusMeta[order.status];
+    const side = getWorkOrderSide(order, user?.profile_id ?? null);
     const transitions = order.allowed_transitions ?? [];
     const availableStatusActions = statusActions.filter((action) => transitions.includes(action.status));
     const canConfirm = transitions.includes("confirmed");
@@ -158,7 +161,10 @@ export default function Detail() {
                         </div>
                     </div>
 
-                    <span className={cn("inline-flex shrink-0 items-center rounded-full px-3.5 py-1.5 text-xs font-bold", meta.className)}>{meta.label}</span>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {side ? <span className={cn("inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold", workOrderSideMeta[side].className)}>{workOrderSideMeta[side].label}</span> : null}
+                        <span className={cn("inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold", meta.className)}>{meta.label}</span>
+                    </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-3">

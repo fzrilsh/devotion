@@ -66,7 +66,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
 
                 <div className="mt-3 flex items-center gap-3">
                     {notification.work_order_id ? (
-                        <Link to={`/orders/${notification.work_order_id}`} className="text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                        <Link to={`/orders/${notification.work_order_id.split("/").pop()}`} className="text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
                             Lihat pesanan
                         </Link>
                     ) : null}

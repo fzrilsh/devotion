@@ -1,10 +1,11 @@
 import type { WorkOrderStatus } from "@api/workOrders";
+import { useAuth } from "@hooks/useAuth";
 import { useWorkOrders } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuClipboardList, LuInbox } from "react-icons/lu";
 import { Link } from "react-router-dom";
-import { formatDateId, formatRupiah, workOrderStatusMeta } from "./meta";
+import { formatDateId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const statusFilters: { value: WorkOrderStatus | "all"; label: string }[] = [
     { value: "all", label: "Semua" },
@@ -24,11 +25,14 @@ const roleFilters = [
 ];
 
 export default function List() {
+    const { user } = useAuth();
     const [status, setStatus] = useState<WorkOrderStatus | "all">("all");
     const [role, setRole] = useState<"as_buyer" | "as_subcontractor" | undefined>(undefined);
 
     const ordersQuery = useWorkOrders(status === "all" ? [] : [status], role);
     const orders = ordersQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const myProfileId = user?.profile_id ?? null;
+    const hasBothRoles = Boolean(user?.roles?.buyer && user?.roles?.subcontractor);
 
     return (
         <div className="space-y-6">
@@ -54,17 +58,20 @@ export default function List() {
                     ))}
                 </div>
 
-                <select
-                    value={role ?? ""}
-                    onChange={(event) => setRole((event.target.value || undefined) as "as_buyer" | "as_subcontractor" | undefined)}
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-industrial-blue-500"
-                >
-                    {roleFilters.map((filter) => (
-                        <option key={filter.label} value={filter.value ?? ""}>
-                            {filter.label}
-                        </option>
-                    ))}
-                </select>
+                {hasBothRoles ? (
+                    <select
+                        value={role ?? ""}
+                        onChange={(event) => setRole((event.target.value || undefined) as "as_buyer" | "as_subcontractor" | undefined)}
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-600 outline-none transition focus:border-industrial-blue-500"
+                        aria-label="Saring berdasarkan posisi saya"
+                    >
+                        {roleFilters.map((filter) => (
+                            <option key={filter.label} value={filter.value ?? ""}>
+                                {filter.label}
+                            </option>
+                        ))}
+                    </select>
+                ) : null}
             </div>
 
             {ordersQuery.isError ? (
@@ -80,6 +87,7 @@ export default function List() {
                 <ul className="space-y-3">
                     {orders.map((order) => {
                         const meta = workOrderStatusMeta[order.status];
+                        const side = getWorkOrderSide(order, myProfileId);
 
                         return (
                             <li key={order.work_order_id}>
@@ -92,6 +100,7 @@ export default function List() {
                                         <div className="flex flex-wrap items-center gap-2">
                                             <p className="text-sm font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
                                             <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", meta.className)}>{meta.label}</span>
+                                            {side ? <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", workOrderSideMeta[side].className)}>{workOrderSideMeta[side].label}</span> : null}
                                         </div>
 
                                         <p className="mt-1 text-xs text-slate-400">

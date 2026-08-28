@@ -1,4 +1,4 @@
-import { confirmPasswordRecovery, getMe, login, logout, register, requestPasswordRecovery, resendCode, verifyEmail, verifyPhone, type LoginRequest, type RecoverConfirmRequest, type RecoverRequest, type RegisterRequest, type ResendCodeRequest, type VerificationCodeRequest } from "@api/auth";
+import { confirmPasswordRecovery, getMe, login, logout, register, requestPasswordRecovery, resendCode, updateMyRoles, verifyEmail, verifyPhone, type LoginRequest, type RecoverConfirmRequest, type RecoverRequest, type RegisterRequest, type ResendCodeRequest, type RolesUpdateRequest, type VerificationCodeRequest } from "@api/auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const authKeys = {
@@ -18,6 +18,10 @@ export function useMe() {
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         refetchOnMount: false,
+
+        // Jangan pernah menampilkan data akun dari cache saat fetch ulang.
+        // Setelah ganti akun, data lama harus hilang sebelum data baru tiba.
+        placeholderData: undefined,
     });
 }
 
@@ -38,8 +42,10 @@ export function useLogout() {
     return useMutation({
         mutationFn: logout,
         onSuccess: () => {
-            queryClient.setQueryData(authKeys.me, null);
-            queryClient.removeQueries({ queryKey: authKeys.me });
+            // Bersihkan seluruh cache, bukan hanya data akun. Kalau hanya
+            // authKeys.me yang dihapus, query lain (profil, listing, pesanan)
+            // masih menyimpan data akun sebelumnya dan ikut ke sesi akun baru.
+            queryClient.clear();
         },
     });
 }
@@ -75,6 +81,17 @@ export function useVerifyPhone() {
 export function useResendCode() {
     return useMutation({
         mutationFn: (data: ResendCodeRequest) => resendCode(data),
+    });
+}
+
+export function useUpdateMyRoles() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: RolesUpdateRequest) => updateMyRoles(data),
+        onSuccess: (account) => {
+            queryClient.setQueryData(authKeys.me, account);
+        },
     });
 }
 

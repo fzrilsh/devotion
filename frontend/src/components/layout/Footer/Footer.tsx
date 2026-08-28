@@ -8,13 +8,13 @@ const platformLinks = [
 ];
 
 const companyLinks = [
-    { label: "Tentang Devotion", to: "/" },
-    { label: "Bantuan", to: "/" },
+    { label: "Tentang Devotion", to: "/tentang" },
+    { label: "Bantuan", to: "/bantuan" },
 ];
 
 const legalLinks = [
-    { label: "Syarat & Ketentuan", to: "/" },
-    { label: "Kebijakan Privasi", to: "/" },
+    { label: "Syarat & Ketentuan", to: "/syarat-ketentuan" },
+    { label: "Kebijakan Privasi", to: "/kebijakan-privasi" },
 ];
 
 function FooterLinkGroup({ title, links }: { title: string; links: { label: string; to: string }[] }) {

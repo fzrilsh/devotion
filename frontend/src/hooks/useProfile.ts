@@ -3,7 +3,7 @@ import { getMyProfile, getPublicProfile, updateMyProfile, type ProfileUpdateRequ
 import { useAuth } from "@hooks/useAuth";
 
 const profileKeys = {
-    me: ["profile", "me"] as const,
+    me: (accountId: string | undefined) => ["profile", "me", accountId] as const,
     public: (profileId: string) => ["profile", "public", profileId] as const,
 };
 
@@ -11,7 +11,7 @@ export function useMyProfile() {
     const { user } = useAuth();
 
     return useQuery({
-        queryKey: profileKeys.me,
+        queryKey: profileKeys.me(user?.account_id),
         queryFn: getMyProfile,
         enabled: Boolean(user && !user.is_admin),
         staleTime: 5 * 60 * 1000,
@@ -35,11 +35,12 @@ export function usePublicProfile(profileId: string) {
 
 export function useUpdateProfile() {
     const queryClient = useQueryClient();
+    const { user } = useAuth();
 
     return useMutation({
         mutationFn: (data: ProfileUpdateRequest) => updateMyProfile(data),
         onSuccess: (updatedProfile) => {
-            queryClient.setQueryData(profileKeys.me, updatedProfile);
+            queryClient.setQueryData(profileKeys.me(user?.account_id), updatedProfile);
         },
     });
 }

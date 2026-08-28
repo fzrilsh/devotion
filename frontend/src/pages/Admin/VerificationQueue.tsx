@@ -96,9 +96,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
                 </div>
             </div>
 
-            {request.status === "rejected" && request.reason ? (
-                <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">Alasan penolakan: {request.reason}</p>
-            ) : null}
+            {request.status === "rejected" && request.reason ? <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">Alasan penolakan: {request.reason}</p> : null}
 
             {error ? (
                 <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert" aria-live="polite">
@@ -116,7 +114,12 @@ function RequestCard({ request }: { request: VerificationRequest }) {
                             <textarea id={`reason-${request.request_id}`} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} className={inputClassName} placeholder="Misalnya: dokumen identitas tidak terbaca" minLength={5} maxLength={1000} />
 
                             <div className="flex gap-2">
-                                <button type="button" onClick={() => decide("rejected")} disabled={decideMutation.isPending} className="flex-1 cursor-pointer rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                <button
+                                    type="button"
+                                    onClick={() => decide("rejected")}
+                                    disabled={decideMutation.isPending}
+                                    className="flex-1 cursor-pointer rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
                                     {decideMutation.isPending ? "Menyimpan..." : "Tolak Pengajuan"}
                                 </button>
                                 <button type="button" onClick={() => setRejectOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
@@ -126,7 +129,12 @@ function RequestCard({ request }: { request: VerificationRequest }) {
                         </div>
                     ) : (
                         <div className="flex gap-2">
-                            <button type="button" onClick={() => decide("approved")} disabled={decideMutation.isPending} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            <button
+                                type="button"
+                                onClick={() => decide("approved")}
+                                disabled={decideMutation.isPending}
+                                className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
                                 <LuCircleCheck className="size-4" aria-hidden />
                                 {decideMutation.isPending ? "Menyimpan..." : "Setujui"}
                             </button>
@@ -179,7 +187,7 @@ export default function AdminVerificationQueue() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada pengajuan dengan status ini.</p>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {items.map((request) => (
                         <RequestCard key={request.request_id} request={request} />
                     ))}

@@ -33,6 +33,11 @@ export async function register(data: RegisterRequest): Promise<RegisterResponse>
     });
 }
 
+export type RolesUpdateRequest = {
+    subcontractor?: boolean;
+    buyer?: boolean;
+};
+
 export async function getMe(): Promise<MyAccount | null> {
     try {
         return await apiClient<MyAccount>("/me");
@@ -88,6 +93,13 @@ export async function requestPasswordRecovery(data: RecoverRequest): Promise<voi
 export async function confirmPasswordRecovery(data: RecoverConfirmRequest): Promise<void> {
     await apiClient<void>("/auth/recover/confirm", {
         method: "POST",
+        body: JSON.stringify(data),
+    });
+}
+
+export async function updateMyRoles(data: RolesUpdateRequest): Promise<MyAccount> {
+    return apiClient<MyAccount>("/me/roles", {
+        method: "PATCH",
         body: JSON.stringify(data),
     });
 }

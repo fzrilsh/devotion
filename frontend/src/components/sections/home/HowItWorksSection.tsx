@@ -44,7 +44,7 @@ const card = {
 
 export default function HowItWorksSection() {
     return (
-        <section className="relative h-full scroll-mt-24 overflow-hidden bg-deep-navy-500">
+        <section id="cara-kerja" className="relative h-full scroll-mt-24 overflow-hidden bg-deep-navy-500">
             <div aria-hidden className="pointer-events-none absolute inset-0">
                 <div className="absolute -top-40 left-1/2 size-128 -translate-x-1/2 rounded-full bg-industrial-blue-500/10 blur-3xl" />
                 <div className="absolute -bottom-48 -right-24 size-96 rounded-full bg-industrial-orange-500/10 blur-3xl" />

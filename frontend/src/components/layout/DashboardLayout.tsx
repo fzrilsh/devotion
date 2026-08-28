@@ -4,6 +4,7 @@ import { useAuth, useLogout } from "@hooks/useAuth";
 import { useUnreadCount } from "@hooks/useNotifications";
 import { useProfile } from "@hooks/useProfile";
 import { cn } from "@lib/utils";
+import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
 import { LuBell, LuChevronDown, LuLogOut, LuMenu, LuShieldCheck, LuX } from "react-icons/lu";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -105,31 +106,30 @@ function NavItemWithChildren({ item, theme, onNavigate }: { item: DashboardNavIt
 
     return (
         <div className="w-full">
-            <div className={cn("group flex w-full items-center rounded-xl text-sm font-semibold transition-all duration-200", theme.navLink(isActive))}>
-                <NavLink to={item.to} end={item.end} onClick={onNavigate} className="flex min-w-0 flex-1 items-center gap-3">
-                    <Icon aria-hidden className={theme.navIcon(isActive)} />
-                    <span>{item.label}</span>
-                </NavLink>
+            <button type="button" onClick={() => setIsOpen((prev) => !prev)} aria-expanded={isOpen} aria-label={`${isOpen ? "Tutup" : "Buka"} submenu ${item.label}`} className={cn("group flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200", theme.navLink(isActive))}>
+                <Icon aria-hidden className={theme.navIcon(isActive)} />
+                <span className="flex-1 text-left">{item.label}</span>
+                <LuChevronDown aria-hidden className={theme.chevron(isOpen)} />
+            </button>
 
-                <button type="button" onClick={() => setIsOpen((prev) => !prev)} aria-expanded={isOpen} aria-label={`${isOpen ? "Tutup" : "Buka"} submenu ${item.label}`} className="cursor-pointer">
-                    <LuChevronDown aria-hidden className={theme.chevron(isOpen)} />
-                </button>
-            </div>
+            <AnimatePresence initial={false}>
+                {isOpen ? (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: "easeInOut" }} className="overflow-hidden">
+                        <div className="ml-8 mt-1 flex flex-col gap-1">
+                            {(item.children ?? []).map((child) => {
+                                const ChildIcon = child.icon;
 
-            {isOpen ? (
-                <div className="ml-8 mt-1 flex flex-col gap-1">
-                    {(item.children ?? []).map((child) => {
-                        const ChildIcon = child.icon;
-
-                        return (
-                            <NavLink key={child.to} to={child.to} end={child.end} onClick={onNavigate} className={({ isActive }) => theme.childLink(isActive)}>
-                                <ChildIcon aria-hidden className="size-4 shrink-0" />
-                                {child.label}
-                            </NavLink>
-                        );
-                    })}
-                </div>
-            ) : null}
+                                return (
+                                    <NavLink key={child.to} to={child.to} end={child.end} onClick={onNavigate} className={({ isActive }) => theme.childLink(isActive)}>
+                                        <ChildIcon aria-hidden className="size-4 shrink-0" />
+                                        {child.label}
+                                    </NavLink>
+                                );
+                            })}
+                        </div>
+                    </motion.div>
+                ) : null}
+            </AnimatePresence>
         </div>
     );
 }
@@ -205,23 +205,25 @@ export default function DashboardLayout({ title, navItems, header }: DashboardLa
             </aside>
 
             {/* Sidebar mobile */}
-            {sidebarOpen ? (
-                <div className="fixed inset-0 z-40 lg:hidden">
-                    <div className="absolute inset-0 bg-deep-navy-800/50" onClick={closeSidebar} aria-hidden />
+            <AnimatePresence>
+                {sidebarOpen ? (
+                    <div className="fixed inset-0 z-99 lg:hidden">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="absolute inset-0 bg-deep-navy-800/50 backdrop-blur-sm" onClick={closeSidebar} aria-hidden />
 
-                    <aside className={cn("absolute inset-y-0 left-0 flex w-72 flex-col p-5 shadow-xl", theme.isAdmin ? "bg-linear-to-b from-deep-navy-500 to-industrial-blue-500" : "bg-white")}>
-                        <button type="button" onClick={closeSidebar} className={cn("absolute right-4 top-5 cursor-pointer transition-colors", theme.isAdmin ? "text-white/50 hover:text-white" : "text-slate-400 hover:text-slate-600")} aria-label="Tutup menu navigasi">
-                            <LuX className="size-5" />
-                        </button>
+                        <motion.aside initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ duration: 0.35, ease: "easeInOut" }} className={cn("absolute inset-y-0 left-0 flex w-72 flex-col p-5 shadow-xl", theme.isAdmin ? "bg-linear-to-b from-deep-navy-500 to-industrial-blue-500" : "bg-white")}>
+                            <button type="button" onClick={closeSidebar} className={cn("absolute right-4 top-5 cursor-pointer transition-colors", theme.isAdmin ? "text-white/50 hover:text-white" : "text-slate-400 hover:text-slate-600")} aria-label="Tutup menu navigasi">
+                                <LuX className="size-5" />
+                            </button>
 
-                        {sidebarContent}
-                    </aside>
-                </div>
-            ) : null}
+                            {sidebarContent}
+                        </motion.aside>
+                    </div>
+                ) : null}
+            </AnimatePresence>
 
             {/* Konten utama */}
-            <div className="flex min-h-screen flex-1 flex-col lg:pl-64">
-                <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white/80 px-5 backdrop-blur-xl sm:px-8">
+            <div className="flex min-h-screen flex-1 flex-col lg:pl-72 sm:pr-4">
+                <header className="sticky top-0 sm:top-4 z-20 flex h-16 items-center gap-4 sm:rounded-2xl p-4 shadow-sm bg-white/80 px-5 backdrop-blur-xl sm:px-8">
                     <button type="button" onClick={() => setSidebarOpen(true)} className="cursor-pointer text-slate-500 transition-colors hover:text-slate-700 lg:hidden" aria-label="Buka menu navigasi">
                         <LuMenu className="size-6" />
                     </button>
@@ -241,7 +243,7 @@ export default function DashboardLayout({ title, navItems, header }: DashboardLa
                     </div>
                 </header>
 
-                <main className="flex-1 px-5 py-8 sm:px-8">
+                <main className="flex-1 px-4 py-8">
                     <Outlet />
                 </main>
             </div>

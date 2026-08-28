@@ -1,4 +1,5 @@
-import { createListing, getListingPeriods, getMasterMachines, getMasterProducts, getMyListing, proposeMasterItem, setListingVisibility, updateListing, updateListingPeriods, type ListingRequest, type PeriodUpdateItem } from "@api/listing";
+import { createListing, getListingPeriods, getMasterMachines, getMasterProducts, getMyListing, setListingVisibility, updateListing, updateListingPeriods, type ListingRequest, type PeriodUpdateItem } from "@api/listing";
+import { proposeCatalogItem } from "@api/master";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const listingKeys = {
@@ -89,6 +90,6 @@ export function useMasterMachines() {
 
 export function useProposeMasterItem() {
     return useMutation({
-        mutationFn: ({ kind, proposedName }: { kind: "product" | "machine"; proposedName: string }) => proposeMasterItem(kind, proposedName),
+        mutationFn: ({ kind, proposedName }: { kind: "product" | "machine"; proposedName: string }) => proposeCatalogItem(kind, proposedName),
     });
 }
