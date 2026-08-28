@@ -3,6 +3,42 @@
 Jalan pintas dan penyimpangan yang dicatat karena tenggat atau karena gerbang
 konstitusi saling berbenturan. Setiap entri menyebut akibatnya.
 
+## Empat risiko yang diterima sadar
+
+Bukan pelanggaran aturan, tetapi penyimpangan dari mitigasi yang dokumen sumber
+tetapkan. Dicatat lengkap di `plan.md` bagian Risiko yang Diterima Sadar dan di
+Assumptions `spec.md`; diulang di sini agar terlihat saat implementasi.
+
+**whatsmeow memakai protokol WhatsApp Web, bukan API resmi.** FR-002 menjadikan
+verifikasi nomor HP sebagai gerbang, jadi nomor yang terblokir berarti tidak ada
+akun baru yang bisa dibuat saat demo.
+
+**Akibat:** risiko blokir nomor menghentikan alur inti. Mitigasi: halaman admin
+QR dan status sambungan, subcommand `user:verify` sebagai jalan darurat, email
+sebagai kanal kedua, dan pembatasan laju per nomor serta per alamat asal. Ini
+tumpang tindih dengan entri layanan luar WhatsApp; lihat `docs/layanan-luar.md`.
+
+**Escrow tidak dibangun.** Dokumen sumber menempatkan penahanan dana yang dirilis
+saat pesanan dikonfirmasi selesai sebagai mitigasi utama risiko gagal bayar dan
+alat tawar dalam sengketa. Versi ini menggantinya dengan pencatatan pernyataan
+pembayaran, sejalan dengan Batas Keuangan yang melarang memproses dana.
+
+**Akibat:** mediasi admin kehilangan salah satu daya paksanya. Tidak ada kolom
+jumlah uang di `catatan_pembayaran`; platform hanya mencatat pernyataan pihak.
+
+**Verifikasi identitas bukan gerbang.** Hasil pencarian dapat memuat usaha yang
+belum diperiksa.
+
+**Akibat:** lencana verifikasi menjadi satu-satunya pembeda antara usaha yang
+sudah dan belum diperiksa; pengguna menanggung penilaian itu sendiri.
+
+**Skor kecocokan tidak memuat faktor perilaku.** Penalti peringkat bagi
+subkontraktor yang tidak memperbarui kalender tidak dipakai.
+
+**Akibat:** penegakan hanya lewat pengingat dan penanda "Data Belum Diperbarui".
+Ini justru menjaga skor tetap deterministik dan bebas dari reputasi, verifikasi,
+serta kebaruan kalender, sesuai gerbang pengujian skor.
+
 ## Cron host untuk `pg_dump` harian
 
 Konstitusi mewajibkan cadangan terjadwal dengan salinan di luar server, sementara
