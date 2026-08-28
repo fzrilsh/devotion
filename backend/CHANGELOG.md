@@ -7,6 +7,19 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Runbook VPS dilengkapi menjadi 16 langkah utuh (T077): pasang compose,
+  menyalakan dan memverifikasi migrasi, seed wilayah dan daftar baku serta
+  `admin:create`, menyambungkan WhatsApp, health check dan pemantau uptime,
+  cadangan basis data, dan snapshot. Langkah firewall diubah menjadi gerbang
+  berupa perintah `curl` dari luar VPS beserta hasil yang diharapkan, dengan
+  peringatan bahwa port yang dipublikasikan Docker melewati `ufw`. Ditambah
+  urutan eksekusi menuju penjurian dan checklist dua belas butir dari
+  `quickstart.md` bagian H. Skrip `backup.sh` ditulis lengkap di langkah 15
+  beserta rotasi tiga salinan, entri crontab, dan `rsync` keluar VPS (artefak
+  T080/T081, eksekusi di server dilakukan pemilik VPS).
+- `docs/menjalankan.md` dilengkapi alur pengembang lokal (Postgres via compose,
+  `serve` dari host di port 5434, seed, uji) dan ringkasan alur server yang
+  menunjuk ke `docs/setup-vps.md` (bagian dari T079).
 - CI memisahkan gerbang mutu dari rilis (T007). Job `backend` (`go vet`,
   `go test ./... -p 1`, gerbang sinkronisasi apidocs) tetap wajib hijau pada
   setiap push dan pull request. Job baru `detect` memeriksa keberadaan

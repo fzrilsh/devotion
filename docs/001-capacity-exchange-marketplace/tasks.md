@@ -719,7 +719,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T034, T038, T046, T052, T061, T066, T074
   **Selesai bila**: dapat diikuti orang yang belum pernah melihat sistem ini; setiap langkah menyebut akun yang dipakai
 
-- [ ] T077 [P] [OPS] Runbook VPS
+- [x] T077 [P] [OPS] Runbook VPS
   **Modul**: `docs/setup-vps.md`
   **Kemampuan**: 16 langkah dari `quickstart.md` bagian B
   **Dependency**: prasyarat T005
