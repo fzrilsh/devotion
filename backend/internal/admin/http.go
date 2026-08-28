@@ -17,17 +17,38 @@ type whatsAppStatus struct {
 	LastError *string `json:"last_error"`
 }
 
-// Register wires GET /api/admin/whatsapp behind an admin-only gate. The route is
-// covered by RequireRole so it stays out of the router's uncovered set, and only
-// an admin principal ever reaches the handler (FR-082 keeps the number out of the
+// Register wires the WhatsApp link routes behind an admin-only gate. Both are
+// covered by RequireRole so they stay out of the router's uncovered set, and only
+// an admin principal ever reaches a handler (FR-082 keeps the number out of the
 // body regardless).
 func (m *Manager) Register(r *httpx.Router, auth httpx.Authenticator) {
-	r.Gated("GET /api/admin/whatsapp", httpx.RequireRole(auth, httpx.RoleAdmin), m.handleStatus)
+	gate := httpx.RequireRole(auth, httpx.RoleAdmin)
+	r.Gated("GET /api/admin/whatsapp", gate, m.handleStatus)
+	r.Gated("POST /api/admin/whatsapp/reconnect", gate, m.handleReconnect)
 }
 
-// handleStatus reports the live link state to an admin. It reads the guarded
-// status and maps empty strings to null, matching the nullable contract fields.
+// handleStatus reports the live link state to an admin. Reading the status arms a
+// pairing cycle when the link is unpaired and none is live: one GetQRChannel call
+// only yields a finite batch of codes, so without this the page would be blank
+// for every admin who opens it more than a few minutes after startup. A paired
+// link is left alone.
 func (m *Manager) handleStatus(w http.ResponseWriter, _ *http.Request) {
+	m.EnsureQR(false)
+	m.writeStatus(w)
+}
+
+// handleReconnect discards whatever cycle is live and starts a new one, or
+// bounces the socket when the link is paired. It is the "sambung ulang" button
+// (T024b): the admin presses it because the code on screen is stale or the link
+// is stuck, and neither case should require server access.
+func (m *Manager) handleReconnect(w http.ResponseWriter, _ *http.Request) {
+	m.EnsureQR(true)
+	m.writeStatus(w)
+}
+
+// writeStatus renders the guarded status, mapping empty strings to null to match
+// the nullable contract fields.
+func (m *Manager) writeStatus(w http.ResponseWriter) {
 	st := m.Status()
 	body := whatsAppStatus{Connected: st.Connected}
 	if st.QRCode != "" {

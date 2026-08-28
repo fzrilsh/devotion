@@ -400,6 +400,11 @@ senyap saat pencarian.
 Buka `https://devotion.web.id/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
 
+Kode QR punya masa berlaku pendek. Muat ulang halaman untuk mendapat kode baru, atau tekan
+tombol sambung ulang bila kode di layar sudah kedaluwarsa. Setiap pemuatan halaman
+menyiapkan siklus pemasangan baru bila tautan belum terpasangkan, jadi tidak ada jendela
+waktu setelah proses menyala yang membuat QR berhenti muncul.
+
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
 justru agar penyambungan ulang tidak memerlukan akses SSH, dan itu penting karena FR-002
 menjadikan verifikasi nomor HP sebagai gerbang pendaftaran.

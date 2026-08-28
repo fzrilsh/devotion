@@ -6,6 +6,35 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diperbaiki
+- Kode QR WhatsApp kini muncul kapan pun admin membukanya, bukan hanya beberapa
+  menit pertama setelah proses menyala. `Manager.Start` memanggil
+  `GetQRChannel` tepat satu kali saat boot, sedangkan whatsmeow mengirim
+  sejumlah kode terbatas per siklus (enam kode, satu menit lalu dua puluh detik
+  masing-masing) kemudian menutup kanal, mencabut event handler-nya, dan
+  memutus soket. Setelah batch itu habis tidak ada apa pun yang memulai siklus
+  baru: `GET /api/admin/whatsapp` hanya membaca `qrCode` yang sudah dikosongkan,
+  jadi memuat ulang halaman tidak pernah menghasilkan kode dan satu-satunya cara
+  memulihkan adalah me-restart kontainer.
+  Sekarang pemasangan disiapkan saat diminta, bukan saat boot: membaca status
+  menyalakan siklus baru bila tautan belum terpasangkan dan tidak ada siklus yang
+  berjalan, lalu menunggu paling lama lima detik agar satu pemuatan halaman
+  langsung memberi kode yang bisa dipindai. Setiap siklus memakai client
+  whatsmeow baru, karena handler QR siklus lama masih terpasang di client lama
+  dan akan memutus soket siklus baru saat event QR berikutnya datang. Penulisan
+  status diberi nomor generasi sehingga pump siklus yang sudah ditinggalkan tidak
+  dapat menimpa kode segar. Tautan yang sudah terpasangkan tidak pernah
+  dipasangkan ulang, hanya disambungkan kembali, supaya sesi yang masih sah tidak
+  terhapus demi menampilkan QR.
+
+### Ditambahkan
+- `POST /api/admin/whatsapp/reconnect`, khusus admin, membuang siklus pemasangan
+  yang berjalan dan memulai yang baru, atau menjatuhkan lalu menyambungkan ulang
+  soket bila tautan sudah terpasangkan. Ini tombol "sambung ulang" yang dituntut
+  T024b, dan bentuk balasannya sama dengan `GET /api/admin/whatsapp`. Nomor
+  layanan tetap tidak pernah ada di respons (FR-082). Jumlah operasi di
+  `contracts/README.md` menjadi 65 pada 57 path.
+
 ### Diubah
 - `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
   pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin
