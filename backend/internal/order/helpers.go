@@ -90,6 +90,20 @@ func principalAccount(w http.ResponseWriter, r *http.Request) (sqlcgen.UserAccou
 	return acc, true
 }
 
+// callerIsAdmin reports whether the gated principal holds the admin role. The
+// work-order detail read uses it to let an admin past the party guard, so the
+// mediation and late-order queues can open the full history of an order the
+// admin is not party to (FR-045, FR-046). It reads the role bitmask rather than
+// the account row so the answer comes from the same source the route gates use.
+// Mirrors verification.callerIsAdmin.
+func callerIsAdmin(r *http.Request) bool {
+	p, ok := httpx.PrincipalFromContext(r.Context())
+	if !ok {
+		return false
+	}
+	return p.Roles.Has(httpx.RoleAdmin)
+}
+
 // decodeJSON reads the request body into dst, rejecting an unknown field or a
 // malformed body with VALIDATION_FAILED. The body is capped so a large payload
 // cannot exhaust memory. It returns false when it already wrote the problem, so

@@ -16,9 +16,9 @@ import (
 // a test asserts membership without caring about the rest of the summary shape.
 func lateListItems(t *testing.T, body []byte) []string {
 	t.Helper()
-	var out workOrderList
+	var out lateOrderList
 	if err := json.Unmarshal(body, &out); err != nil {
-		t.Fatalf("decode WorkOrderList %q: %v", string(body), err)
+		t.Fatalf("decode LateOrderList %q: %v", string(body), err)
 	}
 	ids := make([]string, 0, len(out.Items))
 	for _, it := range out.Items {
@@ -137,6 +137,45 @@ func TestLateOrders_NotifiesBothPartiesOnce_FR045(t *testing.T) {
 	}
 	if got := rec.countFor(h.subAcc, sqlcgen.EventTypeDeadlinePassed); got != 1 {
 		t.Fatalf("subkontraktor diberi tahu %d kali total, mau tepat 1 (FR-045)", got)
+	}
+}
+
+// TestLateOrders_SummaryCarriesNoHistory_FR045 proves the admin list is a summary,
+// not a detail: it never claims to carry the history, allocations, or payments it
+// cannot read from the work-order row alone. An earlier version sent those as empty
+// arrays under the WorkOrderDetail name, which told the client the order had none.
+// The admin follows work_order_id into GET /api/work-orders/{id} for the rest.
+func TestLateOrders_SummaryCarriesNoHistory_FR045(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_late_summary")
+	admin := seedAcceptAccount(t, h.pool, "admin_late_summary@contoh.test", false)
+	handler := woRouter(h, httpx.RoleAdmin, admin)
+
+	h.clock.Advance(2 * 24 * time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/late-orders", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200; body %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Items []map[string]json.RawMessage `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode daftar telat: %v", err)
+	}
+	if len(out.Items) == 0 {
+		t.Fatal("daftar telat kosong; pesanan lewat tenggat seharusnya muncul (FR-045)")
+	}
+	for _, absent := range []string{"allocations", "status_history", "payments", "product_item_id", "readiness_lead_days", "allowed_transitions", "self_cancellable", "auto_confirm_at"} {
+		if _, ok := out.Items[0][absent]; ok {
+			t.Fatalf("ringkasan telat memuat %q; kolom itu tidak dibaca kueri telat, jadi tidak boleh dijanjikan (FR-045)", absent)
+		}
+	}
+	for _, want := range []string{"work_order_id", "status", "buyer_profile_id", "subcontractor_profile_id", "quantity", "deadline", "total_price", "readiness_deadline"} {
+		if _, ok := out.Items[0][want]; !ok {
+			t.Fatalf("ringkasan telat kehilangan %q", want)
+		}
 	}
 }
 
