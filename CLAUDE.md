@@ -252,7 +252,7 @@ saat masih dikerjakan.
 
 ## Backend (Go)
 
-**Stack**: Go 1.22+, `net/http` (router bawaan), `pgx/v5` + `sqlc`,
+**Stack**: Go 1.25+, `net/http` (router bawaan), `pgx/v5` + `sqlc`,
 `golang-migrate`, `bcrypt`, `whatsmeow`, `sentry-go`, PostgreSQL 16.
 
 ### Yang harus benar

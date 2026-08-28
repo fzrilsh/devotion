@@ -37,8 +37,41 @@ perubahannya.
   pengembangan lokal bagian D, dan bind unggahan `${UPLOAD_PATH}:${UPLOAD_PATH}`
   agar path host dan container ditulis satu kali. Ditambah catatan bahwa port
   loopback melewati `ufw` sehingga ikatan ke `127.0.0.1` yang menahannya tertutup.
+- `docs/menjalankan.md` mendapat bagian Frontend: alasan frontend bukan layanan
+  ketiga (hasil build disalin ke `backend/webdist/` lalu disematkan lewat
+  `embed.FS`, itulah yang menjaga Gate I), keadaan sekarang bahwa `frontend/`
+  baru memuat `.gitkeep` sehingga belum ada yang bisa dijalankan dan job `image`
+  serta `deploy` di CI dilewati, perintah `npm ci && npm run dev` untuk nanti,
+  dan tiga hal yang harus benar di `vite.config.ts`: proxy `/api` ke
+  `127.0.0.1:8080` (tanpa itu cookie `SameSite=Lax` tidak terkirim dan setiap
+  permintaan tampak belum masuk), `credentials: 'include'`, dan tipe yang
+  di-generate dari `openapi.yaml`.
 
 ### Diperbaiki
+- `docs/menjalankan.md` sebelumnya tidak dapat diikuti apa adanya. Dua cacatnya:
+  langkah `go run ./cmd/devotion serve` gagal seketika dengan `variabel
+  lingkungan wajib belum diisi: APP_ENV` karena biner Go membaca konfigurasi
+  lewat `os.Getenv` dan tidak pernah membaca berkas `.env` (yang membacanya
+  hanyalah Docker Compose), dan langkah uji `go test ./... -p 1` melewati
+  seluruh uji basis data secara senyap karena bawaan `DATABASE_URL_TEST` di
+  `internal/db/testdb` menunjuk port 5432 sementara compose menerbitkan 5434,
+  dan uji yang tak dapat menjangkau basis data memilih `t.Skip`. Ditambahkan
+  langkah `set -a; . ./.env; set +a`, daftar empat variabel yang wajib di setiap
+  lingkungan, dan `DATABASE_URL_TEST` yang disebut eksplisit pada perintah uji.
+  Keterangan yang sama ditambahkan ke `docs/pengujian.md` dan `quickstart.md`
+  bagian D.
+- Perbedaan penulisan perintah compose antara `docs/menjalankan.md` dan
+  `docs/setup-vps.md` dijelaskan alih-alih diseragamkan. Homebrew memasang
+  Compose sebagai biner standalone `docker-compose`, sedangkan pemasangan Docker
+  di VPS lewat skrip resmi menyediakannya sebagai plugin `docker compose`, jadi
+  satu bentuk tunggal pasti gagal di salah satu mesin. Alur lokal memakai
+  `docker-compose`, runbook server memakai `docker compose`, keduanya Compose v2
+  dan menerima berkas yang sama.
+- Batas bawah versi Go diseragamkan menjadi 1.25+ di `CLAUDE.md`,
+  `docs/setup-vps.md`, `quickstart.md`, dan `docs/dependencies.md`. Sebelumnya
+  tertulis 1.22+ di beberapa tempat sementara `go.mod` sudah dipatok `1.25.0`
+  karena dituntut graf modul whatsmeow, jadi angka 1.22 itu menyesatkan sebagai
+  prasyarat penyiapan.
 - Gerbang uji basis data di CI tidak pernah benar-benar berjalan sejak pipeline
   dibuat. `go test ./...` dijalankan tanpa `-p 1`, jadi paket-paket berjalan
   paralel dan menghabiskan koneksi Postgres (max_connections=20, pool 15),
