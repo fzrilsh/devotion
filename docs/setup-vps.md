@@ -11,7 +11,7 @@ dokumen ini merangkum urutannya agar mudah dirujuk.
 - Akun Cloudflare (domain aktif), Mailjet (kunci API dan secret), Sentry (DSN).
 - Nomor WhatsApp khusus, bukan nomor pribadi, ponselnya tersedia untuk memindai QR.
 - GitHub dengan izin menulis ke GitHub Container Registry.
-- Mesin lokal dengan Docker, Go 1.22+, Node 20+ untuk pengembangan.
+- Mesin lokal dengan Docker, Go 1.25+, Node 20+ untuk pengembangan.
 
 Sengaja tidak dipakai: payment gateway, object storage eksternal, reverse proxy
 sebagai proses tersendiri, mail server sendiri.

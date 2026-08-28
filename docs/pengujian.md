@@ -7,8 +7,8 @@ baru. Cakupan berupa kewajiban yang bisa diperiksa, bukan angka persentase.
 
 ```bash
 cd backend
-go test ./...              # seluruh paket
-go test ./... -p 1         # serial antar paket, wajib bila memakai basis data
+DATABASE_URL_TEST=postgres://devotion:devotion@127.0.0.1:5434/devotion?sslmode=disable \
+  go test ./... -p 1
 ```
 
 `-p 1` menjalankan paket secara berurutan agar total koneksi tetap di bawah
@@ -16,9 +16,18 @@ go test ./... -p 1         # serial antar paket, wajib bila memakai basis data
 paralel menghabiskan koneksi dan gagal dengan SQLSTATE 53300. CI memakai flag
 yang sama.
 
-Uji yang butuh basis data menunjuk `DATABASE_URL_TEST`. Di CI, Postgres
-disediakan sebagai layanan infrastruktur runner, bukan layanan runtime, jadi
-Gate I tidak terpengaruh.
+`DATABASE_URL_TEST` harus disebut eksplisit di lokal, bukan diandalkan
+bawaannya. Nilai bawaan di `internal/db/testdb` menunjuk port 5432, sedangkan
+compose menerbitkan Postgres ke `127.0.0.1:5434`. Uji yang tidak dapat
+menjangkau basis data memilih `t.Skip` sambil menyebut nama variabelnya,
+sengaja, agar basis data yang mati tidak tampak seperti uji yang lulus. Akibat
+praktisnya: menjalankan `go test ./...` tanpa variabel ini melewati seluruh uji
+basis data dan hasilnya tetap hijau. Periksa keluarannya, `ok` yang seharusnya
+`SKIP` adalah pertanda variabelnya salah.
+
+Di CI, Postgres disediakan sebagai layanan infrastruktur runner, bukan layanan
+runtime, jadi Gate I tidak terpengaruh. DSN-nya diset di blok `env` job
+`backend` pada `.github/workflows/ci.yml`.
 
 ## Menjalankan uji frontend
 
