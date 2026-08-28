@@ -48,7 +48,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Tujuan**: repository dapat dibangun dan dijalankan, meski belum ada fitur.
 
-- [ ] T001 [OPS] Struktur repository dan berkas tingkat atas
+- [x] T001 [OPS] Struktur repository dan berkas tingkat atas
   **Modul**: root
   **Kemampuan**: `README.md` (template panitia, struktur tidak diubah), `LICENSE` MIT, `CLAUDE.md`, `.gitignore`, `.env.example` berisi nama variabel tanpa nilai, direktori `backend/`, `frontend/`, `docs/`
   **Dependency**: tidak ada
@@ -76,21 +76,21 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tipe ter-generate dan dapat diimpor; skrip terdokumentasi di `docs/menjalankan.md`
   **Hati-hati**: jangan pernah menulis tipe respons dengan tangan. Yang ditulis tangan akan menyimpang dari kontrak tanpa ada yang tahu.
 
-- [ ] T005 [P] [OPS] Compose dua layanan
+- [x] T005 [P] [OPS] Compose dua layanan
   **Modul**: `docker-compose.yml` (path dipatok)
   **Kemampuan**: tepat dua layanan `backend` dan `postgres`, penyetelan Postgres untuk 2GB sesuai `research.md` R-03, batas log `max-size 10m` `max-file 3` pada keduanya, volume `pgdata` dan bind `/opt/devotion/uploads`
   **Dependency**: tidak ada; prasyarat T001
   **Selesai bila**: `docker compose config` valid; jumlah entri di bawah `services:` tepat dua
   **Hati-hati**: batas log bukan kebersihan. Log tanpa batas mengisi 50GB, lalu Postgres berhenti menulis dan aplikasi mati total.
 
-- [ ] T006 [P] [OPS] Kerangka dokumentasi dan changelog
+- [x] T006 [P] [OPS] Kerangka dokumentasi dan changelog
   **Modul**: `docs/` + `backend/` + `frontend/`
   **Kemampuan**: di `docs/`, terdiri dari `menjalankan.md`, `pengujian.md`, `dependencies.md`, `utang-teknis.md`, `layanan-luar.md`, `temuan-penguji.md`, `cloudflare-ips.md`, `setup-vps.md`, `skenario-uji-manual.md`, dan direktori `master-data/`. Changelog **terpisah per bagian**: `backend/CHANGELOG.md` dan `frontend/CHANGELOG.md`
   **Dependency**: tidak ada; prasyarat T001
   **Selesai bila**: seluruh berkas ada dengan judul dan kerangka bagian; tidak ada `docs/changelog.md`
   **Saran**: kedua changelog diisi setiap kali sebuah story ditutup di checkpoint, bukan direkonstruksi di akhir. `layanan-luar.md` mencatat Cloudflare, Mailjet, Sentry, pemantau uptime, dan wilayah.id beserta akibat bila masing-masing mati.
 
-- [ ] T007 [OPS] CI pipeline
+- [x] T007 [OPS] CI pipeline
   **Modul**: `.github/workflows/`
   **Kemampuan**: `go vet`, `go test`, `npm test`, `npm run build`, salin `dist` → `backend/webdist/`, build image multi-stage, push ke GHCR, deploy via SSH
   **Dependency**: prasyarat T002, T003, T004 (menjalankan vet dan test Go, test dan build frontend, lalu menyalin `dist` ke `webdist`)

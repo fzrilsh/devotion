@@ -5,6 +5,12 @@ on:
     branches: [main, staging, "develop/**"]
   pull_request:
 
+# Cancel superseded runs on the same ref so back-to-back pushes do not pile up
+# runners. The queued run is more valuable than the one already stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   GO_VERSION: "1.25.0"
   NODE_VERSION: "20"
@@ -58,13 +64,32 @@ jobs:
       # connections and fail with SQLSTATE 53300.
       - run: go test ./... -p 1
 
+  # Detect whether the frontend has landed yet. While frontend/ holds only a
+  # placeholder (no package.json), the image and deploy jobs are skipped so the
+  # pipeline stays green as a backend quality gate. Once T003 adds
+  # frontend/package.json, both jobs light up on their own with no workflow edit.
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_frontend: ${{ steps.check.outputs.has_frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "has_frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # Build the frontend, embed it into the backend image, and push to GHCR.
-  # Runs only on branch pushes, not pull requests. The frontend lives in
-  # frontend/ (handled by another contributor); its build output is copied into
-  # backend/webdist/ before the Docker build so the go:embed directive resolves.
+  # Runs only on branch pushes, not pull requests, and only once the frontend
+  # exists. The frontend lives in frontend/ (handled by another contributor);
+  # its build output is copied into backend/webdist/ before the Docker build so
+  # the go:embed directive resolves.
   image:
-    needs: backend
-    if: github.event_name == 'push'
+    needs: [backend, detect]
+    if: github.event_name == 'push' && needs.detect.outputs.has_frontend == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,6 +100,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
       - name: Build frontend
         working-directory: frontend
         run: |

@@ -258,6 +258,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
       TZ: Asia/Jakarta
+    ports:
+      # Hanya loopback. Dibutuhkan agar `go run ./cmd/devotion serve` dari host (bagian D)
+      # dapat menjangkau Postgres di dalam container. 5434 dipilih agar tidak bentrok
+      # dengan Postgres lain di mesin pengembang.
+      - "127.0.0.1:5434:5432"
     command:
       - postgres
       - -c max_connections=20
@@ -295,7 +300,7 @@ services:
     volumes:
       # Path di dalam container sengaja dibuat cermin dengan path host agar .env tidak perlu dua versi.
       - /opt/devotion/tls:/opt/devotion/tls:ro
-      - /opt/devotion/uploads:/opt/devotion/uploads
+      - ${UPLOAD_PATH}:${UPLOAD_PATH}
     healthcheck:
       test: ["CMD", "/devotion", "health:check"]
       interval: 30s
@@ -315,6 +320,12 @@ batas akan mengisi 50GB, lalu Postgres berhenti menerima tulisan dan aplikasi ma
 Tidak ada layanan frontend karena Go menyajikannya, dan tidak ada layanan proxy karena Go
 menghabiskan TLS sendiri. **Cara memeriksa Gate I: hitung entri di bawah `services:`.
 Lebih dari dua berarti pelanggaran.**
+
+Port Postgres dipublikasikan hanya ke `127.0.0.1`, bukan ke `0.0.0.0`, sehingga tidak
+pernah terjangkau dari luar mesin. Ini bukan lubang keamanan sekaligus perlu diingat:
+port yang dipublikasikan Docker melewati aturan `ufw`, jadi mengikat ke loopback adalah
+satu-satunya yang menahan Postgres tetap tertutup di VPS. `UPLOAD_PATH` diambil dari
+`.env` agar path host dan container hanya ditulis satu kali.
 
 ### B11. Menyalakan dan memverifikasi migrasi
 

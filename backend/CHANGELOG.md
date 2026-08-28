@@ -6,6 +6,25 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Ditambahkan
+- CI memisahkan gerbang mutu dari rilis (T007). Job `backend` (`go vet`,
+  `go test ./... -p 1`, gerbang sinkronisasi apidocs) tetap wajib hijau pada
+  setiap push dan pull request. Job baru `detect` memeriksa keberadaan
+  `frontend/package.json`; selama frontend belum mendarat, job `image` dan
+  `deploy` dilewati, bukan gagal, sehingga pipeline dapat hijau sebagai gerbang
+  backend. Begitu T003 menambah `frontend/package.json`, keduanya menyala
+  sendiri tanpa menyentuh workflow. Ditambah blok `concurrency` dengan
+  `cancel-in-progress` dan cache npm pada `setup-node`.
+- Kerangka dokumentasi dilengkapi (T006): `docs/pengujian.md` memuat cara
+  menjalankan uji, aturan skema terpisah, `Clock` yang digantikan, penamaan uji
+  yang menyebut FR, dan minimum tiga kasus per endpoint; `docs/temuan-penguji.md`
+  memuat tabel siap isi beserta catatan bahwa WhatsApp dan email di luar cakupan.
+- Blok YAML `docker-compose.yml` di `quickstart.md` B10 diselaraskan dengan
+  compose sebenarnya (T005): port Postgres `127.0.0.1:5434:5432` untuk alur
+  pengembangan lokal bagian D, dan bind unggahan `${UPLOAD_PATH}:${UPLOAD_PATH}`
+  agar path host dan container ditulis satu kali. Ditambah catatan bahwa port
+  loopback melewati `ufw` sehingga ikatan ke `127.0.0.1` yang menahannya tertutup.
+
 ### Diperbaiki
 - Gerbang uji basis data di CI tidak pernah benar-benar berjalan sejak pipeline
   dibuat. `go test ./...` dijalankan tanpa `-p 1`, jadi paket-paket berjalan
