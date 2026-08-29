@@ -409,7 +409,7 @@ export default function Register() {
                     </p>
 
                     <p className="mt-6 text-center text-sm leading-6 text-slate-500">
-                        Dengan mendaftar, Anda menyetujui <span className="font-bold text-industrial-blue-500">Syarat & Ketentuan</span> serta <span className="font-bold text-industrial-blue-500">Kebijakan Privasi</span> Devotion.
+                        Dengan mendaftar, Anda menyetujui <Link to="/syarat-ketentuan" className="font-bold text-industrial-blue-500">Syarat & Ketentuan</Link> serta <Link to="/kebijakan-privasi" className="font-bold text-industrial-blue-500">Kebijakan Privasi</Link> Devotion.
                     </p>
                 </div>
             </main>

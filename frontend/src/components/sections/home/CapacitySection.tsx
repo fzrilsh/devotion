@@ -58,7 +58,7 @@ const item = {
 
 export default function CapacitySection() {
     return (
-        <section className="relative flex h-full scroll-mt-24 items-center justify-center bg-slate-50">
+        <section id="kapasitas" className="relative flex h-full scroll-mt-24 items-center justify-center bg-slate-50">
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="mx-auto mb-12 max-w-2xl text-center">
                     <p className="text-sm font-bold uppercase tracking-widest text-industrial-blue-500">Kapasitas Terbaik</p>

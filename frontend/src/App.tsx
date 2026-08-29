@@ -8,6 +8,10 @@ import ProtectedRoute from "@routes/ProtectedRoute";
 import Home from "@pages/Home";
 import NotFound from "@pages/NotFound";
 import PublicProfile from "@pages/Profile/PublicProfile";
+import About from "@pages/Static/About";
+import Help from "@pages/Static/Help";
+import Privacy from "@pages/Static/Privacy";
+import Terms from "@pages/Static/Terms";
 
 // ── Auth Pages (Guest only) ──
 import Login from "@pages/Auth/Login";
@@ -41,7 +45,6 @@ import SentRequests from "@pages/Requests/Sent";
 import SentRequestDetail from "@pages/Requests/SentDetail";
 
 // ── Protected: Admin only ──
-import AdminLayout from "@components/layout/AdminLayout";
 import AdminDashboard from "@pages/Admin/Dashboard";
 import AdminVerificationQueue from "@pages/Admin/VerificationQueue";
 import AdminMasterItems from "@pages/Admin/MasterItems";
@@ -69,6 +72,10 @@ export default function App() {
                 {/* ===== PUBLIC ===== */}
                 <Route path="/" element={<Home />} />
                 <Route path="/profile/:profileId" element={<PublicProfile />} />
+                <Route path="/tentang" element={<About />} />
+                <Route path="/bantuan" element={<Help />} />
+                <Route path="/syarat-ketentuan" element={<Terms />} />
+                <Route path="/kebijakan-privasi" element={<Privacy />} />
 
                 {/* ===== GUEST-ONLY AUTH FLOW ===== */}
                 <Route path="/auth" element={<GuestRoute />}>
@@ -120,7 +127,7 @@ export default function App() {
 
                 {/* ===== ADMIN ONLY ===== */}
                 <Route element={<ProtectedRoute adminOnly />}>
-                    <Route path="/admin" element={<AdminLayout />}>
+                    <Route path="/admin" element={<AppLayout />}>
                         <Route index element={<AdminDashboard />} />
                         <Route path="verification" element={<AdminVerificationQueue />} />
                         <Route path="master/items" element={<AdminMasterItems />} />

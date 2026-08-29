@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, ApiError } from "./client";
 import type { components } from "./types";
 
 export type Listing = components["schemas"]["Listing"];
@@ -7,8 +7,15 @@ export type AvailabilityPeriod = components["schemas"]["AvailabilityPeriod"];
 export type PeriodUpdateItem = components["schemas"]["PeriodUpdateItem"];
 export type CatalogItem = components["schemas"]["CatalogItem"];
 
-export async function getMyListing(): Promise<Listing> {
-    return apiClient<Listing>("/listing/me");
+// 404 di sini berarti "belum punya listing" (LISTING_NOT_FOUND), bukan galat.
+// Kembalikan null supaya TanStack Query tidak memperlakukannya sebagai error.
+export async function getMyListing(): Promise<Listing | null> {
+    try {
+        return await apiClient<Listing>("/listing/me");
+    } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return null;
+        throw error;
+    }
 }
 
 export async function createListing(data: ListingRequest): Promise<Listing> {
@@ -44,8 +51,4 @@ export async function getMasterProducts(): Promise<CatalogItem[]> {
 
 export async function getMasterMachines(): Promise<CatalogItem[]> {
     return apiClient<CatalogItem[]>("/master/machines");
-}
-
-export async function proposeMasterItem(kind: "product" | "machine", proposedName: string): Promise<unknown> {
-    return apiClient("/master/proposals", { method: "POST", body: JSON.stringify({ kind: kind as string, proposed_name: proposedName }) });
 }

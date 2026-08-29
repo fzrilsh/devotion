@@ -1,10 +1,35 @@
 import type { Notification } from "@api/notifications";
 import Loading from "@components/common/Loading";
 import { useMarkNotificationRead, useNotifications } from "@hooks/useNotifications";
+import { useAuth } from "@hooks/useAuth";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuBellOff, LuCalendarClock, LuCalendarX, LuCheck, LuCircleAlert, LuClipboardList, LuCreditCard, LuFileInput, LuFileOutput, LuFileText, LuInbox, LuLoaderCircle, LuSettings2, LuShieldCheck, LuStar } from "react-icons/lu";
 import { Link } from "react-router-dom";
+
+// Notification hanya membawa work_order_id; notifikasi request/penawaran tidak
+// punya id tujuan, jadi tautannya mengarah ke halaman daftar yang sesuai peran.
+function getNotificationLink(notification: Notification, isBuyer: boolean): { to: string; label: string } | null {
+    if (notification.work_order_id) {
+        return { to: `/orders/${notification.work_order_id.split("/").pop()}`, label: "Lihat pesanan" };
+    }
+
+    switch (notification.event) {
+        case "request_received":
+            return { to: "/requests/incoming", label: "Lihat request masuk" };
+        case "offer_received":
+        case "counter_offer":
+            return isBuyer ? { to: "/requests/sent", label: "Lihat request terkirim" } : { to: "/requests/incoming", label: "Lihat request masuk" };
+        case "calendar_stale":
+            return { to: "/listing", label: "Perbarui kalender" };
+        case "verification_decision":
+            return { to: "/verification", label: "Lihat verifikasi" };
+        case "item_proposal_decision":
+            return { to: "/listing", label: "Lihat listing" };
+        default:
+            return null;
+    }
+}
 
 const eventMeta: Record<Notification["event"], { label: string; icon: React.ElementType; className: string }> = {
     request_received: { label: "Request masuk", icon: LuFileInput, className: "bg-industrial-blue-500/10 text-industrial-blue-600" },
@@ -41,10 +66,11 @@ function formatRelativeTime(isoDate: string): string {
     return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(date);
 }
 
-function NotificationItem({ notification }: { notification: Notification }) {
+function NotificationItem({ notification, isBuyer }: { notification: Notification; isBuyer: boolean }) {
     const markRead = useMarkNotificationRead();
     const meta = eventMeta[notification.event] ?? { label: "Notifikasi", icon: LuInbox, className: "bg-slate-500/10 text-slate-600" };
     const Icon = meta.icon;
+    const link = getNotificationLink(notification, isBuyer);
 
     return (
         <li className={cn("flex gap-4 rounded-2xl border p-4 transition-colors", notification.read ? "border-slate-200 bg-white" : "border-industrial-blue-500/20 bg-industrial-blue-500/5")}>
@@ -65,9 +91,9 @@ function NotificationItem({ notification }: { notification: Notification }) {
                 {notification.body ? <p className="mt-1 text-sm leading-6 text-slate-500">{notification.body}</p> : null}
 
                 <div className="mt-3 flex items-center gap-3">
-                    {notification.work_order_id ? (
-                        <Link to={`/orders/${notification.work_order_id}`} className="text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
-                            Lihat pesanan
+                    {link ? (
+                        <Link to={link.to} className="text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                            {link.label}
                         </Link>
                     ) : null}
 
@@ -93,6 +119,8 @@ function NotificationItem({ notification }: { notification: Notification }) {
 export default function Notifications() {
     const [unreadOnly, setUnreadOnly] = useState(false);
     const notificationsQuery = useNotifications({ unread: unreadOnly });
+    const { user } = useAuth();
+    const isBuyer = Boolean(user?.roles?.buyer);
 
     const items = notificationsQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const unreadCount = notificationsQuery.data?.pages[0]?.unread_count ?? 0;
@@ -150,7 +178,7 @@ export default function Notifications() {
                 <>
                     <ul className="space-y-3">
                         {items.map((notification) => (
-                            <NotificationItem key={notification.notification_id} notification={notification} />
+                            <NotificationItem key={notification.notification_id} notification={notification} isBuyer={isBuyer} />
                         ))}
                     </ul>
 

@@ -25,7 +25,7 @@ const aboutBenefit = [
 
 export default function AboutSection() {
     return (
-        <section className="bg-slate-100 h-full flex items-center justify-center scroll-mt-24">
+        <section id="tawarkan" className="bg-slate-100 h-full flex items-center justify-center scroll-mt-24">
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center *:content-center">
                     <div className="flex flex-col gap-4 items-start">

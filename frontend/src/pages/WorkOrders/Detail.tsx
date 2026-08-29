@@ -1,12 +1,13 @@
 import { ApiError } from "@api/client";
 import type { WorkOrderDetail } from "@api/workOrders";
 import Loading from "@components/common/Loading";
+import { useAuth } from "@hooks/useAuth";
 import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuPackage, LuShieldAlert, LuStar, LuTriangleAlert } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
-import { formatDateId, formatDateTimeId, formatRupiah, workOrderStatusMeta } from "./meta";
+import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
@@ -66,6 +67,7 @@ const statusActions: { status: "production" | "completed" | "shipped"; label: st
 
 export default function Detail() {
     const { workOrderId = "" } = useParams();
+    const { user } = useAuth();
     const orderQuery = useWorkOrder(workOrderId);
 
     const changeStatus = useChangeWorkOrderStatus(workOrderId);
@@ -112,11 +114,19 @@ export default function Detail() {
     if (orderQuery.isLoading) return <Loading />;
 
     if (orderQuery.isError || !orderQuery.data) {
+        const status = orderQuery.error instanceof ApiError ? orderQuery.error.status : 0;
+        const message =
+            status === 403
+                ? "Pesanan ini tidak terdaftar untuk profil usaha Anda. Periksa kembali bahwa id di tautan adalah id pesanan, bukan id request atau id kandidat."
+                : status === 404
+                  ? "Pesanan dengan id ini tidak ditemukan. Id pesanan diberikan lewat notifikasi kesepakatan dan daftar pesanan; id request kuota dan id kandidat bukan id pesanan."
+                  : "Pesanan tidak dapat dimuat. Coba muat ulang halaman.";
+
         return (
             <div className="space-y-6">
                 <h1 className="text-xl font-bold text-slate-900">Detail Pesanan</h1>
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-red-700">Pesanan tidak ditemukan atau Anda tidak berwenang melihatnya.</p>
+                    <p className="text-sm font-semibold text-red-700">{message}</p>
                     <Link to="/orders" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-red-800 underline underline-offset-2">
                         <LuArrowLeft className="size-4" aria-hidden />
                         Kembali ke daftar pesanan
@@ -128,6 +138,7 @@ export default function Detail() {
 
     const order: WorkOrderDetail = orderQuery.data;
     const meta = workOrderStatusMeta[order.status];
+    const side = getWorkOrderSide(order, user?.profile_id ?? null);
     const transitions = order.allowed_transitions ?? [];
     const availableStatusActions = statusActions.filter((action) => transitions.includes(action.status));
     const canConfirm = transitions.includes("confirmed");
@@ -158,7 +169,10 @@ export default function Detail() {
                         </div>
                     </div>
 
-                    <span className={cn("inline-flex shrink-0 items-center rounded-full px-3.5 py-1.5 text-xs font-bold", meta.className)}>{meta.label}</span>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {side ? <span className={cn("inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold", workOrderSideMeta[side].className)}>{workOrderSideMeta[side].label}</span> : null}
+                        <span className={cn("inline-flex items-center rounded-full px-3.5 py-1.5 text-xs font-bold", meta.className)}>{meta.label}</span>
+                    </div>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-3">

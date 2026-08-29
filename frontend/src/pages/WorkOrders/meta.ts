@@ -1,4 +1,4 @@
-import type { WorkOrderStatus } from "@api/workOrders";
+import type { WorkOrderDetail, WorkOrderStatus } from "@api/workOrders";
 
 export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; className: string }> = {
     accepted: { label: "Diterima", className: "bg-industrial-blue-500/10 text-industrial-blue-600" },
@@ -53,3 +53,19 @@ export function formatRupiah(amount?: number | null): string {
 
     return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
 }
+
+export type WorkOrderSide = "buyer" | "subcontractor" | null;
+
+// Posisi pemanggil di dalam pesanan, diturunkan dari profile_id akun sendiri.
+// Bukan mesin keadaan: tombol aksi tetap dirender dari allowed_transitions.
+export function getWorkOrderSide(order: Pick<WorkOrderDetail, "buyer_profile_id" | "subcontractor_profile_id">, myProfileId?: string | null): WorkOrderSide {
+    if (!myProfileId) return null;
+    if (order.buyer_profile_id === myProfileId) return "buyer";
+    if (order.subcontractor_profile_id === myProfileId) return "subcontractor";
+    return null;
+}
+
+export const workOrderSideMeta: Record<Exclude<WorkOrderSide, null>, { label: string; className: string }> = {
+    buyer: { label: "Anda pemberi order", className: "bg-violet-500/10 text-violet-600" },
+    subcontractor: { label: "Anda subkontraktor", className: "bg-sky-500/10 text-sky-600" },
+};
