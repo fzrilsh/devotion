@@ -112,28 +112,6 @@ Yang di bawah ini tidak terlihat di alur utama, tapi ikut menentukan apakah apli
 - **Galat yang konsisten** dalam format `application/problem+json`, dengan 33 kode mesin yang stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
 - **Swagger UI** di `/docs` saat mode development, membaca kontrak OpenAPI yang sama dengan yang disematkan ke binary.
 
-### Status implementasi
-
-Tabel ini disusun dari pembacaan kode di `origin/staging`, bukan dari catatan tugas. Rute yang disebut selesai memang terdaftar di router, dan status uji berasal dari `go vet` serta `go test` yang benar-benar dijalankan.
-
-| Area | Status |
-|---|---|
-| Akun, peran, profil usaha, sesi, verifikasi email dan HP, pemulihan akun | Selesai di backend dan frontend. |
-| Verifikasi identitas usaha, unggahan berkas, keputusan admin | Selesai di backend dan frontend. |
-| Master data, wilayah, usulan item, pengelolaan daftar baku | Selesai di backend dan frontend. |
-| Listing kapasitas dan kalender mingguan | Selesai di backend dan frontend. |
-| Pencarian, skor kriteria keras, paginasi kursor | Selesai di backend dan frontend. |
-| Request kuota multi-kandidat, penawaran, counter-offer, penolakan | Selesai di backend dan frontend. |
-| Work order, alokasi kapasitas, mesin keadaan, pembatalan, pembayaran, sengketa | Selesai di backend dan frontend. |
-| Konfirmasi otomatis tujuh hari dan pengingatnya | Perhitungannya ada di backend, dipakai dua lapisan sekaligus, saat data dibaca dan lewat penjadwal dalam proses. Frontend sudah menampilkan hitung mundurnya. Satu yang belum: rute `POST /api/work-orders/{workOrderId}/confirm` sudah ada di kontrak dan sudah dipanggil frontend, tapi belum terdaftar di router, jadi konfirmasi manual masih membalas 404. |
-| Ulasan, reputasi turunan, tingkat penyelesaian, moderasi | Selesai di backend dan frontend. |
-| Notifikasi, preferensi kanal, rate limiting, health check, panel WhatsApp | Selesai di backend dan frontend. |
-| Panel admin: verifikasi, usulan, daftar baku, pesanan telat, sengketa, moderasi ulasan | Selesai di backend dan frontend. |
-| Pengujian otomatis frontend | Belum ada. `frontend/package.json` tidak punya script `test`, padahal CI memanggil `npm test` sebelum membangun image, jadi job image belum pernah terbit. |
-| Uji integrasi backend terhadap database | Tersedia, tapi memilih dilewati kalau `DATABASE_URL_TEST` tidak menunjuk database yang bisa dijangkau. |
-
-> Tiga hal yang harus ditutup sebelum submission. Pertama, daftarkan rute `POST /api/work-orders/{workOrderId}/confirm` di backend. Kedua, tambahkan script `test` di `frontend/package.json`, karena CI memanggilnya sebelum membangun image. Ketiga, buang opsi `erasableSyntaxOnly` dari `tsconfig.app.json` dan `tsconfig.node.json`; opsi itu baru dikenal TypeScript 5.8 sedangkan yang terpasang 5.7.2, dan akibatnya `npm run build` berhenti sebelum Vite jalan.
-
 ---
 
 ## Demo dan screenshot
@@ -860,36 +838,53 @@ Kredensial di atas hanya contoh. Pakai akun lokal sendiri saat menguji.
 
 Kontrak OpenAPI 3.1 di [contracts/openapi.yaml](docs/001-capacity-exchange-marketplace/contracts/openapi.yaml), peta endpoint terhadap requirement di [contracts/README.md](docs/001-capacity-exchange-marketplace/contracts/README.md). Salinan yang di-embed disinkronkan lewat `backend/apidocs-sync.sh`, dan CI menggagalkan build bila salinannya basi.
 
+### API eksternal
+
+Satu API pihak ketiga: [wilayah.id](https://wilayah.id/), sumber wilayah administratif Indonesia. Tanpa kunci API. Seluruh pemanggilannya di `backend/internal/masterdata/regions.go`, satu-satunya `http.Client` keluar di backend.
+
+```http
+GET https://wilayah.id/api/provinces.json          → 38 provinsi
+GET https://wilayah.id/api/regencies/{kode}.json   → kabupaten/kota per provinsi
+```
+
+Respons dibungkus objek `data` berisi `code` dan `name`. Kecamatan dan desa tidak diambil, tidak ada requirement yang memakainya.
+
+| Hal | Keputusan |
+|---|---|
+| Kapan dipanggil | Hanya `seed:regions --refresh`, timeout 30 detik, satu galat membatalkan semuanya |
+| Saat melayani pengguna | Tidak pernah, wilayah dibaca dari tabel `province` dan `city` |
+| Sumber bawaan | `docs/master-data/regions.json`, 38 provinsi dan 514 kabupaten/kota |
+| Idempotensi | Upsert pada kode wilayah, nama diperbarui, baris tidak pernah dihapus |
+| Normalisasi | `NormalizeCityCode` membuang titik, `32.73` menjadi `3273`, tanpa itu `city_code_format` dan `city_belongs_to_province` menolak |
+
+> Bila wilayah.id mati, aplikasi tetap jalan penuh. `seed:regions` tanpa `--refresh` membaca salinan JSON di repository.
+
+Bentuk respons dan kueri verifikasi di [docs/master-data/README.md](docs/master-data/README.md), alasannya di `research.md` R-02. Cloudflare, Mailjet, Sentry, dan WhatsApp bukan API data, dicatat di `docs/layanan-luar.md`.
+
 ---
 
 ## Testing
 
 ### Data dummy untuk pengujian
 
-Isi database dengan data uji lewat gist berikut, terpisah dari repository supaya dump besar tidak ikut ke riwayat kode:
-
-**[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**
-
-Seluruh isinya **data dummy**, dibuat khusus untuk menguji website Devotion. Nama usaha, email, nomor telepon, dan nomor identitas semuanya fiktif, tidak ada data pribadi orang sungguhan. Isinya 60 usaha konveksi, 47 listing kapasitas, dan 34 pesanan yang tersebar di tujuh status, plus antrean admin yang tidak kosong, sehingga setiap layar punya sesuatu untuk ditampilkan.
+**[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**, disimpan di luar repository supaya dump besar tidak ikut ke riwayat kode. Isinya 60 usaha konveksi, 47 listing, dan 34 pesanan di tujuh status, plus antrean admin yang tidak kosong. Semua fiktif, tidak ada data pribadi orang sungguhan.
 
 | Berkas | Isi |
 |---|---|
 | `dummy-data.sql` | seluruh data, satu transaksi |
-| `creedentials.txt` | daftar 61 akun uji beserta sandinya |
+| `creedentials.txt` | 61 akun uji beserta sandinya |
 | `copy-files.sh` | penyalin 122 berkas unggahan tiruan, Linux dan macOS |
 | `copy-files.ps1` | penyalin yang sama untuk Windows |
 
-Tiga hal harus beres sebelum impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` sengaja tidak ikut di dump, karena keduanya data acuan yang id-nya dibuat per database, sedangkan profil dan listing menunjuk keduanya lewat kunci asing. Bila belum ada, impor berhenti sendiri dengan pesan yang menyebut seed mana yang kurang.
+Prasyarat impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` tidak ikut di dump karena id-nya dibuat per database sedangkan profil dan listing menunjuknya lewat kunci asing. Bila belum ada, impor berhenti dengan pesan yang menyebut seed mana yang kurang.
 
 ```bash
 docker compose exec -T postgres psql -U devotion -d devotion < dummy-data.sql
 ```
 
-Keluaran terakhir harus `COMMIT`. Satu galat saja menggagalkan seluruh transaksi dan database tetap seperti sebelumnya, jadi tidak ada risiko data separuh jadi. Impor kedua di atas database yang sama akan gagal di pelanggaran UNIQUE, bukan menghasilkan data ganda.
+Keluaran terakhir harus `COMMIT`. Satu galat menggagalkan seluruh transaksi, jadi tidak ada risiko data separuh jadi, dan impor kedua gagal di pelanggaran UNIQUE alih-alih menghasilkan data ganda. Waktu di dalam dump dihitung relatif terhadap saat impor, jadi kalender kapasitas selalu terlihat baru. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`, tanpa itu halaman verifikasi admin menampilkan gambar rusak.
 
-Semua waktu di dalam dump dihitung relatif terhadap saat impor, bukan tanggal mati, jadi kalender kapasitas selalu terlihat baru kapan pun diimpor. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`; tanpa itu halaman verifikasi admin menampilkan gambar rusak.
-
-> Data ini hanya untuk pengembangan dan demo. Jangan diimpor ke database yang sudah memuat data sungguhan.
+> Hanya untuk pengembangan dan demo. Jangan diimpor ke database yang memuat data sungguhan.
 
 ### Menjalankan pengujian
 
@@ -907,7 +902,7 @@ npm run lint
 npm run build
 ```
 
-`DATABASE_URL_TEST` harus disebut eksplisit. Nilai bawaan menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan uji yang tidak menjangkau database memilih `t.Skip` daripada gagal, jadi tanpa variabel itu seluruh uji database dilewati diam-diam dan hasilnya tetap terlihat hijau.
+`DATABASE_URL_TEST` wajib disebut eksplisit: bawaannya menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan uji yang tidak menjangkau database memilih `t.Skip` daripada gagal. Tanpa variabel itu seluruh uji database dilewati diam-diam dan hasilnya tetap hijau.
 
 Uji integrasi memakai skema terpisah pada layanan Postgres yang sama, bukan container tambahan. Uji bertenggat memakai `Clock` yang dapat digantikan, sehingga konfirmasi otomatis 7 hari diuji tanpa menunggu 7 hari.
 
@@ -928,24 +923,11 @@ npm test               script test belum ada di package.json
 
 ### Cakupan
 
-Coverage tidak diukur sebagai persentase. Yang dijaga adalah keterlacakan: **64 berkas uji Go**, **353 kasus uji**, dan setiap uji menyebut FR yang diverifikasinya di nama fungsinya, misalnya `TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`. Dengan cara itu **57 requirement** dapat ditelusuri dari nama uji ke spec.
+Bukan persentase, tapi keterlacakan: **64 berkas uji Go**, **353 kasus uji**, setiap uji menyebut FR yang diverifikasinya di nama fungsinya (`TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`), sehingga **57 requirement** dapat ditelusuri dari nama uji ke spec.
 
-Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus:
+Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus: urutan hasil pencarian dapat diulang termasuk antar halaman; skor bebas dari pengaruh reputasi, verifikasi, kebaruan kalender, dan jarak; kapasitas terjumlah lintas periode sampai tenggat; dua kesepakatan berbarengan atas periode yang sama hanya satu berhasil; pembatalan pra-produksi membalik seluruh baris alokasi; request kuota ke listing sendiri ditolak; konfirmasi otomatis 7 hari dan penghentiannya oleh sengketa; tingkat penyelesaian membebani hanya pihak yang membatalkan; dokumen identitas tertutup selain bagi pemilik dan admin; validasi berkas dari magic bytes beserta batas ukuran, kuota storage, dan pembuangan metadata gambar; idempotensi horizon kalender; migrasi dan constraint PostgreSQL.
 
-- Urutan hasil pencarian dapat diulang, termasuk antar halaman.
-- Skor tidak terpengaruh reputasi, verifikasi, kebaruan kalender, maupun jarak.
-- Kapasitas terjumlah lintas periode sampai tenggat.
-- Dua kesepakatan berbarengan atas periode yang sama: hanya satu berhasil.
-- Pembatalan pra-produksi membalik seluruh baris alokasi.
-- Request kuota ke listing milik sendiri ditolak.
-- Konfirmasi otomatis 7 hari, dan penghentiannya oleh sengketa.
-- Tingkat penyelesaian membebani hanya pihak yang membatalkan.
-- Dokumen identitas tidak dapat diakses selain pemilik dan admin.
-- Validasi berkas dari magic bytes, batas ukuran, kuota storage, pembuangan metadata gambar.
-- Idempotensi horizon kalender.
-- Migrasi dan constraint PostgreSQL.
-
-Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/skenario-uji-manual.md`, sehingga label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
+Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/skenario-uji-manual.md`, karena itu label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
 
 ---
 
