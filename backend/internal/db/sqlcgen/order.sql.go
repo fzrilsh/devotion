@@ -1634,6 +1634,60 @@ func (q *Queries) MoveWorkOrderToMediation(ctx context.Context, id pgtype.UUID) 
 	return i, err
 }
 
+const partyConfirmWorkOrder = `-- name: PartyConfirmWorkOrder :one
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = false, confirmed_at = $2
+WHERE work_order.id = $1 AND work_order.status = 'shipped'
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = work_order.id AND d.status <> 'resolved'
+  )
+RETURNING id, candidate_id, offer_id, buyer_id, subcontractor_id, quantity, total_price, deadline, readiness_week_start, status, shipped_at, confirmed_at, auto_confirmed, cancelled_by_id, cancellation_reason, cancelled_at, created_at, confirm_warn_sent_at, late_notified_at, auto_confirm_base_at
+`
+
+type PartyConfirmWorkOrderParams struct {
+	ID          pgtype.UUID
+	ConfirmedAt pgtype.Timestamptz
+}
+
+// Closes one shipped order as buyer-confirmed (FR-047, FR-068): status to
+// 'confirmed', auto_confirmed false (this is the buyer's manual acceptance, not
+// the system's 7-day closure, so the two are distinguishable in the trail), and
+// confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+// guard makes the write a no-op if the order left 'shipped' since the caller read
+// it (e.g. the ticker already auto-confirmed, or a dispute moved it to mediation),
+// so a returned row means this call did the closing. The NOT EXISTS open-dispute
+// guard mirrors AutoConfirmWorkOrder: an order with an unresolved dispute stays
+// open even while its status is still 'shipped' (FR-070). confirmed_at >= shipped_at
+// holds by the shipped_before_confirmed CHECK since the order had shipped.
+func (q *Queries) PartyConfirmWorkOrder(ctx context.Context, arg PartyConfirmWorkOrderParams) (WorkOrder, error) {
+	row := q.db.QueryRow(ctx, partyConfirmWorkOrder, arg.ID, arg.ConfirmedAt)
+	var i WorkOrder
+	err := row.Scan(
+		&i.ID,
+		&i.CandidateID,
+		&i.OfferID,
+		&i.BuyerID,
+		&i.SubcontractorID,
+		&i.Quantity,
+		&i.TotalPrice,
+		&i.Deadline,
+		&i.ReadinessWeekStart,
+		&i.Status,
+		&i.ShippedAt,
+		&i.ConfirmedAt,
+		&i.AutoConfirmed,
+		&i.CancelledByID,
+		&i.CancellationReason,
+		&i.CancelledAt,
+		&i.CreatedAt,
+		&i.ConfirmWarnSentAt,
+		&i.LateNotifiedAt,
+		&i.AutoConfirmBaseAt,
+	)
+	return i, err
+}
+
 const raiseUsedCapacity = `-- name: RaiseUsedCapacity :one
 UPDATE availability_period
 SET used_capacity = used_capacity + $2, updated_at = $3

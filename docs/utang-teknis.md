@@ -183,15 +183,16 @@ sesuai kontrak. Belum diputuskan.
 
 ### B. Endpoint didokumentasikan tapi tidak ada di backend
 
-- **POST `/work-orders/{id}/confirm`** didokumentasikan
-  (`openapi.yaml:1098-1114`) tetapi tidak ada handler mana pun. Konfirmasi manual
-  buyer tidak punya endpoint; konfirmasi hanya lewat auto-confirm tujuh hari plus
-  ticker.
+- **POST `/work-orders/{id}/confirm`** ~~didokumentasikan
+  (`openapi.yaml:1098-1114`) tetapi tidak ada handler mana pun~~. **Sudah
+  diperbaiki**: handler ditambahkan di `internal/order/confirm.go` (gate peran
+  buyer, query `PartyConfirmWorkOrder`, sengketa terbuka menahan konfirmasi).
+  Konfirmasi manual buyer kini punya endpoint, di samping auto-confirm tujuh hari.
 - **`confirmed` muncul di `allowed_transitions`** dari status `shipped`
-  (`internal/order/accept.go:465-469`), padahal `/status` menolak `confirmed`
-  (`workorder.go:245-256`) dan `/confirm` tidak ada. FE yang render tombol dari
-  array itu tidak punya tujuan kirim. Ini gap alur order nyata, bukan cuma drift
-  dokumen.
+  (`internal/order/accept.go:465-469`). ~~`/status` menolak `confirmed` dan
+  `/confirm` tidak ada~~, sehingga FE yang render tombol dari array itu tidak
+  punya tujuan kirim. **Sudah diperbaiki**: `/confirm` kini jadi tujuan kirim
+  tombol itu. Gap alur order tertutup.
 
 ### C. Field selalu null atau tak terdokumentasi
 

@@ -342,6 +342,26 @@ WHERE work_order.id = $1 AND work_order.status = 'shipped'
   )
 RETURNING *;
 
+-- name: PartyConfirmWorkOrder :one
+-- Closes one shipped order as buyer-confirmed (FR-047, FR-068): status to
+-- 'confirmed', auto_confirmed false (this is the buyer's manual acceptance, not
+-- the system's 7-day closure, so the two are distinguishable in the trail), and
+-- confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+-- guard makes the write a no-op if the order left 'shipped' since the caller read
+-- it (e.g. the ticker already auto-confirmed, or a dispute moved it to mediation),
+-- so a returned row means this call did the closing. The NOT EXISTS open-dispute
+-- guard mirrors AutoConfirmWorkOrder: an order with an unresolved dispute stays
+-- open even while its status is still 'shipped' (FR-070). confirmed_at >= shipped_at
+-- holds by the shipped_before_confirmed CHECK since the order had shipped.
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = false, confirmed_at = $2
+WHERE work_order.id = $1 AND work_order.status = 'shipped'
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = work_order.id AND d.status <> 'resolved'
+  )
+RETURNING *;
+
 -- name: ListShippedApproachingAutoConfirm :many
 -- The shipped orders inside the FR-069 warning lead that have not yet been warned:
 -- the effective base COALESCE(auto_confirm_base_at, shipped_at) is within

@@ -28,6 +28,20 @@ perubahannya.
   terhapus demi menampilkan QR.
 
 ### Ditambahkan
+- `POST /api/work-orders/{workOrderId}/confirm`, khusus pemberi order, menutup
+  pesanan berstatus Dikirim sebagai diterima manual (FR-047, US5 AS-2). Endpoint
+  ini sudah didokumentasikan di kontrak dan diwajibkan spec, tetapi tidak punya
+  handler: konfirmasi hanya terjadi lewat auto-confirm tujuh hari, padahal
+  `allowed_transitions` menawarkan `confirmed` dari `shipped` sehingga tombol di
+  frontend tidak punya tujuan kirim. Handler memakai gate peran buyer, guard
+  pihak (bukan buyer pesanan ini jadi 404), dan mesin keadaan yang sama dengan
+  `/status` sehingga status bukan Dikirim ditolak `INVALID_STATUS_TRANSITION`.
+  Query `PartyConfirmWorkOrder` men-set `confirmed_at` dan `auto_confirmed=false`
+  dengan guard `status='shipped'` plus tanpa sengketa terbuka, meniru guard
+  auto-confirm, jadi sengketa terbuka menahan konfirmasi manual sama seperti
+  konfirmasi otomatis (FR-070). Riwayat status mencatat pelaku manusia
+  (`by_system=false`, `changed_by` = akun buyer, FR-039), dan subkontraktor
+  diberi tahu.
 - `POST /api/admin/whatsapp/reconnect`, khusus admin, membuang siklus pemasangan
   yang berjalan dan memulai yang baru, atau menjatuhkan lalu menyambungkan ulang
   soket bila tautan sudah terpasangkan. Ini tombol "sambung ulang" yang dituntut
