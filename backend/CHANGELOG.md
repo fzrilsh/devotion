@@ -50,6 +50,28 @@ perubahannya.
   `contracts/README.md` menjadi 65 pada 57 path.
 
 ### Diubah
+- `contracts/openapi.yaml` diselaraskan dengan respons backend sebenarnya, hasil
+  audit kontrak-vs-kode enam domain (`docs/utang-teknis.md`). Ini kelompok drift
+  yang kode-nya benar dan kontraknya menyimpang, jadi hanya kontrak yang berubah,
+  tanpa perubahan perilaku backend. Penting sekarang karena jalur [FE]
+  men-generate tipe TypeScript dari kontrak, sehingga tiap drift membuat tipe FE
+  menyimpang diam-diam dari respons: `POST /work-orders/{id}/payments` dan
+  `POST /work-orders/{id}/disputes` kini balikin `WorkOrderDetail` penuh (backend
+  konsisten memuat ulang detail di tiap mutasi pesanan), bukan `PaymentRecord`
+  atau `Dispute`; `SearchResult` bertambah `region_level` dan `relaxation`
+  (`most_restrictive` + `suggestion`) yang memang diemit search untuk tombol
+  perluas tier wilayah (FR-028, FR-063); `SearchCandidate.distance_km` dihapus
+  karena selalu null dan jarak informatif saja; `GET /admin/proposals` jadi
+  envelope `{items, pagination}` dengan `proposer_name`, cocok dengan endpoint
+  admin berpaginasi lain; `Notification.work_order_id` diganti `link`, string
+  nullable tanpa `format: uuid`, karena nilainya deep link generik yang bisa
+  menunjuk `/quota-requests/...`; `/auth/verify-email` dan `/auth/verify-phone`
+  membuang `security: []` (keduanya menuntut sesi), mendokumentasikan 401, dan
+  mengubah 400 jadi 422; `/search` mengubah 400 jadi 422 dan menambah 403; catatan
+  penawaran (`POST /candidates/{id}/offer`, `POST /offers/{id}/counter`)
+  `maxLength` 1000 jadi 500 sesuai batas backend; `max_lead_days` membuang default
+  365 karena backend memperlakukannya sebagai unset. Field respons `link` di
+  `internal/notification/http.go` ikut diganti namanya dari `work_order_id`.
 - `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
   pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin
   membaca riwayat lengkap pesanan yang ia bukan pihaknya, tetapi tidak ada jalan

@@ -165,21 +165,27 @@ Ini yang paling berbahaya: klien hasil generate akan salah tipe.
 
 - **POST `/work-orders/{id}/payments`** balikin `WorkOrderDetail` penuh
   (`internal/order/payment.go:77-82`), kontrak bilang `PaymentRecord`
-  (`openapi.yaml:1189`).
+  (`openapi.yaml:1189`). **Sudah diperbaiki**: kontrak diselaraskan ke
+  `WorkOrderDetail`.
 - **POST `/work-orders/{id}/disputes`** balikin `WorkOrderDetail` penuh
   (`internal/order/dispute.go:58-63`), kontrak bilang `Dispute`
-  (`openapi.yaml:1215`). Skema `Dispute` cuma dihasilkan jalur mediasi admin.
+  (`openapi.yaml:1215`). **Sudah diperbaiki**: kontrak diselaraskan ke
+  `WorkOrderDetail`.
 - **GET `/admin/proposals`** balikin envelope `{items, pagination}` dengan
   `proposer_name` dan tanpa `reason` (`internal/masterdata/admin.go:209-216,265`),
   kontrak bilang array `ItemProposal` telanjang dengan `reason`
-  (`openapi.yaml:1440-1447`).
+  (`openapi.yaml:1440-1447`). **Sudah diperbaiki di kontrak**: envelope
+  `{items, pagination}` dengan `ItemProposal` bertambah `proposer_name`. `reason`
+  tetap di skema (diisi kode pada Langkah 3).
 - **`Notification.work_order_id`** diemit backend sebagai path, bukan UUID
-  sebagaimana skema menuntut.
+  sebagaimana skema menuntut. **Sudah diperbaiki**: skema dan field respons
+  diganti nama jadi `link`, string nullable tanpa `format: uuid`.
 
 Kedua kasus order (payments, disputes) adalah pilihan desain yang konsisten di
-kode: tiap mutasi pesanan memuat ulang dan balikin detail. Keputusan: apakah
-kontrak diselaraskan ke `WorkOrderDetail`, atau handler dipersempit ke objek
-sesuai kontrak. Belum diputuskan.
+kode: tiap mutasi pesanan memuat ulang dan balikin detail. Keputusan diambil:
+kontrak diselaraskan ke `WorkOrderDetail`, sesuai aturan spec-first hanya bila
+kontrak keliru; di sini kode yang benar dan kontrak yang menyimpang, jadi kontrak
+yang berubah.
 
 ### B. Endpoint didokumentasikan tapi tidak ada di backend
 
