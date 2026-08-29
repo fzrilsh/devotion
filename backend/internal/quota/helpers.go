@@ -70,6 +70,16 @@ func tstz(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t, Valid: true}
 }
 
+// textPtr maps a pgtype.Text back to an optional string: an invalid (NULL) value
+// becomes nil, so an unset rejection_reason serializes as null.
+func textPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.String
+	return &s
+}
+
 // pgdate wraps a time as a pgtype.Date for the deadline column. Only the
 // calendar date matters; the time of day is dropped by the date type.
 func pgdate(t time.Time) pgtype.Date {

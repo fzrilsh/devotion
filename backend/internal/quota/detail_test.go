@@ -17,13 +17,14 @@ type detailResp struct {
 	Quantity   int    `json:"quantity"`
 	Material   string `json:"material"`
 	Candidates []struct {
-		CandidateID  string      `json:"candidate_id"`
-		ListingID    string      `json:"listing_id"`
-		ProfileID    string      `json:"profile_id"`
-		BusinessName string      `json:"business_name"`
-		Status       string      `json:"status"`
-		Offers       []offerResp `json:"offers"`
-		LatestOffer  *offerResp  `json:"latest_offer"`
+		CandidateID     string      `json:"candidate_id"`
+		ListingID       string      `json:"listing_id"`
+		ProfileID       string      `json:"profile_id"`
+		BusinessName    string      `json:"business_name"`
+		Status          string      `json:"status"`
+		RejectionReason *string     `json:"rejection_reason"`
+		Offers          []offerResp `json:"offers"`
+		LatestOffer     *offerResp  `json:"latest_offer"`
 	} `json:"candidates"`
 }
 
@@ -90,6 +91,45 @@ func TestDetail_NoOfferYet_FR032(t *testing.T) {
 	}
 	if d.Candidates[0].LatestOffer != nil {
 		t.Fatalf("latest_offer mau nil sebelum ada balasan, dapat %+v", d.Candidates[0].LatestOffer)
+	}
+	if d.Candidates[0].RejectionReason != nil {
+		t.Fatalf("rejection_reason mau nil selama belum ditolak, dapat %q", *d.Candidates[0].RejectionReason)
+	}
+}
+
+// TestDetail_SerializesRejectionReason_FR035 proves that once a subcontractor
+// declines a candidate with a reason, the buyer's detail view carries that
+// reason in rejection_reason so the buyer sees why the candidate said no
+// (FR-035). Before the reject the field is null (covered by the no-offer case);
+// after it holds the stored reason verbatim.
+func TestDetail_SerializesRejectionReason_FR035(t *testing.T) {
+	h := newHarness(t, "detail_reject_reason")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+
+	const reason = "Kapasitas kami sudah penuh minggu itu."
+	h.asSubcontractor(f.subconAcc)
+	rec := h.doJSON(http.MethodPost,
+		"/api/candidates/"+uuidString(f.candidateID)+"/reject",
+		rejectBody(reason))
+	mustStatus(t, rec, http.StatusNoContent)
+
+	h.asBuyer(h.buyerAcc)
+	rec = h.do(http.MethodGet, "/api/quota-requests/"+uuidString(f.requestID))
+	mustStatus(t, rec, http.StatusOK)
+
+	d := decodeDetail(t, rec)
+	if len(d.Candidates) != 1 {
+		t.Fatalf("mau 1 kandidat, dapat %d", len(d.Candidates))
+	}
+	c := d.Candidates[0]
+	if c.Status != "rejected" {
+		t.Fatalf("status %q, mau rejected", c.Status)
+	}
+	if c.RejectionReason == nil {
+		t.Fatalf("rejection_reason nil; body %s", rec.Body.String())
+	}
+	if *c.RejectionReason != reason {
+		t.Fatalf("rejection_reason %q, mau %q", *c.RejectionReason, reason)
 	}
 }
 

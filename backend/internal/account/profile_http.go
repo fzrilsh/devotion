@@ -83,6 +83,23 @@ type publicProfileBody struct {
 // column is NOT NULL but the contract models as nullable.
 func strPtr(s string) *string { return &s }
 
+// verificationStatusOf returns the status of the profile's most recent
+// verification submission, or nil when the profile never submitted one. A query
+// error other than no-rows is logged and treated as nil: the profile still
+// renders, only the status badge is absent, which never blocks the page.
+func (s *Service) verificationStatusOf(ctx context.Context, profileID pgtype.UUID) *string {
+	st, err := s.queries().LatestVerificationStatusByProfile(ctx, profileID)
+	if err != nil {
+		if !isNoRows(err) {
+			slog.ErrorContext(ctx, "account: gagal membaca status verifikasi profil",
+				"profile_id", uuidString(profileID))
+		}
+		return nil
+	}
+	v := string(st)
+	return &v
+}
+
 // handleGetProfileMe returns the caller's own profile. The route is gated to the
 // business roles, so an admin never reaches this handler (it is refused with 403
 // at the router, the same as every other business endpoint). For a business
@@ -111,7 +128,7 @@ func (s *Service) handleGetProfileMe(w http.ResponseWriter, r *http.Request, acc
 		Latitude:           floatFromNumeric(row.Latitude),
 		Longitude:          floatFromNumeric(row.Longitude),
 		IdentityVerified:   row.Verified,
-		VerificationStatus: nil,
+		VerificationStatus: s.verificationStatusOf(r.Context(), row.ID),
 		Reputation:         s.reputationOf(r.Context(), row.ID),
 	})
 }
@@ -167,7 +184,7 @@ func (s *Service) handlePutProfileMe(w http.ResponseWriter, r *http.Request, acc
 		Latitude:           floatFromNumeric(row.Latitude),
 		Longitude:          floatFromNumeric(row.Longitude),
 		IdentityVerified:   row.Verified,
-		VerificationStatus: nil,
+		VerificationStatus: s.verificationStatusOf(r.Context(), row.ID),
 		Reputation:         s.reputationOf(r.Context(), row.ID),
 	})
 }

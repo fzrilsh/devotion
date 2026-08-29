@@ -2214,6 +2214,10 @@ components:
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
+        rejection_reason:
+          type: string
+          nullable: true
+          description: Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035).
         latest_offer: { $ref: '#/components/schemas/Offer' }
         offers:
           type: array

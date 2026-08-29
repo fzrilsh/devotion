@@ -129,6 +129,25 @@ func (q *Queries) DecideVerificationRequest(ctx context.Context, arg DecideVerif
 	return i, err
 }
 
+const latestVerificationStatusByProfile = `-- name: LatestVerificationStatusByProfile :one
+SELECT status
+FROM verification_request
+WHERE profile_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+// LatestVerificationStatusByProfile returns the status of the profile's most
+// recent verification submission, or no row when the profile never submitted one.
+// The caller maps the no-row case to a null verification_status on MyProfile,
+// distinct from a profile that has a pending or decided request (FR-006).
+func (q *Queries) LatestVerificationStatusByProfile(ctx context.Context, profileID pgtype.UUID) (VerificationStatus, error) {
+	row := q.db.QueryRow(ctx, latestVerificationStatusByProfile, profileID)
+	var status VerificationStatus
+	err := row.Scan(&status)
+	return status, err
+}
+
 const listVerificationQueue = `-- name: ListVerificationQueue :many
 SELECT
     vr.id, vr.profile_id, vr.identity_number, vr.identity_file_id,

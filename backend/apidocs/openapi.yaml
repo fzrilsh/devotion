@@ -95,7 +95,7 @@ paths:
     post:
       tags: [auth]
       summary: Verifikasi alamat email dengan kode enam digit
-      security: []
+      description: Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
       x-fr: [FR-002]
       requestBody:
         required: true
@@ -104,7 +104,8 @@ paths:
             schema: { $ref: '#/components/schemas/VerificationCodeRequest' }
       responses:
         '204': { description: Email terverifikasi }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '410':
           description: Kode kedaluwarsa atau sudah dipakai
           content:
@@ -115,7 +116,7 @@ paths:
     post:
       tags: [auth]
       summary: Verifikasi nomor HP dengan kode enam digit dari WhatsApp
-      security: []
+      description: Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
       x-fr: [FR-002]
       requestBody:
         required: true
@@ -124,7 +125,8 @@ paths:
             schema: { $ref: '#/components/schemas/VerificationCodeRequest' }
       responses:
         '204': { description: Nomor HP terverifikasi }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '410': { description: Kode kedaluwarsa atau sudah dipakai }
 
   /auth/resend-code:
@@ -754,7 +756,7 @@ paths:
           schema: { type: string, format: date }
         - name: max_lead_days
           in: query
-          schema: { type: integer, minimum: 0, default: 365 }
+          schema: { type: integer, minimum: 0 }
         - name: region_level
           in: query
           required: true
@@ -779,7 +781,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SearchResult' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
 
   # ─────────────────────────── quota request ───────────────────────────
 
@@ -885,7 +888,7 @@ paths:
               properties:
                 total_price: { type: integer, format: int64, minimum: 1, description: Rupiah bulat }
                 readiness_lead_days: { type: integer, minimum: 0, maximum: 365 }
-                note: { type: string, maxLength: 1000 }
+                note: { type: string, maxLength: 500 }
       responses:
         '201':
           content:
@@ -953,7 +956,7 @@ paths:
               required: [total_price]
               properties:
                 total_price: { type: integer, format: int64, minimum: 1 }
-                note: { type: string, maxLength: 1000 }
+                note: { type: string, maxLength: 500 }
       responses:
         '201':
           content:
@@ -1186,7 +1189,7 @@ paths:
         '201':
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PaymentRecord' }
+              schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Pernyataan dengan arah yang sama sudah dicatat }
 
   /work-orders/{workOrderId}/disputes:
@@ -1212,7 +1215,7 @@ paths:
         '201':
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Dispute' }
+              schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Sudah ada sengketa terbuka pada pesanan ini }
 
   # ─────────────────────────── reputation ───────────────────────────
@@ -1442,8 +1445,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/ItemProposal' }
+                type: object
+                required: [items, pagination]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ItemProposal' }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /admin/proposals/{proposalId}/decision:
@@ -1586,7 +1594,31 @@ paths:
       description: |
         Menampilkan status tautan whatsmeow dan kode QR bila perlu ditautkan ulang. Tidak
         pernah menampilkan nomor layanan pada keluaran (FR-082) [1].
-      x-fr: [FR-082]
+
+        Membaca status juga menyiapkan siklus pemasangan baru bila tautan belum
+        terpasangkan dan tidak ada siklus yang berjalan: satu siklus hanya
+        mengeluarkan sejumlah kode lalu berakhir, jadi tanpa penyiapan ini `qr_code`
+        akan kosong bagi admin yang membuka halaman beberapa menit setelah proses
+        menyala. Tautan yang sudah terpasangkan tidak diganggu.
+      x-fr: [FR-002, FR-052, FR-082]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WhatsAppStatus' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/whatsapp/reconnect:
+    post:
+      tags: [admin]
+      summary: Sambungkan ulang sesi WhatsApp
+      description: |
+        Membuang siklus pemasangan yang sedang berjalan dan memulai yang baru, sehingga
+        admin mendapat kode QR segar tanpa akses server. Bila tautan sudah terpasangkan,
+        soket dijatuhkan lalu disambungkan ulang, bukan dipasangkan ulang: sesi yang
+        masih sah tidak dihapus. Bentuk balasannya sama dengan `GET /admin/whatsapp`,
+        dan nomor layanan tetap tidak pernah muncul (FR-082) [1].
+      x-fr: [FR-002, FR-052, FR-082]
       responses:
         '200':
           content:
@@ -1920,6 +1952,7 @@ components:
         kind: { type: string, enum: [product, machine] }
         proposed_name: { type: string }
         status: { type: string, enum: [pending, approved, rejected] }
+        proposer_name: { type: string }
         reason: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
 
@@ -2060,18 +2093,33 @@ components:
 
     SearchResult:
       type: object
-      required: [items, pagination]
+      required: [items, pagination, region_level]
       properties:
         items:
           type: array
           items: { $ref: '#/components/schemas/SearchCandidate' }
         pagination: { $ref: '#/components/schemas/Pagination' }
+        region_level:
+          type: string
+          enum: [city, province, national]
+          description: Tingkat cakupan wilayah yang benar-benar dipakai pencarian ini (FR-063).
+        relaxation:
+          type: object
+          nullable: true
+          description: |
+            Saran pelonggaran, hadir hanya bila pencarian di tingkat national tetap kosong
+            (FR-028). Menyebut kriteria keras paling membatasi dan satu langkah pelonggaran
+            konkret.
+          required: [most_restrictive, suggestion]
+          properties:
+            most_restrictive: { type: string }
+            suggestion: { type: string }
 
     SearchCandidate:
       type: object
       description: |
         Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
-        jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
+        jarak (FR-034). Field criteria menjelaskan kriteria keras
         mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
         Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
         memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
@@ -2102,7 +2150,6 @@ components:
         stale_calendar:
           type: boolean
           description: Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan.
-        distance_km: { type: number, format: double, nullable: true }
         identity_verified: { type: boolean }
         criteria:
           type: array
@@ -2167,6 +2214,10 @@ components:
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
+        rejection_reason:
+          type: string
+          nullable: true
+          description: Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035).
         latest_offer: { $ref: '#/components/schemas/Offer' }
         offers:
           type: array
@@ -2380,7 +2431,10 @@ components:
             - calendar_stale
         title: { type: string }
         body: { type: string }
-        work_order_id: { type: string, format: uuid, nullable: true }
+        link:
+          type: string
+          nullable: true
+          description: Deep link generik ke sumber notifikasi (mis. pesanan atau request kuota); null bila tidak ada tujuan.
         read: { type: boolean }
         created_at: { type: string, format: date-time }
 

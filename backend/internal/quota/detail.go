@@ -79,13 +79,14 @@ func validCandidateStatus(raw string) bool {
 // chain; latest_offer is its last element, omitted when the candidate has no
 // reply yet. offers is omitted on the incoming list, which carries no chain.
 type detailCandidateView struct {
-	CandidateID  string      `json:"candidate_id"`
-	ListingID    string      `json:"listing_id"`
-	ProfileID    string      `json:"profile_id"`
-	BusinessName string      `json:"business_name"`
-	Status       string      `json:"status"`
-	Offers       []offerView `json:"offers,omitempty"`
-	LatestOffer  *offerView  `json:"latest_offer,omitempty"`
+	CandidateID     string      `json:"candidate_id"`
+	ListingID       string      `json:"listing_id"`
+	ProfileID       string      `json:"profile_id"`
+	BusinessName    string      `json:"business_name"`
+	Status          string      `json:"status"`
+	RejectionReason *string     `json:"rejection_reason"`
+	Offers          []offerView `json:"offers,omitempty"`
+	LatestOffer     *offerView  `json:"latest_offer,omitempty"`
 }
 
 // detailView is the QuotaRequestDetail response: the request fields plus every
@@ -146,11 +147,12 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 	candidates := make([]detailCandidateView, 0, len(candRows))
 	for _, c := range candRows {
 		view := detailCandidateView{
-			CandidateID:  uuidString(c.CandidateID),
-			ListingID:    uuidString(c.ListingID),
-			ProfileID:    uuidString(c.SubcontractorID),
-			BusinessName: c.BusinessName,
-			Status:       string(c.Status),
+			CandidateID:     uuidString(c.CandidateID),
+			ListingID:       uuidString(c.ListingID),
+			ProfileID:       uuidString(c.SubcontractorID),
+			BusinessName:    c.BusinessName,
+			Status:          string(c.Status),
+			RejectionReason: textPtr(c.RejectionReason),
 		}
 		if chain, ok := chainByCandidate[uuidString(c.CandidateID)]; ok && len(chain) > 0 {
 			view.Offers = chain
@@ -211,11 +213,12 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 	items := make([]detailCandidateView, 0, len(rows))
 	for _, c := range rows {
 		items = append(items, detailCandidateView{
-			CandidateID:  uuidString(c.CandidateID),
-			ListingID:    uuidString(c.ListingID),
-			ProfileID:    uuidString(c.SubcontractorID),
-			BusinessName: c.BusinessName,
-			Status:       string(c.Status),
+			CandidateID:     uuidString(c.CandidateID),
+			ListingID:       uuidString(c.ListingID),
+			ProfileID:       uuidString(c.SubcontractorID),
+			BusinessName:    c.BusinessName,
+			Status:          string(c.Status),
+			RejectionReason: textPtr(c.RejectionReason),
 		})
 	}
 

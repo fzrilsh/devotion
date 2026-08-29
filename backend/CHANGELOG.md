@@ -7,6 +7,21 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Lima respons backend diselaraskan ke kontrak yang sudah benar, hasil audit
+  drift enam domain (`docs/utang-teknis.md`), sehingga tipe TypeScript hasil
+  generate frontend cocok dengan yang dikirim backend. `proposalQueueItem` kini
+  mengisi `reason` dari `admin_note` yang sebelumnya sudah di-SELECT
+  `ListItemProposalsPending` lalu dibuang, jadi antrean usulan admin membawa
+  alasan usulan. `PATCH /api/me/roles` menolak pencabutan peran yang masih
+  dipakai order aktif dengan 409 `ROLES_IN_USE`, bukan lagi 422; kasus kedua
+  peran dikosongkan tetap 422 karena itu validasi masukan. Respons profil
+  mengisi `verification_status` dari pengajuan verifikasi terbaru lewat query
+  `LatestVerificationStatusByProfile`, null selama profil belum pernah mengajukan,
+  bukan lagi hardcoded null. Detail dan daftar request kuota menserialisasi
+  `rejection_reason` (null sebelum kandidat ditolak, berisi alasan verbatim
+  sesudahnya, FR-035). `product_item_id` dan `readiness_lead_days` di
+  `workOrderView` diberi `omitempty` sehingga baris daftar pesanan tidak lagi
+  mengirim UUID kosong yang menjegal validator klien ketat.
 - Kode QR WhatsApp kini muncul kapan pun admin membukanya, bukan hanya beberapa
   menit pertama setelah proses menyala. `Manager.Start` memanggil
   `GetQRChannel` tepat satu kali saat boot, sedangkan whatsmeow mengirim
@@ -70,7 +85,9 @@ perubahannya.
   mengubah 400 jadi 422; `/search` mengubah 400 jadi 422 dan menambah 403; catatan
   penawaran (`POST /candidates/{id}/offer`, `POST /offers/{id}/counter`)
   `maxLength` 1000 jadi 500 sesuai batas backend; `max_lead_days` membuang default
-  365 karena backend memperlakukannya sebagai unset. Field respons `link` di
+  365 karena backend memperlakukannya sebagai unset. `RequestCandidate` bertambah
+  `rejection_reason` (string nullable) seiring backend mulai menserialisasinya.
+  Field respons `link` di
   `internal/notification/http.go` ikut diganti namanya dari `work_order_id`.
 - `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
   pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin

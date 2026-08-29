@@ -355,6 +355,11 @@ type Querier interface {
 	// purpose, so issuing a fresh code retires the previous ones in the same
 	// transaction and only the newest can be redeemed.
 	InvalidateVerificationCodes(ctx context.Context, arg InvalidateVerificationCodesParams) error
+	// LatestVerificationStatusByProfile returns the status of the profile's most
+	// recent verification submission, or no row when the profile never submitted one.
+	// The caller maps the no-row case to a null verification_status on MyProfile,
+	// distinct from a profile that has a pending or decided request (FR-006).
+	LatestVerificationStatusByProfile(ctx context.Context, profileID pgtype.UUID) (VerificationStatus, error)
 	// Locks the order's still-active allocation rows together with their periods,
 	// ordered ascending by week_start. The order mirrors the formation lock order of
 	// R-04 (LockPeriodsInRange), the deadlock preventer: two transactions touching

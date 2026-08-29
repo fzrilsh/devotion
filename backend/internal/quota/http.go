@@ -25,14 +25,16 @@ type requestInput struct {
 }
 
 // candidateView is one candidate of a request as returned to the buyer: the
-// candidate row id, its listing and owning profile, the business name, and the
-// candidate's own status (FR-029).
+// candidate row id, its listing and owning profile, the business name, the
+// candidate's own status, and the rejection reason when it was rejected (FR-029,
+// FR-035). rejection_reason is null for any status other than rejected.
 type candidateView struct {
-	CandidateID  string `json:"candidate_id"`
-	ListingID    string `json:"listing_id"`
-	ProfileID    string `json:"profile_id"`
-	BusinessName string `json:"business_name"`
-	Status       string `json:"status"`
+	CandidateID     string  `json:"candidate_id"`
+	ListingID       string  `json:"listing_id"`
+	ProfileID       string  `json:"profile_id"`
+	BusinessName    string  `json:"business_name"`
+	Status          string  `json:"status"`
+	RejectionReason *string `json:"rejection_reason"`
 }
 
 // requestView is the QuotaRequest response body. expires_at is the reply window
