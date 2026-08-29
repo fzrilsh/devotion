@@ -205,14 +205,16 @@ func (s *Service) handleUpdateItem(w http.ResponseWriter, r *http.Request) {
 }
 
 // proposalQueueItem is one row of the admin pending-proposal queue: the proposal,
-// its proposed name and kind, and the proposer's business name.
+// its proposed name and kind, the proposer's business name, and the admin note
+// carried as the decision reason (null while still pending).
 type proposalQueueItem struct {
-	ProposalID   string `json:"proposal_id"`
-	Kind         string `json:"kind"`
-	ProposedName string `json:"proposed_name"`
-	Status       string `json:"status"`
-	ProposerName string `json:"proposer_name"`
-	CreatedAt    string `json:"created_at"`
+	ProposalID   string  `json:"proposal_id"`
+	Kind         string  `json:"kind"`
+	ProposedName string  `json:"proposed_name"`
+	Status       string  `json:"status"`
+	ProposerName string  `json:"proposer_name"`
+	Reason       *string `json:"reason"`
+	CreatedAt    string  `json:"created_at"`
 }
 
 // proposalQueueResponse is the pending-proposal queue page plus the keyset
@@ -251,6 +253,7 @@ func (s *Service) handleListProposals(w http.ResponseWriter, r *http.Request) {
 			ProposedName: row.ProposedName,
 			Status:       string(row.Status),
 			ProposerName: row.ProposerName,
+			Reason:       textPtr(row.AdminNote),
 			CreatedAt:    row.CreatedAt.Time.Format(createProposalTimeLayout),
 		})
 	}

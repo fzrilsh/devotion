@@ -86,11 +86,11 @@ type workOrderView struct {
 	Status                 string           `json:"status"`
 	BuyerProfileID         string           `json:"buyer_profile_id"`
 	SubcontractorProfileID string           `json:"subcontractor_profile_id"`
-	ProductItemID          string           `json:"product_item_id"`
+	ProductItemID          string           `json:"product_item_id,omitempty"`
 	Quantity               int32            `json:"quantity"`
 	Deadline               string           `json:"deadline"`
 	TotalPrice             int64            `json:"total_price"`
-	ReadinessLeadDays      int32            `json:"readiness_lead_days"`
+	ReadinessLeadDays      int32            `json:"readiness_lead_days,omitempty"`
 	ReadinessDeadline      string           `json:"readiness_deadline"`
 	AllowedTransitions     []string         `json:"allowed_transitions"`
 	SelfCancellable        bool             `json:"self_cancellable"`

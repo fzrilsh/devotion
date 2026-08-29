@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // profileView mirrors the fields of myProfileBody and publicProfileBody a test
@@ -17,9 +19,10 @@ type profileView struct {
 	CityName         *string  `json:"city_name"`
 	ProvinceCode     *string  `json:"province_code"`
 	ProvinceName     *string  `json:"province_name"`
-	Latitude         *float64 `json:"latitude"`
-	Longitude        *float64 `json:"longitude"`
-	IdentityVerified bool     `json:"identity_verified"`
+	Latitude           *float64 `json:"latitude"`
+	Longitude          *float64 `json:"longitude"`
+	IdentityVerified   bool     `json:"identity_verified"`
+	VerificationStatus *string  `json:"verification_status"`
 }
 
 // TestRegister_MembuatProfilDalamSatuTransaksi_FR004 proves registration lands
@@ -339,5 +342,78 @@ func TestPublicProfile_TanpaSesi_Berhasil_FR016(t *testing.T) {
 	}
 	if pub.ProfileID != mine.ProfileID {
 		t.Fatalf("profile_id publik = %q, mau %q", pub.ProfileID, mine.ProfileID)
+	}
+}
+
+// TestGetMyProfile_TanpaPengajuanVerifikasi_StatusNull_FR004 proves a profile
+// that never submitted a verification request reports verification_status null,
+// so the badge is simply absent rather than defaulting to a status the profile
+// never held. FR-004.
+func TestGetMyProfile_TanpaPengajuanVerifikasi_StatusNull_FR004(t *testing.T) {
+	h := newHarness(t, "profile_verif_none")
+	cookie := h.registerAndLogin(t, "belumverif@example.com", "+6281300011011", "rahasia123")
+
+	rec := h.do("GET", "/api/profile/me", nil, cookie)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200, body %s", rec.Code, rec.Body.String())
+	}
+	var pv profileView
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if pv.VerificationStatus != nil {
+		t.Fatalf("verification_status = %q, mau null sebelum ada pengajuan", *pv.VerificationStatus)
+	}
+}
+
+// TestGetMyProfile_DenganPengajuanVerifikasi_StatusTerisi_FR004 proves the
+// profile view carries the status of the most recent verification submission, so
+// a business that submitted its identity and location documents sees "pending"
+// while it waits for an admin decision. FR-004.
+func TestGetMyProfile_DenganPengajuanVerifikasi_StatusTerisi_FR004(t *testing.T) {
+	h := newHarness(t, "profile_verif_pending")
+	cookie := h.registerAndLogin(t, "verifpending@example.com", "+6281300012012", "rahasia123")
+
+	ctx := context.Background()
+	var profileID pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`SELECT bp.id FROM business_profile bp JOIN user_account ua ON ua.id = bp.account_id
+		 WHERE ua.email = $1`, "verifpending@example.com").Scan(&profileID); err != nil {
+		t.Fatalf("ambil profil: %v", err)
+	}
+
+	var identityFile, locationFile pgtype.UUID
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO uploaded_file (owner_profile_id, type, original_name, mime_type, size_bytes, storage_path, created_at)
+		 VALUES ($1, 'identity_document', 'ktp.jpg', 'image/jpeg', 1024, $2, $3) RETURNING id`,
+		profileID, "verif/pending/identity", baseTime).Scan(&identityFile); err != nil {
+		t.Fatalf("seed identity file: %v", err)
+	}
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO uploaded_file (owner_profile_id, type, original_name, mime_type, size_bytes, storage_path, created_at)
+		 VALUES ($1, 'location_photo', 'lokasi.jpg', 'image/jpeg', 2048, $2, $3) RETURNING id`,
+		profileID, "verif/pending/location", baseTime).Scan(&locationFile); err != nil {
+		t.Fatalf("seed location file: %v", err)
+	}
+	if _, err := h.pool.Exec(ctx,
+		`INSERT INTO verification_request (profile_id, identity_number, identity_file_id, location_file_id, status, created_at)
+		 VALUES ($1, '3273010101010001', $2, $3, 'pending', $4)`,
+		profileID, identityFile, locationFile, baseTime); err != nil {
+		t.Fatalf("seed verification_request: %v", err)
+	}
+
+	rec := h.do("GET", "/api/profile/me", nil, cookie)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200, body %s", rec.Code, rec.Body.String())
+	}
+	var pv profileView
+	if err := json.Unmarshal(rec.Body.Bytes(), &pv); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if pv.VerificationStatus == nil {
+		t.Fatalf("verification_status nil; body %s", rec.Body.String())
+	}
+	if *pv.VerificationStatus != "pending" {
+		t.Fatalf("verification_status = %q, mau pending", *pv.VerificationStatus)
 	}
 }

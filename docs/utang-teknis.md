@@ -174,9 +174,10 @@ Ini yang paling berbahaya: klien hasil generate akan salah tipe.
 - **GET `/admin/proposals`** balikin envelope `{items, pagination}` dengan
   `proposer_name` dan tanpa `reason` (`internal/masterdata/admin.go:209-216,265`),
   kontrak bilang array `ItemProposal` telanjang dengan `reason`
-  (`openapi.yaml:1440-1447`). **Sudah diperbaiki di kontrak**: envelope
-  `{items, pagination}` dengan `ItemProposal` bertambah `proposer_name`. `reason`
-  tetap di skema (diisi kode pada Langkah 3).
+  (`openapi.yaml:1440-1447`). **Sudah diperbaiki**: kontrak jadi envelope
+  `{items, pagination}` dengan `ItemProposal` bertambah `proposer_name`, dan
+  `proposalQueueItem` kini mengisi `reason` dari `admin_note` yang sudah di-SELECT
+  `ListItemProposalsPending`, jadi kontrak dan kode sepakat penuh.
 - **`Notification.work_order_id`** diemit backend sebagai path, bukan UUID
   sebagaimana skema menuntut. **Sudah diperbaiki**: skema dan field respons
   diganti nama jadi `link`, string nullable tanpa `format: uuid`.
@@ -205,21 +206,27 @@ yang berubah.
 - **`distance_km`** ada di skema SearchCandidate tetapi `viewOf` tidak pernah
   set (`internal/search/search.go:86,257-274`), selalu null. Sesuai catatan
   bahwa jarak informatif saja.
-- **`verification_status`** di respons profil hardcoded nil
-  (`internal/account/profile_http.go:114,170`).
+- **`verification_status`** di respons profil ~~hardcoded nil
+  (`internal/account/profile_http.go:114,170`)~~. **Sudah diperbaiki**: query
+  `LatestVerificationStatusByProfile` mengisi field dari pengajuan verifikasi
+  terbaru; null selama profil belum pernah mengajukan.
 - **`region_level` dan `relaxation`** diemit search
   (`search.go:100-103,111-112,202,220`) tetapi tidak ada di kontrak. Justru
   `relaxation` (menyimpan `most_restrictive` + `suggestion`) yang dibutuhkan T037
-  untuk tombol perluas tier wilayah. Kandidat kuat: kontrak yang diperluas.
-- **`rejection_reason`** di-SELECT (`db/queries/request.sql:45,184`) tetapi tak
-  pernah diserialisasi ke respons.
+  untuk tombol perluas tier wilayah. **Sudah diperbaiki**: kontrak diperluas.
+- **`rejection_reason`** ~~di-SELECT (`db/queries/request.sql:45,184`) tetapi tak
+  pernah diserialisasi ke respons~~. **Sudah diperbaiki**: `candidateView` dan
+  `detailCandidateView` menserialisasi `rejection_reason` (null sebelum ditolak),
+  dan kontrak menambahkan field itu ke `RequestCandidate` (FR-035).
 
 ### D. Kode status dan security berbeda
 
 - **Endpoint verify** wajib session padahal kontrak menandai `security: []`
   (`internal/account/handlers.go:156-166`).
-- **PATCH `/me/roles`** balikin 422, kontrak bilang 409
-  (`handlers.go:388-389`).
+- **PATCH `/me/roles`** ~~balikin 422, kontrak bilang 409
+  (`handlers.go:388-389`)~~. **Sudah diperbaiki**: kode galat `ROLES_IN_USE`
+  (409) ditambahkan dan dipakai `errRolesActive`; kasus kedua peran false tetap
+  422 karena itu validasi masukan.
 - **`/search`** balikin 422 untuk query buruk, kontrak dokumentasikan 400 dan
   tidak punya 403 (`internal/search/http.go:29`). Terkait entri "Kode status
   `'400'` pada path di luar User Story 1" di atas.
@@ -233,10 +240,10 @@ yang berubah.
 - **T045**: sisi baca incoming-request tidak pernah expose quantity, deadline,
   kapasitas-dalam-rentang, maupun can-fulfill (`internal/quota/detail.go:81-89`).
   Butuh perubahan backend plus kontrak, bukan FE saja.
-- **`WorkOrderList` items** menserialisasi `product_item_id: ""` (bukan UUID
+- **`WorkOrderList` items** ~~menserialisasi `product_item_id: ""` (bukan UUID
   valid) dan `readiness_lead_days: 0` karena `workOrderView` tanpa `omitempty`
-  (`internal/order/workorder.go:453-478`). Lolos validasi karena tak wajib, tapi
-  bisa menjegal validator klien yang ketat.
+  (`internal/order/workorder.go:453-478`)~~. **Sudah diperbaiki**: kedua field
+  diberi `omitempty` sehingga baris daftar tidak lagi mengirim UUID kosong.
 
 ### Yang sudah cocok (tidak perlu diapa-apakan)
 

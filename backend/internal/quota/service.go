@@ -112,6 +112,8 @@ func (s *Service) createRequest(ctx context.Context, accountID pgtype.UUID, in r
 				ProfileID:    uuidString(row.ProfileID),
 				BusinessName: row.BusinessName,
 				Status:       string(cand.Status),
+				// A freshly created candidate is always pending, so rejection_reason
+				// is null here; it is populated on the detail and list reads.
 			})
 
 			link := "/quota-requests/" + uuidString(reqRow.ID)
@@ -182,11 +184,12 @@ func (s *Service) listRequests(ctx context.Context, accountID pgtype.UUID, q lis
 		for _, c := range candRows {
 			rid := uuidString(c.RequestID)
 			candByRequest[rid] = append(candByRequest[rid], candidateView{
-				CandidateID:  uuidString(c.CandidateID),
-				ListingID:    uuidString(c.ListingID),
-				ProfileID:    uuidString(c.SubcontractorID),
-				BusinessName: c.BusinessName,
-				Status:       string(c.Status),
+				CandidateID:     uuidString(c.CandidateID),
+				ListingID:       uuidString(c.ListingID),
+				ProfileID:       uuidString(c.SubcontractorID),
+				BusinessName:    c.BusinessName,
+				Status:          string(c.Status),
+				RejectionReason: textPtr(c.RejectionReason),
 			})
 		}
 	}

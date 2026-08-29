@@ -241,3 +241,13 @@ func uuidString(u pgtype.UUID) string {
 func tstz(t time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: t, Valid: true}
 }
+
+// textPtr maps a pgtype.Text back to an optional string: an invalid (NULL) value
+// becomes nil, so an unset admin note surfaces as a null reason in the response.
+func textPtr(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.String
+	return &s
+}
