@@ -117,6 +117,60 @@ func TestWorkOrderDetail_NonPartyGets404_FR038(t *testing.T) {
 	}
 }
 
+// TestWorkOrderDetail_AdminReadsNonPartyOrder_FR045_FR046 proves an admin reads
+// the full detail of an order it is on neither side of. FR-046 requires an admin
+// mediating a dispute to see the whole history, and FR-045 puts a late order in
+// front of an admin who is not a party either. The admin late list and the dispute
+// queue both carry only a work_order_id, so this is the only route to the history.
+func TestWorkOrderDetail_AdminReadsNonPartyOrder_FR045_FR046(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_detail_admin")
+	admin := seedAcceptAccount(t, h.pool, "admin_detail@contoh.test", false)
+	handler := woRouter(h, httpx.RoleAdmin, admin)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/work-orders/"+uuidString(h.workOrderID), nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200; admin harus dapat membaca riwayat pesanan yang bukan pihaknya (FR-046); body %s",
+			rec.Code, rec.Body.String())
+	}
+	var body workOrderView
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode WorkOrderDetail: %v", err)
+	}
+	if body.WorkOrderID != uuidString(h.workOrderID) {
+		t.Fatalf("work_order_id %q, mau %q", body.WorkOrderID, uuidString(h.workOrderID))
+	}
+	if len(body.StatusHistory) == 0 {
+		t.Fatal("status_history kosong; admin membuka detail justru untuk riwayatnya (FR-046)")
+	}
+	if len(body.Allocations) == 0 {
+		t.Fatal("allocations kosong; FR-046 menuntut alokasi kapasitas terbaca admin")
+	}
+}
+
+// TestWorkOrderDetail_AdminCannotAdvanceStatus_FR045_FR046 proves widening the
+// detail read did not widen the write: the forward status change stays
+// subcontractor only (FR-005), and an admin moves an order through dispute
+// resolution instead.
+func TestWorkOrderDetail_AdminCannotAdvanceStatus_FR045_FR046(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_status_admin")
+	admin := seedAcceptAccount(t, h.pool, "admin_status@contoh.test", false)
+	handler := woRouter(h, httpx.RoleAdmin, admin)
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/api/work-orders/"+uuidString(h.workOrderID)+"/status",
+		strings.NewReader(`{"new_status":"production"}`))
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status %d, mau 403; admin membaca saja, transisi maju tetap milik subkontraktor (FR-005); body %s",
+			rec.Code, rec.Body.String())
+	}
+}
+
 // TestWorkOrderStatus_SubcontractorAdvances_FR039 proves the subcontractor can
 // drive the order forward one legal step (accepted -> production), the response
 // reflects the new status, and the allowed transitions recompute from it.

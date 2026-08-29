@@ -6,6 +6,59 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diperbaiki
+- Kode QR WhatsApp kini muncul kapan pun admin membukanya, bukan hanya beberapa
+  menit pertama setelah proses menyala. `Manager.Start` memanggil
+  `GetQRChannel` tepat satu kali saat boot, sedangkan whatsmeow mengirim
+  sejumlah kode terbatas per siklus (enam kode, satu menit lalu dua puluh detik
+  masing-masing) kemudian menutup kanal, mencabut event handler-nya, dan
+  memutus soket. Setelah batch itu habis tidak ada apa pun yang memulai siklus
+  baru: `GET /api/admin/whatsapp` hanya membaca `qrCode` yang sudah dikosongkan,
+  jadi memuat ulang halaman tidak pernah menghasilkan kode dan satu-satunya cara
+  memulihkan adalah me-restart kontainer.
+  Sekarang pemasangan disiapkan saat diminta, bukan saat boot: membaca status
+  menyalakan siklus baru bila tautan belum terpasangkan dan tidak ada siklus yang
+  berjalan, lalu menunggu paling lama lima detik agar satu pemuatan halaman
+  langsung memberi kode yang bisa dipindai. Setiap siklus memakai client
+  whatsmeow baru, karena handler QR siklus lama masih terpasang di client lama
+  dan akan memutus soket siklus baru saat event QR berikutnya datang. Penulisan
+  status diberi nomor generasi sehingga pump siklus yang sudah ditinggalkan tidak
+  dapat menimpa kode segar. Tautan yang sudah terpasangkan tidak pernah
+  dipasangkan ulang, hanya disambungkan kembali, supaya sesi yang masih sah tidak
+  terhapus demi menampilkan QR.
+
+### Ditambahkan
+- `POST /api/admin/whatsapp/reconnect`, khusus admin, membuang siklus pemasangan
+  yang berjalan dan memulai yang baru, atau menjatuhkan lalu menyambungkan ulang
+  soket bila tautan sudah terpasangkan. Ini tombol "sambung ulang" yang dituntut
+  T024b, dan bentuk balasannya sama dengan `GET /api/admin/whatsapp`. Nomor
+  layanan tetap tidak pernah ada di respons (FR-082). Jumlah operasi di
+  `contracts/README.md` menjadi 65 pada 57 path.
+
+### Diubah
+- `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
+  pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin
+  membaca riwayat lengkap pesanan yang ia bukan pihaknya, tetapi tidak ada jalan
+  menuju riwayat itu: guard pihak menjawab 404, dan `GET /api/work-orders` selalu
+  kosong untuk admin karena akun admin tidak punya baris `business_profile`.
+  Guard pihak dilonggarkan lewat satu pemeriksaan peran, tanpa path baru dan
+  tanpa tipe respons baru, sehingga tipe TypeScript hasil generate tidak berubah.
+  Akses admin baca saja: `POST /api/work-orders/{workOrderId}/status` tetap
+  khusus subkontraktor, dan admin mengubah keadaan lewat penyelesaian sengketa.
+  Pemanggil lain tetap menerima 404, bukan 403.
+- `GET /api/admin/late-orders` mengembalikan skema ringkas `LateOrderList` berisi
+  `LateOrderSummary`, bukan lagi `WorkOrderList` berisi `WorkOrderDetail`.
+  **Perubahan yang memutus kompatibilitas** bagi kode frontend yang membaca
+  `allocations`, `status_history`, `payments`, `product_item_id`,
+  `readiness_lead_days`, `allowed_transitions`, `self_cancellable`, atau
+  `auto_confirm_at` dari baris daftar telat. Kueri `ListLateWorkOrdersForAdmin`
+  membaca baris pesanan saja, tanpa join ke `business_profile` maupun
+  `quota_request`, jadi lima kolom pertama tidak pernah bisa diisi dan sisanya
+  dikirim sebagai array kosong: bentuk lama menjanjikan data yang tidak ada dan
+  membuat pesanan tampak tanpa riwayat. Ringkasan sekarang memuat delapan kolom
+  yang benar-benar dibaca kueri, dan frontend mengikuti `work_order_id` ke
+  `GET /api/work-orders/{id}` dengan sesi admin yang sama untuk detailnya.
+
 ### Ditambahkan
 - Runbook VPS dilengkapi menjadi 16 langkah utuh (T077): pasang compose,
   menyalakan dan memverifikasi migrasi, seed wilayah dan daftar baku serta

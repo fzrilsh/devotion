@@ -47,7 +47,10 @@ func (s *Service) registerWorkOrder(r *httpx.Router, auth httpx.Authenticator) {
 // route is authenticated but not role-gated: the party guard compares the caller's
 // account id to the order's two parties, so a non-party (or a malformed id, or an
 // order that does not exist) all collapse to the same 404, never leaking that the
-// order exists to someone not on it.
+// order exists to someone not on it. An admin is admitted past the party guard
+// because FR-045 and FR-046 require reading the full history of an order the admin
+// is not party to; the read stays read-only, since the forward status change is
+// still subcontractor only and an admin changes state through dispute resolution.
 func (s *Service) handleWorkOrderDetail(w http.ResponseWriter, r *http.Request) {
 	acc, ok := principalAccount(w, r)
 	if !ok {
@@ -68,7 +71,7 @@ func (s *Service) handleWorkOrderDetail(w http.ResponseWriter, r *http.Request) 
 		httpx.WriteInternal(w)
 		return
 	}
-	if row.BuyerAccount != acc.ID && row.SubcontractorAccount != acc.ID {
+	if row.BuyerAccount != acc.ID && row.SubcontractorAccount != acc.ID && !callerIsAdmin(r) {
 		httpx.WriteProblem(w, httpx.CodeNotFound, "Pesanan tidak ditemukan.")
 		return
 	}

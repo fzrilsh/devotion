@@ -54,7 +54,7 @@ func (s *Service) handleListLateOrders(w http.ResponseWriter, r *http.Request) {
 		rows = rows[:workOrderPageLimit]
 	}
 
-	items := make([]workOrderView, 0, len(rows))
+	items := make([]lateOrderView, 0, len(rows))
 	for _, wo := range rows {
 		items = append(items, s.lateItemView(wo))
 	}
@@ -65,22 +65,46 @@ func (s *Service) handleListLateOrders(w http.ResponseWriter, r *http.Request) {
 		c := encodeCursor(cursor{created: last.CreatedAt, id: last.ID})
 		page.NextCursor = &c
 	}
-	writeJSON(w, http.StatusOK, workOrderList{Items: items, Pagination: page})
+	writeJSON(w, http.StatusOK, lateOrderList{Items: items, Pagination: page})
 }
 
-// lateItemView renders one admin late-order row as the same summary WorkOrderDetail
-// shape the party list uses, so the frontend renders the admin list from the shared
-// contract. It applies the same lazy auto-confirm as listItemView (research.md R-07
-// layer 1): a shipped order past its 7-day window would read as confirmed and so
-// leave the active set, but the late query's status filter has already excluded
-// confirmed rows, so this only keeps the two layers' status text consistent.
-func (s *Service) lateItemView(wo sqlcgen.ListLateWorkOrdersForAdminRow) workOrderView {
+// lateOrderView is the LateOrderSummary body: one row of the admin late-order
+// list. It is deliberately narrower than workOrderView. The late query reads the
+// work-order row alone, so it has no product item, no readiness lead, and no
+// history, allocations, or payments; sending those as empty arrays under the
+// WorkOrderDetail name told the client fields existed when they never did. Admin
+// opens the full picture through GET /api/work-orders/{workOrderId}, which admits
+// an admin past the party guard (FR-045, FR-046).
+type lateOrderView struct {
+	WorkOrderID            string `json:"work_order_id"`
+	Status                 string `json:"status"`
+	BuyerProfileID         string `json:"buyer_profile_id"`
+	SubcontractorProfileID string `json:"subcontractor_profile_id"`
+	Quantity               int32  `json:"quantity"`
+	Deadline               string `json:"deadline"`
+	TotalPrice             int64  `json:"total_price"`
+	ReadinessDeadline      string `json:"readiness_deadline"`
+}
+
+// lateOrderList is the LateOrderList body: a page of summaries plus the keyset
+// pagination cursor.
+type lateOrderList struct {
+	Items      []lateOrderView `json:"items"`
+	Pagination pagination      `json:"pagination"`
+}
+
+// lateItemView renders one admin late-order row as a LateOrderSummary. It applies
+// the same lazy auto-confirm as listItemView (research.md R-07 layer 1): a shipped
+// order past its 7-day window would read as confirmed and so leave the active set,
+// but the late query's status filter has already excluded confirmed rows, so this
+// only keeps the two layers' status text consistent.
+func (s *Service) lateItemView(wo sqlcgen.ListLateWorkOrdersForAdminRow) lateOrderView {
 	effStatus := wo.Status
 	if wo.Status == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid &&
 		IsAutoConfirmDue(AutoConfirmBase(wo.AutoConfirmBaseAt, wo.ShippedAt), s.clock.Now(), wo.HasOpenDispute) {
 		effStatus = sqlcgen.WorkOrderStatusConfirmed
 	}
-	view := workOrderView{
+	return lateOrderView{
 		WorkOrderID:            uuidString(wo.ID),
 		Status:                 string(effStatus),
 		BuyerProfileID:         uuidString(wo.BuyerID),
@@ -89,17 +113,7 @@ func (s *Service) lateItemView(wo sqlcgen.ListLateWorkOrdersForAdminRow) workOrd
 		Deadline:               platform.FormatDateID(wo.Deadline.Time),
 		TotalPrice:             wo.TotalPrice,
 		ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
-		AllowedTransitions:     allowedTransitions(effStatus),
-		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
-		Allocations:            []allocationView{},
-		StatusHistory:          []statusEntry{},
-		Payments:               []paymentView{},
 	}
-	if effStatus == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid {
-		at := AutoConfirmAt(wo.ShippedAt.Time)
-		view.AutoConfirmAt = &at
-	}
-	return view
 }
 
 // LateOrderJob is layer 2 of the two-layer late-order monitoring (research.md

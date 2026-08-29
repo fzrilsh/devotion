@@ -1033,7 +1033,15 @@ paths:
     get:
       tags: [work-order]
       summary: Detail pesanan beserta riwayat status dan alokasi kapasitas
-      x-fr: [FR-038, FR-039, FR-041, FR-077]
+      description: |
+        Boleh dibaca oleh pihak pesanan (pemberi order atau subkontraktor) dan
+        oleh admin. Admin diberi akses karena FR-045 dan FR-046 menuntut admin
+        membaca seluruh riwayat pesanan yang ia bukan pihaknya, baik dari antrean
+        sengketa maupun dari daftar pesanan telat. Pemanggil lain menerima 404,
+        bukan 403, agar keberadaan pesanan tidak terbocorkan. Aksesnya baca saja:
+        POST /work-orders/{workOrderId}/status tetap khusus subkontraktor, dan
+        admin mengubah keadaan lewat penyelesaian sengketa.
+      x-fr: [FR-038, FR-039, FR-041, FR-045, FR-046, FR-077]
       parameters:
         - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -1491,6 +1499,12 @@ paths:
     get:
       tags: [admin]
       summary: Pesanan yang melewati tenggat kesiapan
+      description: |
+        Daftar ringkas, bukan detail. Setiap baris hanya memuat kolom yang ada
+        pada baris pesanan; riwayat status, alokasi kapasitas, dan catatan
+        pembayaran tidak disertakan. Untuk membukanya, panggil
+        GET /work-orders/{workOrderId} dengan sesi admin yang sama (FR-045,
+        FR-046).
       x-fr: [FR-045]
       parameters:
         - { name: cursor, in: query, schema: { type: string } }
@@ -1498,7 +1512,7 @@ paths:
         '200':
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/WorkOrderList' }
+              schema: { $ref: '#/components/schemas/LateOrderList' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /admin/disputes:
@@ -1572,7 +1586,31 @@ paths:
       description: |
         Menampilkan status tautan whatsmeow dan kode QR bila perlu ditautkan ulang. Tidak
         pernah menampilkan nomor layanan pada keluaran (FR-082) [1].
-      x-fr: [FR-082]
+
+        Membaca status juga menyiapkan siklus pemasangan baru bila tautan belum
+        terpasangkan dan tidak ada siklus yang berjalan: satu siklus hanya
+        mengeluarkan sejumlah kode lalu berakhir, jadi tanpa penyiapan ini `qr_code`
+        akan kosong bagi admin yang membuka halaman beberapa menit setelah proses
+        menyala. Tautan yang sudah terpasangkan tidak diganggu.
+      x-fr: [FR-002, FR-052, FR-082]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WhatsAppStatus' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/whatsapp/reconnect:
+    post:
+      tags: [admin]
+      summary: Sambungkan ulang sesi WhatsApp
+      description: |
+        Membuang siklus pemasangan yang sedang berjalan dan memulai yang baru, sehingga
+        admin mendapat kode QR segar tanpa akses server. Bila tautan sudah terpasangkan,
+        soket dijatuhkan lalu disambungkan ulang, bukan dipasangkan ulang: sesi yang
+        masih sah tidak dihapus. Bentuk balasannya sama dengan `GET /admin/whatsapp`,
+        dan nomor layanan tetap tidak pernah muncul (FR-082) [1].
+      x-fr: [FR-002, FR-052, FR-082]
       responses:
         '200':
           content:
@@ -2249,6 +2287,37 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/WorkOrderDetail' }
+        pagination: { $ref: '#/components/schemas/Pagination' }
+
+    LateOrderSummary:
+      type: object
+      description: |
+        Ringkasan satu pesanan telat untuk daftar pantau admin (FR-045). Sengaja
+        lebih sempit dari WorkOrderDetail: hanya kolom yang benar-benar dibaca
+        dari baris pesanan. Riwayat status, alokasi kapasitas, dan catatan
+        pembayaran tidak ada di sini; admin membukanya lewat
+        GET /work-orders/{workOrderId}.
+      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, total_price, readiness_deadline]
+      properties:
+        work_order_id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/WorkOrderStatus' }
+        buyer_profile_id: { type: string, format: uuid }
+        subcontractor_profile_id: { type: string, format: uuid }
+        quantity: { type: integer }
+        deadline: { type: string, format: date }
+        total_price: { type: integer, format: int64 }
+        readiness_deadline:
+          type: string
+          format: date
+          description: Dihitung satu kali di domain, dipakai kedua lapisan penjadwal.
+
+    LateOrderList:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/LateOrderSummary' }
         pagination: { $ref: '#/components/schemas/Pagination' }
 
     PaymentRecord:

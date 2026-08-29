@@ -236,6 +236,39 @@ Catat entri di CHANGELOG pada branch kerja yang sama dengan perubahannya, dalam
 commit yang sama bila memungkinkan, supaya riwayat dan catatan tidak terpisah.
 Perubahan tanpa entri CHANGELOG dianggap belum selesai.
 
+### Trailer `Co-Authored-By` di tiap commit
+
+Setiap commit di repository ini mencantumkan seluruh anggota tim sebagai
+co-author, karena pekerjaannya keputusan bersama meski yang mengetik satu orang.
+
+| Nama | Peran | GitHub |
+|------|-------|--------|
+| Juan Kevin Utomo | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
+| Fazril Syaveral Hillaby | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
+| Chiko Maulana Ahmad | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
+
+Blok trailer, ditulis apa adanya di akhir pesan commit setelah satu baris
+kosong, satu trailer per baris tanpa baris kosong di antaranya:
+
+```text
+Co-Authored-By: Juan Kevin Utomo <85393163+TrygerZ@users.noreply.github.com>
+Co-Authored-By: Fazril Syaveral Hillaby <55905559+fzrilsh@users.noreply.github.com>
+Co-Authored-By: Chiko Maulana Ahmad <76936064+ChikoID@users.noreply.github.com>
+```
+
+Yang perlu diperhatikan:
+
+- Alamat `users.noreply.github.com` dipakai supaya GitHub mengaitkan kontribusi
+  ke akun yang benar tanpa memajang alamat email pribadi siapa pun di riwayat
+  publik. Jangan menggantinya dengan alamat pribadi.
+- Ejaan `Co-Authored-By` persis seperti di atas. GitHub tidak mengenali variasi
+  lain, termasuk `Co-Authorized-By`.
+- Anggota yang menjadi author commit tetap ikut ditulis sebagai co-author.
+  Daftarnya sama untuk semua commit, jadi tidak ada yang perlu diingat per kasus.
+- Trailer ini juga ikut pada commit merge.
+- Tiga trailer itu saja. Jangan menambahkan trailer co-author untuk agent atau
+  alat, termasuk `Co-Authored-By: Claude`.
+
 ### Menandai task selesai
 
 Saat sebuah task di `docs/001-capacity-exchange-marketplace/tasks.md` betul-betul

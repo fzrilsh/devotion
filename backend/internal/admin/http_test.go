@@ -42,19 +42,24 @@ func newManager(qr, lastErr string) *Manager {
 // still holds regardless of role, since the number is never a body field.
 func TestStatus_AdminOnly_FR082(t *testing.T) {
 	cases := []struct {
-		name string
-		auth stubAuth
-		want int
+		name   string
+		method string
+		path   string
+		auth   stubAuth
+		want   int
 	}{
-		{"unauthenticated", stubAuth{fail: true}, http.StatusUnauthorized},
-		{"buyer forbidden", stubAuth{roles: httpx.RoleBuyer}, http.StatusForbidden},
-		{"admin ok", stubAuth{roles: httpx.RoleAdmin}, http.StatusOK},
+		{"status unauthenticated", "GET", "/api/admin/whatsapp", stubAuth{fail: true}, http.StatusUnauthorized},
+		{"status buyer forbidden", "GET", "/api/admin/whatsapp", stubAuth{roles: httpx.RoleBuyer}, http.StatusForbidden},
+		{"status admin ok", "GET", "/api/admin/whatsapp", stubAuth{roles: httpx.RoleAdmin}, http.StatusOK},
+		{"reconnect unauthenticated", "POST", "/api/admin/whatsapp/reconnect", stubAuth{fail: true}, http.StatusUnauthorized},
+		{"reconnect subcontractor forbidden", "POST", "/api/admin/whatsapp/reconnect", stubAuth{roles: httpx.RoleSubcontractor}, http.StatusForbidden},
+		{"reconnect admin ok", "POST", "/api/admin/whatsapp/reconnect", stubAuth{roles: httpx.RoleAdmin}, http.StatusOK},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httpx.NewRouter(quietLogger())
 			newManager("", "").Register(r, tc.auth)
-			req := httptest.NewRequest("GET", "/api/admin/whatsapp", nil)
+			req := httptest.NewRequest(tc.method, tc.path, nil)
 			rec := httptest.NewRecorder()
 			r.Handler().ServeHTTP(rec, req)
 			if rec.Code != tc.want {

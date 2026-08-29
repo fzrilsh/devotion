@@ -89,6 +89,8 @@ Enam belas langkah berurutan; jangan melompat.
     kredensial akun uji di `quickstart.md` §E.
 13. **Menyambungkan WhatsApp.** Buka `/admin/whatsapp`, pindai QR dengan ponsel
     nomor khusus. Sesi tersimpan agar tidak perlu memindai ulang tiap restart.
+    Kode QR berlaku singkat: muat ulang halaman atau tekan sambung ulang untuk
+    kode baru, kapan pun setelah proses menyala.
 14. **Health check dan pemantau uptime.**
 
     ```bash
