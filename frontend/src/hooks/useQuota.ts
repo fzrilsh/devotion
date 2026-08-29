@@ -1,4 +1,4 @@
-import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type QuotaRequestCreate, type SearchParams } from "@api/search";
+import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type QuotaRequestCreate, type RequestCandidate, type SearchParams } from "@api/search";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const quotaKeys = {
@@ -57,6 +57,42 @@ export function useIncomingCandidates(status?: CandidateStatus) {
         initialPageParam: undefined as string | undefined,
         getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
         staleTime: 30 * 1000,
+    });
+}
+
+// Kandidat request masuk diidentifikasi candidate_id. Endpoint detail request
+// (/quota-requests/{id}) khusus pembanding milik pemberi order, jadi halaman
+// subkontraktor membaca kandidatnya dari daftar incoming.
+export function useIncomingCandidate(candidateId: string) {
+    const queryClient = useQueryClient();
+
+    return useQuery({
+        queryKey: ["quota", "incoming", "detail", candidateId] as const,
+        queryFn: async () => {
+            let cursor: string | undefined;
+
+            for (let page = 0; page < 5; page += 1) {
+                const result = await getIncomingCandidates({ cursor });
+                const found = result.items.find((item) => item.candidate_id === candidateId);
+
+                if (found) return found;
+                if (!result.pagination.has_next || !result.pagination.next_cursor) break;
+
+                cursor = result.pagination.next_cursor;
+            }
+
+            // Cache daftar bisa saja belum termuat halaman yang memuat kandidat ini.
+            // Lempar agar select jatuh ke cache daftar, atau memicu refetch.
+            throw new Error("CANDIDATE_NOT_LOADED");
+        },
+        select: (fresh) => {
+            const pages = queryClient.getQueryData<{ pages: { items: RequestCandidate[] }[] }>(quotaKeys.incoming());
+
+            return pages?.pages.flatMap((page) => page.items).find((item) => item.candidate_id === candidateId) ?? fresh;
+        },
+        enabled: Boolean(candidateId),
+        staleTime: 30 * 1000,
+        retry: false,
     });
 }
 

@@ -10,11 +10,11 @@ export default function HeroSection() {
                     </h1>
                     <p className="text-base text-slate-500 max-w-lg">Devotion menghubungkan UMKM konveksi dengan subkontraktor terpercaya yang siap memenuhi kebutuhan produksi Anda. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                        <a href="/" className="inline-flex items-center justify-center gap-2 rounded-full bg-industrial-blue-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-blue-600 hover:-translate-y-0.5 transition-all duration-200">
+                        <a href="/search" className="inline-flex items-center justify-center gap-2 rounded-full bg-industrial-blue-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-blue-600 hover:-translate-y-0.5 transition-all duration-200">
                             <LuSearch /> Cari SubKontraktor
                         </a>
 
-                        <a href="/" className="inline-flex items-center justify-center rounded-full border-2 border-deep-navy-500 px-6 py-3.5 text-sm font-semibold text-deep-navy-500 hover:bg-deep-navy-500/5 transition-all duration-200">
+                        <a href="/listing" className="inline-flex items-center justify-center rounded-full border-2 border-deep-navy-500 px-6 py-3.5 text-sm font-semibold text-deep-navy-500 hover:bg-deep-navy-500/5 transition-all duration-200">
                             Tawarkan Kapasitas
                         </a>
                     </div>

@@ -61,7 +61,7 @@ export default function Incoming() {
                     ) : null}
                 </div>
             ) : (
-                <ul className="space-y-3">
+                <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {candidates.map((candidate) => {
                         const meta = candidateStatusMeta[candidate.status];
 
