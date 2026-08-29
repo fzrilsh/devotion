@@ -26,7 +26,7 @@ teknis ada di `research.md`.
 | Akun Sentry | DSN untuk backend, opsional untuk frontend |
 | Nomor WhatsApp khusus | Bukan nomor pribadi anggota tim; ponselnya tersedia untuk memindai QR |
 | GitHub | Repository dan izin menulis ke GitHub Container Registry |
-| Mesin lokal | Docker, Go 1.22+, Node 20+ untuk pengembangan |
+| Mesin lokal | Docker, Go 1.25+, Node 20+ untuk pengembangan |
 
 Yang **tidak** dibutuhkan dan sengaja tidak dipakai: payment gateway (dilarang Batas
 Keuangan konstitusi, sehingga mitigasi gagal bayar berupa escrow wajib pada dokumen
@@ -400,6 +400,11 @@ senyap saat pencarian.
 Buka `https://devotion.web.id/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
 
+Kode QR punya masa berlaku pendek. Muat ulang halaman untuk mendapat kode baru, atau tekan
+tombol sambung ulang bila kode di layar sudah kedaluwarsa. Setiap pemuatan halaman
+menyiapkan siklus pemasangan baru bila tautan belum terpasangkan, jadi tidak ada jendela
+waktu setelah proses menyala yang membuat QR berhenti muncul.
+
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
 justru agar penyambungan ulang tidak memerlukan akses SSH, dan itu penting karena FR-002
 menjadikan verifikasi nomor HP sebagai gerbang pendaftaran.
@@ -526,20 +531,42 @@ git clone https://github.com/fzrilsh/devotion.git && cd devotion
 cp .env.example .env        # isi untuk lokal; APP_ENV=development
 
 docker compose up -d postgres
+
+set -a; . ./.env; set +a    # biner Go membaca env, bukan berkas .env
 cd backend && go run ./cmd/devotion serve
 
 cd ../frontend && npm ci && npm run dev
 ```
 
-Pada `APP_ENV=development`, backend melayani HTTP biasa tanpa TLS dan tanpa pemeriksaan
-sertifikat klien Cloudflare, dan Vite dev server memproksikan `/api` ke backend.
+Langkah `set -a; . ./.env; set +a` tidak bisa dilewati. `.env` hanya dibaca Docker
+Compose; biner Go mengambil konfigurasi dari variabel lingkungan lewat `os.Getenv`,
+jadi tanpa ekspor itu `serve` berhenti dengan `variabel lingkungan wajib belum
+diisi: APP_ENV`. Yang wajib di setiap lingkungan hanya empat: `APP_ENV`,
+`APP_BASE_URL`, `DATABASE_URL`, `UPLOAD_PATH`.
+
+Perintah compose di bagian ini ditulis sebagai plugin (`docker compose`), bentuk
+yang dipasang skrip resmi Docker di VPS. Pemasangan lewat Homebrew di mesin lokal
+hanya menyediakan biner standalone `docker-compose`; pakai bentuk yang ada, sebab
+keduanya Compose v2 dan menerima berkas yang sama.
+
+Pada `APP_ENV=development`, backend melayani HTTP biasa di `:8080` tanpa TLS dan
+tanpa pemeriksaan sertifikat klien Cloudflare, dan Vite dev server memproksikan
+`/api` ke backend.
 
 Pengujian:
 
 ```bash
-cd backend  && go test ./...              # seluruh pengujian backend
-cd frontend && npm test                   # Jest
+cd backend
+DATABASE_URL_TEST=postgres://devotion:devotion@127.0.0.1:5434/devotion?sslmode=disable \
+  go test ./... -p 1                      # seluruh pengujian backend
+cd ../frontend && npm test                # Jest
 ```
+
+`DATABASE_URL_TEST` disebut eksplisit karena nilai bawaannya di dalam kode
+menunjuk port 5432 sementara compose menerbitkan 5434. Uji yang tidak dapat
+menjangkau basis data memilih `t.Skip` daripada gagal, jadi variabel yang salah
+membuat seluruh uji basis data dilewati sementara hasilnya tetap hijau. `-p 1`
+menjaga total koneksi di bawah `max_connections=20`.
 
 Pengujian backend memakai **skema terpisah pada layanan Postgres yang sama**, bukan
 layanan basis data tambahan. Konstitusi melarang menambah layanan untuk keperluan

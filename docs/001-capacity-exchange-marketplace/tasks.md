@@ -62,7 +62,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: `go run ./cmd/devotion` menampilkan daftar subcommand; `go vet ./...` bersih
   **Saran**: satu berkas per subcommand, dispatcher tipis di `main.go`. Subcommand adalah proses sekali jalan, bukan proses runtime, jadi tidak melanggar Gate I.
 
-- [ ] T003 [P] [FE] Inisialisasi frontend
+- [x] T003 [P] [FE] Inisialisasi frontend
   **Modul**: `frontend/`
   **Kemampuan**: Vite + React 18 + TypeScript + Tailwind, Jest, struktur `src/{pages,components,api,schemas,lib}`
   **Dependency**: sesuai `plan.md` Primary Dependencies. Jangan tambah di luar daftar itu; prasyarat T001
@@ -204,7 +204,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: admin dapat masuk; menjalankan dua kali tidak membuat admin ganda
   **Hati-hati**: kata sandi lewat prompt, bukan argumen, karena argumen tersimpan di riwayat shell.
 
-- [ ] T021 [FE] Frontend: shell aplikasi
+- [x] T021 [FE] Frontend: shell aplikasi
   **Modul**: `frontend/src/`
   **FR**: FR-055, FR-056
   **Kemampuan**: layout mobile-first bahasa Indonesia, routing, klien API dengan `credentials: 'include'`, TanStack Query, penanganan galat yang menampilkan `detail` dari respons, halaman masuk dan daftar
@@ -436,7 +436,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T039, T040
   **Hati-hati**: test kedaluwarsa 72 jam wajib memakai `Clock` yang digeser. Karena tidak ada `DEFAULT now()`, baris uji dapat dibuat dengan waktu apa pun secara konsisten.
 
-- [ ] T044 [US3] [FE] Frontend: request dan perbandingan
+- [x] T044 [US3] [FE] Frontend: request dan perbandingan
   **Modul**: `frontend/src/pages/request/`
   **FR**: FR-029, FR-030, FR-032, FR-033
   **Kemampuan**: pilih kandidat dari hasil pencarian, form request, daftar request terkirim dengan status per kandidat, perbandingan penawaran berdampingan, aksi counter-offer dan terima
@@ -569,7 +569,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T054, T055, T057
   **Hati-hati**: seluruh test tenggat memakai `Clock` yang digeser, bukan menunggu waktu nyata.
 
-- [ ] T059 [US5] [FE] Frontend: dashboard pesanan
+- [x] T059 [US5] [FE] Frontend: dashboard pesanan
   **Modul**: `frontend/src/pages/work-orders/`
   **FR**: FR-038, FR-039, FR-041, FR-044
   **Kemampuan**: daftar aktif dan riwayat, detail dengan riwayat status, rincian alokasi per minggu, tombol transisi, form pembatalan, catatan pembayaran, tombol laporkan sengketa
@@ -577,7 +577,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tombol dirender dari `allowed_transitions` yang dikirim backend
   **Hati-hati**: **jangan** duplikasi mesin keadaan pesanan di React. Kalau logikanya ditulis ulang, dua tempat akan berbeda pada suatu titik.
 
-- [ ] T060 [US5] [FE] Frontend: tenggat konfirmasi
+- [x] T060 [US5] [FE] Frontend: tenggat konfirmasi
   **Modul**: `frontend/src/pages/work-orders/`
   **FR**: FR-068, FR-069
   **Kemampuan**: tanggal pesanan akan dianggap diterima ditampilkan jelas pada pesanan berstatus Dikirim; penanda bahwa penutupan terjadi otomatis
