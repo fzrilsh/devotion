@@ -276,10 +276,15 @@ export default function IncomingDetail() {
                 ) : null}
 
                 {candidate.status === "agreed" ? (
-                    <p className="mt-4 flex items-center gap-2 border-t border-emerald-100 pt-4 text-sm font-semibold text-emerald-700">
-                        <LuCircleCheck className="size-4" aria-hidden />
-                        Kesepakatan terbentuk. Pesanan sudah dibuat dan kapasitas Anda teralokasi.
-                    </p>
+                    <div className="mt-4 border-t border-emerald-100 pt-4">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                            <LuCircleCheck className="size-4" aria-hidden />
+                            Kesepakatan terbentuk. Pesanan sudah dibuat dan kapasitas Anda teralokasi.
+                        </p>
+                        <Link to="/orders" className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 underline underline-offset-2">
+                            Buka daftar pesanan
+                        </Link>
+                    </div>
                 ) : null}
 
                 {terminal && candidate.status !== "agreed" ? (

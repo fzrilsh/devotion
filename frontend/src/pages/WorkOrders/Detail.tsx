@@ -114,11 +114,19 @@ export default function Detail() {
     if (orderQuery.isLoading) return <Loading />;
 
     if (orderQuery.isError || !orderQuery.data) {
+        const status = orderQuery.error instanceof ApiError ? orderQuery.error.status : 0;
+        const message =
+            status === 403
+                ? "Pesanan ini tidak terdaftar untuk profil usaha Anda. Periksa kembali bahwa id di tautan adalah id pesanan, bukan id request atau id kandidat."
+                : status === 404
+                  ? "Pesanan dengan id ini tidak ditemukan. Id pesanan diberikan lewat notifikasi kesepakatan dan daftar pesanan; id request kuota dan id kandidat bukan id pesanan."
+                  : "Pesanan tidak dapat dimuat. Coba muat ulang halaman.";
+
         return (
             <div className="space-y-6">
                 <h1 className="text-xl font-bold text-slate-900">Detail Pesanan</h1>
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-red-700">Pesanan tidak ditemukan atau Anda tidak berwenang melihatnya.</p>
+                    <p className="text-sm font-semibold text-red-700">{message}</p>
                     <Link to="/orders" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-red-800 underline underline-offset-2">
                         <LuArrowLeft className="size-4" aria-hidden />
                         Kembali ke daftar pesanan

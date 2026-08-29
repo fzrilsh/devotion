@@ -47,5 +47,8 @@ export async function apiClient<T>(path: string, options: RequestInit = {}): Pro
         return undefined as T;
     }
 
-    return response.json();
+    // Body sukses bisa kosong; jangan anggap itu kegagalan parse.
+    const text = await response.text();
+
+    return (text ? JSON.parse(text) : undefined) as T;
 }
