@@ -142,7 +142,7 @@ Tabel ini disusun dari pembacaan kode di `origin/staging`, bukan dari catatan tu
 
 **[https://devotion.web.id/](https://devotion.web.id/)**
 
-Perlu diketahui apa adanya: saat README ini ditulis, domain itu masih membalas `521` dari Cloudflare. Artinya DNS dan sertifikat sudah beres, tapi origin di VPS belum menyala atau belum tersambung. Begitu origin dijalankan, cek ulang dengan perintah ini dan pastikan balasannya `200`:
+Perlu diketahui apa adanya: saat README ini ditulis, domain itu masih membalas `521` dari Cloudflare. Artinya DNS dan sertifikat sudah beres, tapi origin belum menyala atau belum tersambung. Begitu origin dijalankan, cek ulang dengan perintah ini dan pastikan balasannya `200`:
 
 ```bash
 curl -i https://devotion.web.id/api/health
@@ -205,7 +205,7 @@ Testing      : go vet, go test, ESLint, tsc
 
 ### Alasan pemilihan teknologi
 
-Dua batasan menentukan hampir semua pilihan: VPS 2GB RAM, dan aturan panitia yang membatasi layanan runtime menjadi dua.
+Satu batasan menentukan hampir semua pilihan: aturan panitia yang membatasi layanan runtime menjadi dua.
 
 | Teknologi | Alasan pemilihan |
 |---|---|
@@ -252,7 +252,7 @@ flowchart TB
         cf["Cloudflare<br/>proxy dan TLS<br/>Origin Certificate"]
     end
 
-    subgraph vps["VPS 2GB, docker compose"]
+    subgraph host["Server, docker compose"]
         subgraph be["Layanan 1: backend, Go 1.25"]
             spa["Static handler<br/>embed.FS webdist"]
             api["API handler<br/>net/http router"]
@@ -725,7 +725,7 @@ npm run build
 npm run lint
 ```
 
-Untuk production, CI membangun frontend, menyalin hasilnya ke `backend/webdist/`, lalu membangun image; server hanya menarik dan menjalankan. Jangan build di VPS: build Vite pada mesin 2GB sementara Postgres hidup akan kehabisan memori, dan yang dimatikan kernel biasanya Postgres.
+Untuk production, CI membangun frontend, menyalin hasilnya ke `backend/webdist/`, lalu membangun image; server hanya menarik dan menjalankan. Build tidak dilakukan di server produksi, supaya proses build tidak berebut sumber daya dengan Postgres yang sedang hidup.
 
 ### Panduan pengguna
 
@@ -863,6 +863,33 @@ Kontrak OpenAPI 3.1 di [contracts/openapi.yaml](docs/001-capacity-exchange-marke
 ---
 
 ## Testing
+
+### Data dummy untuk pengujian
+
+Isi database dengan data uji lewat gist berikut, terpisah dari repository supaya dump besar tidak ikut ke riwayat kode:
+
+**[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**
+
+Seluruh isinya **data dummy**, dibuat khusus untuk menguji website Devotion. Nama usaha, email, nomor telepon, dan nomor identitas semuanya fiktif, tidak ada data pribadi orang sungguhan. Isinya 60 usaha konveksi, 47 listing kapasitas, dan 34 pesanan yang tersebar di tujuh status, plus antrean admin yang tidak kosong, sehingga setiap layar punya sesuatu untuk ditampilkan.
+
+| Berkas | Isi |
+|---|---|
+| `dummy-data.sql` | seluruh data, satu transaksi |
+| `creedentials.txt` | daftar 61 akun uji beserta sandinya |
+| `copy-files.sh` | penyalin 122 berkas unggahan tiruan, Linux dan macOS |
+| `copy-files.ps1` | penyalin yang sama untuk Windows |
+
+Tiga hal harus beres sebelum impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` sengaja tidak ikut di dump, karena keduanya data acuan yang id-nya dibuat per database, sedangkan profil dan listing menunjuk keduanya lewat kunci asing. Bila belum ada, impor berhenti sendiri dengan pesan yang menyebut seed mana yang kurang.
+
+```bash
+docker compose exec -T postgres psql -U devotion -d devotion < dummy-data.sql
+```
+
+Keluaran terakhir harus `COMMIT`. Satu galat saja menggagalkan seluruh transaksi dan database tetap seperti sebelumnya, jadi tidak ada risiko data separuh jadi. Impor kedua di atas database yang sama akan gagal di pelanggaran UNIQUE, bukan menghasilkan data ganda.
+
+Semua waktu di dalam dump dihitung relatif terhadap saat impor, bukan tanggal mati, jadi kalender kapasitas selalu terlihat baru kapan pun diimpor. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`; tanpa itu halaman verifikasi admin menampilkan gambar rusak.
+
+> Data ini hanya untuk pengembangan dan demo. Jangan diimpor ke database yang sudah memuat data sungguhan.
 
 ### Menjalankan pengujian
 
