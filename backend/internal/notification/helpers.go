@@ -42,7 +42,7 @@ func uuidString(u pgtype.UUID) string {
 }
 
 // textPtr maps a pgtype.Text back to an optional string: an invalid (NULL) value
-// becomes nil, so the notification.link column surfaces as a null work_order_id.
+// becomes nil, so the notification.link column surfaces as a null link.
 func textPtr(t pgtype.Text) *string {
 	if !t.Valid {
 		return nil

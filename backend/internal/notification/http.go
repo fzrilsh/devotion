@@ -32,14 +32,15 @@ func (s *Service) Register(r *httpx.Router) {
 	r.Gated("PUT /api/notifications/preferences", auth, s.handlePutPreferences)
 }
 
-// notificationBody is the Notification response body. work_order_id is backed by
-// the DB link column (a generic deep link); the field name follows the contract.
+// notificationBody is the Notification response body. link is backed by the DB
+// link column (a generic deep link that may point at an order or a quota
+// request); the field name follows the contract.
 type notificationBody struct {
 	NotificationID string  `json:"notification_id"`
 	Event          string  `json:"event"`
 	Title          string  `json:"title"`
 	Body           string  `json:"body"`
-	WorkOrderID    *string `json:"work_order_id"`
+	Link           *string `json:"link"`
 	Read           bool    `json:"read"`
 	CreatedAt      string  `json:"created_at"`
 }
@@ -133,7 +134,7 @@ func (s *Service) handleList(w http.ResponseWriter, r *http.Request) {
 			Event:          string(row.Event),
 			Title:          row.Title,
 			Body:           row.Body,
-			WorkOrderID:    textPtr(row.Link),
+			Link:           textPtr(row.Link),
 			Read:           row.ReadAt.Valid,
 			CreatedAt:      row.CreatedAt.Time.Format(time.RFC3339),
 		})
