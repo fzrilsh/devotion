@@ -11,7 +11,7 @@
         "test": "jest",
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
-        "generate-api": "openapi-typescript ../docs/001-capacity-exchange-marketplace/contracts/openapi.yaml -o ./src/api/types.ts"
+        "generate:api": "openapi-typescript ../docs/001-capacity-exchange-marketplace/contracts/openapi.yaml -o ./src/api/types.ts"
     },
     "dependencies": {
         "@hookform/resolvers": "^5.9.1",

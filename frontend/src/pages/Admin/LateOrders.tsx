@@ -33,7 +33,7 @@ export default function AdminLateOrders() {
 
                         return (
                             <li key={order.work_order_id}>
-                                <Link to={`/orders/${order.work_order_id}`} className="group flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-5 transition-all hover:border-amber-400 hover:shadow-md hover:shadow-slate-200">
+                                <Link to={`/admin/orders/${order.work_order_id}`} className="group flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-5 transition-all hover:border-amber-400 hover:shadow-md hover:shadow-slate-200">
                                     <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600">
                                         <LuClock className="size-5" aria-hidden />
                                     </span>

@@ -1,5 +1,12 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
+// Alamat penuh satu endpoint, untuk hal yang tidak lewat fetch: pratayang berkas
+// yang dibuka di tab baru. Jangan menulis prefiks "/api" di halaman, karena
+// VITE_API_URL bisa menunjuk host lain.
+export function apiUrl(path: string): string {
+    return `${API_BASE_URL}${path}`;
+}
+
 export class ApiError extends Error {
     status: number;
     data: unknown;

@@ -3,23 +3,23 @@ import { LuBadgeCheck, LuMap, LuShieldCheck, LuZap } from "react-icons/lu";
 const aboutBenefit = [
     {
         icon: LuShieldCheck,
-        title: "Mitra Terverifikasi",
-        description: "Mitra telah melalui verifikasi dokumen dan kapasitas produksi.",
+        title: "Lencana Verifikasi",
+        description: "Usaha yang lolos pemeriksaan dokumen mendapat lencana, dan Anda melihatnya sebelum memutuskan.",
     },
     {
         icon: LuZap,
-        title: "Respons Cepat",
-        description: "Rata-rata konfirmasi mitra dalam waktu 4 jam kerja.",
+        title: "Batas Balasan Jelas",
+        description: "Setiap request kuota punya batas balasan 72 jam, jadi Anda tidak menunggu tanpa kepastian.",
     },
     {
         icon: LuMap,
-        title: "Jaringan Luas",
-        description: "Lebih dari 1.200 mitra aktif di 34 kota Indonesia.",
+        title: "Pencarian Bertingkat",
+        description: "Mulai dari satu kota, lalu perluas ke provinsi atau seluruh Indonesia bila belum ada yang cocok.",
     },
     {
         icon: LuBadgeCheck,
-        title: "Transaksi Aman",
-        description: "Pembayaran terproteksi dengan jaminan kepuasan.",
+        title: "Kapasitas Terukur",
+        description: "Kandidat dinilai dari empat kriteria keras, dan alasan setiap kandidat lolos atau gugur ditampilkan.",
     },
 ];
 

@@ -19,7 +19,7 @@ function getNotificationLink(notification: Notification, isBuyer: boolean): { to
             return { to: "/requests/incoming", label: "Lihat request masuk" };
         case "offer_received":
         case "counter_offer":
-            return isBuyer ? { to: "/requests/sent", label: "Lihat request terkirim" } : { to: "/requests/incoming", label: "Lihat request masuk" };
+            return isBuyer ? { to: "/quota-requests", label: "Lihat request terkirim" } : { to: "/requests/incoming", label: "Lihat request masuk" };
         case "calendar_stale":
             return { to: "/listing", label: "Perbarui kalender" };
         case "verification_decision":

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { LuLayoutDashboard, LuLogIn, LuLogOut, LuUserPlus } from "react-icons/lu";
 import { useHeader } from "./useHeader";
 import HeaderLink from "./HeaderLink";
+import { Link } from "react-router-dom";
 
 interface HeaderMobileProps {
     isOpen: boolean;
@@ -31,10 +32,10 @@ export default function HeaderMobile({ isOpen, navItems, isAuthenticated, dashbo
                         <div className="flex flex-col items-center gap-3 border-t border-slate-100 px-8 pt-6">
                             {isAuthenticated ? (
                                 <>
-                                    <a href={dashboardPath} className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-industrial-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
+                                    <Link to={dashboardPath} className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-industrial-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                                         <LuLayoutDashboard className="size-4" aria-hidden />
                                         Dasbor
-                                    </a>
+                                    </Link>
 
                                     <button type="button" onClick={onLogout} disabled={logoutPending} className="inline-flex w-full max-w-xs cursor-pointer items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
                                         <LuLogOut className="size-4" aria-hidden />
@@ -43,15 +44,15 @@ export default function HeaderMobile({ isOpen, navItems, isAuthenticated, dashbo
                                 </>
                             ) : (
                                 <>
-                                    <a href="/auth/login" className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-industrial-blue-500/40 bg-white px-6 py-3 text-sm font-semibold text-industrial-blue-600 transition hover:bg-industrial-blue-500/5">
+                                    <Link to="/auth/login" className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl border border-industrial-blue-500/40 bg-white px-6 py-3 text-sm font-semibold text-industrial-blue-600 transition hover:bg-industrial-blue-500/5">
                                         <LuLogIn className="size-4" aria-hidden />
                                         Masuk
-                                    </a>
+                                    </Link>
 
-                                    <a href="/auth/register" className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-industrial-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
+                                    <Link to="/auth/register" className="inline-flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-industrial-blue-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                                         <LuUserPlus className="size-4" aria-hidden />
                                         Daftar
-                                    </a>
+                                    </Link>
                                 </>
                             )}
                         </div>

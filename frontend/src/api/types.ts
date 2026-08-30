@@ -1837,7 +1837,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Detail pesanan beserta riwayat status dan alokasi kapasitas */
+        /**
+         * Detail pesanan beserta riwayat status dan alokasi kapasitas
+         * @description Boleh dibaca oleh pihak pesanan (pemberi order atau subkontraktor) dan
+         *     oleh admin. Admin diberi akses karena FR-045 dan FR-046 menuntut admin
+         *     membaca seluruh riwayat pesanan yang ia bukan pihaknya, baik dari antrean
+         *     sengketa maupun dari daftar pesanan telat. Pemanggil lain menerima 404,
+         *     bukan 403, agar keberadaan pesanan tidak terbocorkan. Aksesnya baca saja:
+         *     POST /work-orders/{workOrderId}/status tetap khusus subkontraktor, dan
+         *     admin mengubah keadaan lewat penyelesaian sengketa.
+         */
         get: {
             parameters: {
                 query?: never;
@@ -2769,7 +2778,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Pesanan yang melewati tenggat kesiapan */
+        /**
+         * Pesanan yang melewati tenggat kesiapan
+         * @description Daftar ringkas, bukan detail. Setiap baris hanya memuat kolom yang ada
+         *     pada baris pesanan; riwayat status, alokasi kapasitas, dan catatan
+         *     pembayaran tidak disertakan. Untuk membukanya, panggil
+         *     GET /work-orders/{workOrderId} dengan sesi admin yang sama (FR-045,
+         *     FR-046).
+         */
         get: {
             parameters: {
                 query?: {
@@ -2786,7 +2802,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkOrderList"];
+                        "application/json": components["schemas"]["LateOrderList"];
                     };
                 };
                 403: components["responses"]["Forbidden"];
@@ -2945,6 +2961,12 @@ export interface paths {
          * Status sesi WhatsApp pengirim notifikasi
          * @description Menampilkan status tautan whatsmeow dan kode QR bila perlu ditautkan ulang. Tidak
          *     pernah menampilkan nomor layanan pada keluaran (FR-082) [1].
+         *
+         *     Membaca status juga menyiapkan siklus pemasangan baru bila tautan belum
+         *     terpasangkan dan tidak ada siklus yang berjalan: satu siklus hanya
+         *     mengeluarkan sejumlah kode lalu berakhir, jadi tanpa penyiapan ini `qr_code`
+         *     akan kosong bagi admin yang membuka halaman beberapa menit setelah proses
+         *     menyala. Tautan yang sudah terpasangkan tidak diganggu.
          */
         get: {
             parameters: {
@@ -2968,6 +2990,49 @@ export interface paths {
         };
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/whatsapp/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sambungkan ulang sesi WhatsApp
+         * @description Membuang siklus pemasangan yang sedang berjalan dan memulai yang baru, sehingga
+         *     admin mendapat kode QR segar tanpa akses server. Bila tautan sudah terpasangkan,
+         *     soket dijatuhkan lalu disambungkan ulang, bukan dipasangkan ulang: sesi yang
+         *     masih sah tidak dihapus. Bentuk balasannya sama dengan `GET /admin/whatsapp`,
+         *     dan nomor layanan tetap tidak pernah muncul (FR-082) [1].
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WhatsAppStatus"];
+                    };
+                };
+                403: components["responses"]["Forbidden"];
+            };
+        };
         delete?: never;
         options?: never;
         head?: never;
@@ -3468,6 +3533,36 @@ export interface components {
         };
         WorkOrderList: {
             items: components["schemas"]["WorkOrderDetail"][];
+            pagination: components["schemas"]["Pagination"];
+        };
+        /**
+         * @description Ringkasan satu pesanan telat untuk daftar pantau admin (FR-045). Sengaja
+         *     lebih sempit dari WorkOrderDetail: hanya kolom yang benar-benar dibaca
+         *     dari baris pesanan. Riwayat status, alokasi kapasitas, dan catatan
+         *     pembayaran tidak ada di sini; admin membukanya lewat
+         *     GET /work-orders/{workOrderId}.
+         */
+        LateOrderSummary: {
+            /** Format: uuid */
+            work_order_id: string;
+            status: components["schemas"]["WorkOrderStatus"];
+            /** Format: uuid */
+            buyer_profile_id: string;
+            /** Format: uuid */
+            subcontractor_profile_id: string;
+            quantity: number;
+            /** Format: date */
+            deadline: string;
+            /** Format: int64 */
+            total_price: number;
+            /**
+             * Format: date
+             * @description Dihitung satu kali di domain, dipakai kedua lapisan penjadwal.
+             */
+            readiness_deadline: string;
+        };
+        LateOrderList: {
+            items: components["schemas"]["LateOrderSummary"][];
             pagination: components["schemas"]["Pagination"];
         };
         /** @description Pernyataan pembayaran tanpa jumlah uang (FR-040, FR-042). */

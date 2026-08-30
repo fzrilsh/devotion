@@ -54,9 +54,8 @@ function OfferHistory({ offers }: { offers: Offer[] }) {
     );
 }
 
-function CandidateCard({ candidate, agreed }: { candidate: RequestCandidate; agreed: boolean }) {
+function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: RequestCandidate; agreed: boolean; onAccept: (offerId: string) => Promise<void>; accepting: boolean }) {
     const counterMutation = useCounterOffer();
-    const acceptMutation = useAcceptOffer();
     const [counterOpen, setCounterOpen] = useState(false);
     const [counterPrice, setCounterPrice] = useState("");
     const [counterNote, setCounterNote] = useState("");
@@ -72,7 +71,7 @@ function CandidateCard({ candidate, agreed }: { candidate: RequestCandidate; agr
         setError("");
 
         try {
-            await acceptMutation.mutateAsync(latest.offer_id);
+            await onAccept(latest.offer_id);
         } catch (err) {
             setError(getProblemMessage(err));
         }
@@ -142,9 +141,9 @@ function CandidateCard({ candidate, agreed }: { candidate: RequestCandidate; agr
                         </div>
                     ) : (
                         <div className="flex gap-2">
-                            <button type="button" onClick={handleAccept} disabled={acceptMutation.isPending} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            <button type="button" onClick={handleAccept} disabled={accepting} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
                                 <LuHandshake className="size-4" aria-hidden />
-                                {acceptMutation.isPending ? "Memproses..." : "Terima Penawaran"}
+                                {accepting ? "Memproses..." : "Terima Penawaran"}
                             </button>
                             <button type="button" onClick={() => setCounterOpen(true)} className="cursor-pointer rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
                                 Counter
@@ -170,6 +169,10 @@ export default function SentDetail() {
     const { requestId = "" } = useParams();
     const navigate = useNavigate();
     const requestQuery = useQuotaRequest(requestId);
+
+    // Satu mutation untuk seluruh kandidat, dipegang induk. Kalau tiap kartu
+    // memegang instance sendiri, hasil kesepakatan tidak pernah terbaca di sini
+    // dan tautan ke pesanan baru tidak muncul.
     const acceptMutation = useAcceptOffer();
 
     if (requestQuery.isLoading) return <Loading />;
@@ -248,7 +251,15 @@ export default function SentDetail() {
 
                 <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
                     {request.candidates.map((candidate) => (
-                        <CandidateCard key={candidate.candidate_id} candidate={candidate} agreed={Boolean(agreedCandidate)} />
+                        <CandidateCard
+                            key={candidate.candidate_id}
+                            candidate={candidate}
+                            agreed={Boolean(agreedCandidate)}
+                            accepting={acceptMutation.isPending}
+                            onAccept={async (offerId) => {
+                                await acceptMutation.mutateAsync(offerId);
+                            }}
+                        />
                     ))}
                 </div>
             </div>

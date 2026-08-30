@@ -158,7 +158,7 @@ export default function Register() {
                 roles: getRoles(selectedRole),
             });
 
-            navigate("/auth/login");
+            navigate("/auth/verify-email", { replace: true, state: { email: values.email } });
         } catch (error) {
             setError("root", {
                 message: getProblemMessage(error),

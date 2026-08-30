@@ -1,4 +1,4 @@
-import { ApiError } from "@api/client";
+import { ApiError, apiUrl } from "@api/client";
 import type { VerificationRequest, VerificationStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useDecideVerification, useVerificationQueue } from "@hooks/useAdmin";
@@ -81,14 +81,14 @@ function RequestCard({ request }: { request: VerificationRequest }) {
 
                 <div className="flex shrink-0 gap-2">
                     {request.identity_file_id ? (
-                        <a href={`/api/files/${request.identity_file_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                        <a href={apiUrl(`/files/${request.identity_file_id}`)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                             <LuFileImage className="size-3.5" aria-hidden />
                             Dokumen
                         </a>
                     ) : null}
 
                     {request.location_file_id ? (
-                        <a href={`/api/files/${request.location_file_id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                        <a href={apiUrl(`/files/${request.location_file_id}`)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
                             <LuFileImage className="size-3.5" aria-hidden />
                             Foto Lokasi
                         </a>

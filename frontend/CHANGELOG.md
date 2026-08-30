@@ -36,6 +36,8 @@ All notable changes to this project will be documented in this file.
 - Aligned admin mutation payloads with the generated OpenAPI `paths` types, encoded admin path identifiers, and built master-item query parameters with `URLSearchParams`.
 - Normalized admin proposal and dispute list responses before rendering and skipped the business-profile query for admin accounts, which do not have a business profile.
 - Rendered the WhatsApp QR payload into a scannable QR image with the `qrcode` package, while keeping support for image data URLs.
+- Added a read-only admin order supervision page at `/admin/orders/:workOrderId` (`GET /work-orders/{workOrderId}`, which admins may read per FR-045 and FR-046): order figures, status history, the per-week allocation table, links to both parties' profiles, payment statements, and the readiness and order deadlines. Status changes stay with the transaction parties; admins act through dispute resolution.
+- Regenerated `api/types.ts` from `openapi.yaml`, picking up `LateOrderSummary`, `LateOrderList`, and `POST /admin/whatsapp/reconnect`.
 
 ### Changed
 
@@ -47,6 +49,19 @@ All notable changes to this project will be documented in this file.
 - Redesigned the public footer: a four-column layout (brand with the capacity-exchange description and the no-funds-held note, in-page navigation, platform links, company links) with a bottom bar for copyright and legal links.
 
 ### Fixed
+
+- Completion rate is no longer multiplied by 100 on the search results and My Profile pages. `Reputation.completion_rate` is already a percentage (0-100) per `openapi.yaml`, so a value of 92 was rendering as "9200%". The public profile page was already correct. The `enough_data` gate (FR-073) was correct in all three places and is unchanged.
+- The "Lihat Pesanan" banner on the sent quota request detail page now appears after a deal is struck. The accept-offer mutation moved to the page component and is passed down to each candidate card, so the created work order is readable where the banner renders; previously each card held its own mutation instance and the page's copy never ran.
+- Admin queues now open the admin order supervision page consistently. The dashboard's late-order rows and the dispute cards linked to `/orders/{id}` (the transaction party's view) while the late orders page linked to `/admin/orders/{id}`, so one order showed two different pages depending on the entry point.
+- Identity document and location photo links in the admin verification queue now go through the API base URL instead of a hardcoded `/api` prefix, which broke both buttons whenever `VITE_API_URL` pointed at another host. Added `apiUrl()` to `api/client.ts` for links opened outside `fetch`.
+- `getLateOrders` now returns `LateOrderList` instead of `WorkOrderList`. The list endpoint deliberately omits status history, allocations, and payment records; the wider type made those look available (FR-045).
+- Offer and counter-offer notifications for buyers now link to `/quota-requests` instead of `/requests/sent`, a route that does not exist and landed the user on the 404 page.
+- Registration continues to the Verify Email page carrying the registered email instead of returning to login, so the six-digit codes sent to email and WhatsApp have a screen to be entered on (FR-002).
+- The work orders list now shows a loading state while the first page is being fetched, instead of the "no orders on this filter" empty state.
+- My Profile no longer calls setState during render. The form syncs through React Hook Form's `values` option and the province filter is read with `useWatch`, removing the double render under StrictMode.
+- Forgot Password now says a six-digit code is sent, matching what the API and the Reset Password page actually expect, instead of promising a link.
+- Removed invented figures and the payment guarantee claim from the landing page. "Pembayaran terproteksi dengan jaminan kepuasan" contradicted the platform's boundary of never holding, transferring, or processing funds; the partner counts were not backed by data.
+- Internal navigation in the hero section and the public header now uses `Link` instead of `<a href>`, so moving off the landing page no longer reloads the SPA and discards the TanStack Query cache, including `/me`.
 
 - The Verify Email page no longer shows the raw "Belum masuk" problem title. A 401 now explains that the session was not read and offers a "Masuk kembali" link, and a 410 explains the code expired with a hint to resend.
 - Registration now continues to the Verify Email page with the registered email instead of dropping the user back at login, and a successful email verification continues to Verify Phone.
