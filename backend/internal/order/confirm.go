@@ -142,6 +142,21 @@ func (s *Service) confirm(ctx context.Context, accountID, workOrderID pgtype.UUI
 			&link); err != nil {
 			return err
 		}
+
+		// A confirmed order is reviewable, so invite both parties to rate each other
+		// (FR-051 "permintaan rating", US5 AS-1). The request rides the confirmation
+		// transaction so it never outlives a rolled-back close; it is non-transactional,
+		// so each party still honors its channel preferences (FR-091).
+		reviewLink := "/work-orders/" + uuidString(workOrderID) + "/review"
+		for _, account := range [2]pgtype.UUID{accountID, subcontractorAccount} {
+			if err := s.notifier.Enqueue(ctx, tx, account,
+				sqlcgen.EventTypeRatingRequest,
+				"Beri ulasan untuk pesanan ini",
+				"Pesanan telah selesai. Beri rating dan ulasan untuk pihak lain agar reputasi keduanya terbentuk.",
+				&reviewLink); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 	if err != nil {

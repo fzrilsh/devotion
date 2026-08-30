@@ -141,6 +141,15 @@ func TestAutoConfirm_EightDaysCloses_FR068(t *testing.T) {
 		t.Fatalf("subkontraktor diberi tahu %d kali, mau 1 (FR-068)", got)
 	}
 
+	// Both parties are invited to rate each other once the order auto-closes
+	// (FR-051 "permintaan rating", US5 AS-1).
+	if got := rec.countFor(h.buyerAcc, sqlcgen.EventTypeRatingRequest); got != 1 {
+		t.Fatalf("pemberi order diminta ulasan %d kali, mau 1 (FR-051)", got)
+	}
+	if got := rec.countFor(h.subAcc, sqlcgen.EventTypeRatingRequest); got != 1 {
+		t.Fatalf("subkontraktor diminta ulasan %d kali, mau 1 (FR-051)", got)
+	}
+
 	// The system closure records a by_system history row with no human actor.
 	history, err := h.svc.queries().ListWorkOrderStatusHistory(context.Background(), h.workOrderID)
 	if err != nil {

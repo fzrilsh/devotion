@@ -179,7 +179,7 @@ func runServe(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	verification.New(pool, clock, fileStore).Register(router, acc)
+	verification.New(pool, clock, fileStore, notif).Register(router, acc)
 
 	// GET /health probes the database, the WhatsApp link, and the upload volume
 	// usage against its quota. It reports storage full when usage reaches the
