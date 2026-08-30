@@ -5,6 +5,7 @@ export type WorkOrderList = components["schemas"]["WorkOrderList"];
 export type WorkOrderDetail = components["schemas"]["WorkOrderDetail"];
 export type WorkOrderStatus = components["schemas"]["WorkOrderStatus"];
 export type PaymentRecord = components["schemas"]["PaymentRecord"];
+export type PaymentMismatch = components["schemas"]["PaymentMismatch"];
 export type Review = components["schemas"]["Review"];
 export type WorkOrderContacts = components["schemas"]["WorkOrderContacts"];
 

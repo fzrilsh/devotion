@@ -1,7 +1,9 @@
 import { ApiError } from "@api/client";
 import type { Dispute, DisputeResult, DisputeStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
+import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useDisputes, useMediateDispute, useResolveDispute } from "@hooks/useAdmin";
+import { useWorkOrder } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuGavel, LuHandshake, LuInbox, LuMessagesSquare } from "react-icons/lu";
@@ -47,6 +49,11 @@ function getProblemMessage(error: unknown): string {
 function DisputeCard({ dispute }: { dispute: Dispute }) {
     const mediateMutation = useMediateDispute();
     const resolveMutation = useResolveDispute();
+
+    // Spec mengarahkan selisih pernyataan pembayaran ke admin saat sengketa
+    // dilaporkan (FR-043), jadi pesanannya dibaca di sini. Sengketa yang sudah
+    // diputus tidak perlu bahan mediasi lagi.
+    const orderQuery = useWorkOrder(dispute.work_order_id, { enabled: dispute.status !== "resolved" });
 
     const [resolveOpen, setResolveOpen] = useState(false);
     const [result, setResult] = useState<DisputeResult>("continued");
@@ -96,6 +103,8 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                     </div>
 
                     <p className="mt-2 text-sm leading-6 text-slate-800">{dispute.report_body}</p>
+
+                    <PaymentMismatchNotice mismatch={orderQuery.data?.payment_mismatch} audience="admin" className="mt-3" />
                 </div>
 
                 <Link to={`/admin/orders/${dispute.work_order_id}`} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">

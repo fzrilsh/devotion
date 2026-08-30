@@ -1,6 +1,6 @@
 import DashboardLayout, { type DashboardNavItem } from "@components/layout/DashboardLayout";
 import { useAuth } from "@hooks/useAuth";
-import { LuClipboardList, LuClock, LuFileBox, LuFileInput, LuFileOutput, LuLayoutDashboard, LuMessageSquare, LuMessagesSquare, LuPhone, LuSearch, LuShieldCheck, LuStar } from "react-icons/lu";
+import { LuActivity, LuClipboardList, LuClock, LuFileBox, LuFileInput, LuFileOutput, LuLayoutDashboard, LuMessageSquare, LuMessagesSquare, LuPhone, LuSearch, LuShieldCheck, LuStar } from "react-icons/lu";
 
 const adminNavItems: DashboardNavItem[] = [
     { to: "/admin", label: "Dasbor", icon: LuLayoutDashboard, end: true },
@@ -25,6 +25,7 @@ const adminNavItems: DashboardNavItem[] = [
     },
     { to: "/admin/reviews", label: "Moderasi Ulasan", icon: LuStar },
     { to: "/admin/whatsapp", label: "WhatsApp", icon: LuPhone },
+    { to: "/admin/system", label: "Status Sistem", icon: LuActivity },
 ];
 
 export default function AppLayout() {

@@ -116,7 +116,7 @@ export default function PublicProfile() {
 
         return (
             <HomeLayout>
-                <div className="mx-auto max-w-3xl px-5 py-20 text-center">
+                <div className="mx-auto max-w-7xl px-5 py-20 text-center">
                     <h1 className="text-2xl font-extrabold tracking-tight text-slate-900">{notFound ? "Profil tidak ditemukan" : "Profil tidak dapat dimuat"}</h1>
                     <p className="mt-2 text-sm text-slate-500">{notFound ? "Profil usaha yang Anda cari tidak tersedia atau sudah tidak aktif." : "Terjadi kesalahan saat memuat profil. Silakan coba lagi."}</p>
                     <Link to="/" className="mt-6 inline-block rounded-xl bg-industrial-blue-500 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-industrial-blue-600">
@@ -137,7 +137,7 @@ export default function PublicProfile() {
     return (
         <HomeLayout>
             <div className="bg-slate-50 mt-24 min-h-screen h-full">
-                <div className="mx-auto max-w-4xl px-5 py-10">
+                <div className="mx-auto max-w-7xl px-5 py-10">
                     {/* Kepala profil */}
                     <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
                         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">

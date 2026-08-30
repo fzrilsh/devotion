@@ -3657,6 +3657,13 @@ export interface components {
                 note?: string | null;
             }[];
             payments?: components["schemas"]["PaymentRecord"][];
+            /**
+             * @description Terisi bila pernyataan pembayaran kedua pihak tidak cocok (FR-043), null bila
+             *     cocok atau belum ada pernyataan sama sekali. Ditandai server dan ditampilkan
+             *     kepada admin saat sengketa dilaporkan. Klien tidak menyusun ulang aturannya
+             *     dari daftar payments.
+             */
+            payment_mismatch: components["schemas"]["PaymentMismatch"] | null;
         };
         WorkOrderList: {
             items: components["schemas"]["WorkOrderDetail"][];
@@ -3725,6 +3732,21 @@ export interface components {
             note?: string | null;
             /** Format: date-time */
             created_at?: string;
+        };
+        /**
+         * @description Ketidakcocokan pernyataan pembayaran antar pihak (FR-043). Platform tidak
+         *     memverifikasi terjadinya pembayaran, jadi yang ditandai hanyalah pertentangan
+         *     antar pernyataan, bukan siapa yang benar.
+         */
+        PaymentMismatch: {
+            /**
+             * @description missing_counterpart: satu pihak menyatakan, pihak lawan belum menyatakan apa pun.
+             *     date_differs: kedua pihak menyatakan, tetapi tanggalnya berbeda.
+             * @enum {string}
+             */
+            kind: "missing_counterpart" | "date_differs";
+            /** @description Selisih hari antar tanggal pernyataan, hanya pada kind date_differs. */
+            day_difference?: number;
         };
         Dispute: {
             /** Format: uuid */
@@ -3796,7 +3818,14 @@ export interface components {
             };
         };
         WhatsAppStatus: {
-            connected: boolean;
+            /**
+             * @description connected: tautan terpasang dan kanal WhatsApp jalan. pairing: siklus
+             *     pemasangan berjalan dan kode QR menunggu dipindai. disconnected: tautan
+             *     terputus dan tidak ada siklus pemasangan yang berjalan. Bendera boolean
+             *     tidak dipakai karena tidak dapat membedakan pairing dari disconnected.
+             * @enum {string}
+             */
+            status: "connected" | "pairing" | "disconnected";
             /** @description Muatan kode QR untuk penautan ulang, bila perlu. Tanpa nomor layanan. */
             qr_code?: string | null;
             last_error?: string | null;

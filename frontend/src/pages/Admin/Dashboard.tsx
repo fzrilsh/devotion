@@ -1,8 +1,9 @@
 import type { Dispute, ItemProposal, VerificationRequest } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useDisputes, useItemProposals, useLateOrders, useVerificationQueue } from "@hooks/useAdmin";
+import { useHealth } from "@hooks/useSystem";
 import { cn } from "@lib/utils";
-import { LuArrowRight, LuCalendarX, LuClipboardList, LuClock, LuInbox, LuMessageSquare, LuMessagesSquare, LuShieldAlert, LuShieldCheck, LuTriangleAlert } from "react-icons/lu";
+import { LuActivity, LuArrowRight, LuCalendarX, LuClipboardList, LuClock, LuInbox, LuMessageSquare, LuMessagesSquare, LuShieldAlert, LuShieldCheck, LuTriangleAlert } from "react-icons/lu";
 import { Link } from "react-router-dom";
 
 function formatDate(isoDate?: string | null): string {
@@ -91,6 +92,48 @@ const disputeStatusMeta: Record<Dispute["status"], { label: string; className: s
     resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
 };
 
+// Peringatan ringkas saja; rinciannya di halaman Status Sistem. Health yang gagal
+// dibaca sebagai tidak sehat, karena 503 memang jawaban untuk basis data gagal
+// atau penyimpanan penuh.
+function SystemHealthBanner() {
+    const healthQuery = useHealth();
+    const health = healthQuery.data;
+
+    const unreachable = healthQuery.isError;
+
+    if (healthQuery.isLoading || (!unreachable && !health)) return null;
+
+    const storageStatus = health?.dependencies.storage.status;
+    const degraded = health?.status === "degraded";
+    const severe = unreachable || health?.dependencies.database === "fail" || storageStatus === "full";
+
+    if (!unreachable && !degraded && storageStatus === "ok") return null;
+
+    const message = unreachable
+        ? "Status sistem tidak dapat dibaca. Periksa apakah instance masih melayani."
+        : health?.dependencies.database === "fail"
+          ? "Basis data gagal. Instance tidak dapat melayani permintaan yang menulis."
+          : storageStatus === "full"
+            ? "Ruang unggahan penuh. Unggahan pengguna ditolak sampai berkas lama dibersihkan."
+            : storageStatus === "near_full"
+              ? "Ruang unggahan hampir penuh. Bersihkan berkas lama sebelum unggahan mulai ditolak."
+              : "Kanal WhatsApp terputus. Kode verifikasi dan notifikasi WhatsApp tidak terkirim.";
+
+    return (
+        <div className={cn("flex flex-wrap items-start justify-between gap-3 rounded-2xl border p-4", severe ? "border-red-200 bg-red-50" : "border-amber-500/20 bg-amber-50")}>
+            <div className="flex items-start gap-3">
+                <LuActivity className={cn("mt-0.5 size-5 shrink-0", severe ? "text-red-600" : "text-amber-600")} aria-hidden />
+                <p className={cn("text-xs leading-5", severe ? "text-red-800" : "text-amber-800")}>{message}</p>
+            </div>
+
+            <Link to="/admin/system" className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-industrial-blue-600 transition-colors hover:text-industrial-blue-700">
+                Buka status sistem
+                <LuArrowRight className="size-3.5" aria-hidden />
+            </Link>
+        </div>
+    );
+}
+
 function todayLabel(): string {
     const today = new Date();
     const hari = today.toLocaleDateString("id-ID", { weekday: "long" });
@@ -119,6 +162,8 @@ export default function AdminDashboard() {
                 <h1 className="text-xl font-bold text-slate-900">Dasbor Admin</h1>
                 <p className="mt-1 text-sm text-slate-500">Ringkasan antrean moderasi dan pengawasan platform.</p>
             </div>
+
+            <SystemHealthBanner />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <QueueCard title="Antrean Verifikasi" description="Pengajuan verifikasi identitas yang menunggu keputusan." count={verificationItems.length} tone="blue" icon={LuShieldCheck} to="/admin/verification" />

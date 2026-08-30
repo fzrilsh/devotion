@@ -136,3 +136,10 @@ export async function resolveDispute(disputeId: string, data: DisputeResolutionR
 export async function getWhatsAppStatus(): Promise<WhatsAppStatus> {
     return apiClient<WhatsAppStatus>("/admin/whatsapp");
 }
+
+// Membuang siklus pemasangan yang berjalan lalu memulai yang baru, sehingga admin
+// mendapat kode QR segar tanpa akses server. Bentuk balasannya sama dengan GET,
+// jadi hasilnya langsung ditulis ke cache status.
+export async function reconnectWhatsApp(): Promise<WhatsAppStatus> {
+    return apiClient<WhatsAppStatus>("/admin/whatsapp/reconnect", { method: "POST" });
+}

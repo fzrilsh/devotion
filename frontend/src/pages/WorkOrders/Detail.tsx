@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import type { WorkOrderDetail } from "@api/workOrders";
 import Loading from "@components/common/Loading";
+import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useAuth } from "@hooks/useAuth";
 import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder, useWorkOrderContacts } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
@@ -480,9 +481,11 @@ export default function Detail() {
                 </div>
             ) : null}
 
-            {order.payments && order.payments.length > 0 ? (
+            {(order.payments && order.payments.length > 0) || order.payment_mismatch ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6">
                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Pernyataan Pembayaran</h2>
+
+                    <PaymentMismatchNotice mismatch={order.payment_mismatch} audience="party" className="mt-3" />
 
                     <ul className="mt-3 space-y-2">
                         {order.payments.map((payment) => (

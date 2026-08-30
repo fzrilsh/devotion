@@ -1,4 +1,4 @@
-import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
+import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, reconnectWhatsApp, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const adminKeys = {
@@ -143,5 +143,18 @@ export function useWhatsAppStatus() {
         staleTime: 10 * 1000,
         refetchInterval: 30 * 1000,
         retry: false,
+    });
+}
+
+// Balasan reconnect sebentuk dengan GET /admin/whatsapp, jadi ditulis langsung ke
+// cache status supaya kode QR baru tampil tanpa menunggu polling berikutnya.
+export function useReconnectWhatsApp() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: reconnectWhatsApp,
+        onSuccess: (status) => {
+            queryClient.setQueryData(adminKeys.whatsapp, status);
+        },
     });
 }

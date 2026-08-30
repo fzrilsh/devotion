@@ -17,11 +17,11 @@ export function useWorkOrders(status: WorkOrderStatus[], role?: "as_buyer" | "as
     });
 }
 
-export function useWorkOrder(workOrderId: string) {
+export function useWorkOrder(workOrderId: string, options?: { enabled?: boolean }) {
     return useQuery({
         queryKey: workOrderKeys.detail(workOrderId),
         queryFn: () => getWorkOrder(workOrderId),
-        enabled: Boolean(workOrderId),
+        enabled: Boolean(workOrderId) && (options?.enabled ?? true),
         staleTime: 30 * 1000,
         retry: false,
     });

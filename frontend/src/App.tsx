@@ -53,6 +53,7 @@ import AdminLateOrders from "@pages/Admin/LateOrders";
 import AdminDisputes from "@pages/Admin/Disputes";
 import AdminReviewsModeration from "@pages/Admin/ReviewsModeration";
 import AdminWhatsApp from "@pages/Admin/WhatsApp";
+import AdminSystem from "@pages/Admin/System";
 import AdminOrderDetail from "@pages/Admin/OrderDetail";
 
 // ──────────────────────────────────────────────
@@ -138,6 +139,7 @@ export default function App() {
                         <Route path="disputes" element={<AdminDisputes />} />
                         <Route path="reviews" element={<AdminReviewsModeration />} />
                         <Route path="whatsapp" element={<AdminWhatsApp />} />
+                        <Route path="system" element={<AdminSystem />} />
                     </Route>
                 </Route>
 

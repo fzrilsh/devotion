@@ -1,5 +1,6 @@
 import type { Dispute } from "@api/admin";
 import Loading from "@components/common/Loading";
+import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useDisputes } from "@hooks/useAdmin";
 import { useWorkOrder } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
@@ -263,6 +264,8 @@ export default function AdminOrderDetail() {
                             <LuBanknote className="size-4" aria-hidden />
                             Pernyataan Pembayaran
                         </h2>
+
+                        <PaymentMismatchNotice mismatch={order.payment_mismatch} audience="admin" className="mt-3" />
 
                         {order.payments && order.payments.length > 0 ? (
                             <ul className="mt-3 space-y-2">
