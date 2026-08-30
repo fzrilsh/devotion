@@ -745,6 +745,11 @@ type Querier interface {
 	// RenewSession slides the expiry forward and records access time, implementing
 	// rolling 7-day renewal on each authenticated request.
 	RenewSession(ctx context.Context, arg RenewSessionParams) error
+	// RequestHasStandingOffer reports whether a request still has a candidate that
+	// replied with an offer or was agreed, so the expiry job tells the buyer the
+	// request lapsed "tanpa penawaran" only when none did (AS-7, FR-037). A rejected
+	// or not-continued candidate is not a standing offer, matching the notice body.
+	RequestHasStandingOffer(ctx context.Context, requestID pgtype.UUID) (bool, error)
 	// Records the admin's mediation decision and closes the dispute (FR-067, FR-072).
 	// status moves to 'resolved'; result is the explicit outcome (cancelled /
 	// continued / confirmed) the resolution_complete CHECK now requires; admin_note
