@@ -1,4 +1,5 @@
 import type { WorkOrderStatus } from "@api/workOrders";
+import Loading from "@components/common/Loading";
 import { useAuth } from "@hooks/useAuth";
 import { useWorkOrders } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
@@ -74,7 +75,9 @@ export default function List() {
                 ) : null}
             </div>
 
-            {ordersQuery.isError ? (
+            {ordersQuery.isLoading ? (
+                <Loading />
+            ) : ordersQuery.isError ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
                     <p className="text-sm font-semibold text-red-700">Daftar pesanan tidak dapat dimuat. Coba muat ulang halaman.</p>
                 </div>

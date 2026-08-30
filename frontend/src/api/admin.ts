@@ -7,7 +7,8 @@ export type VerificationStatus = components["schemas"]["VerificationStatus"];
 export type ItemProposal = components["schemas"]["ItemProposal"];
 export type Dispute = components["schemas"]["Dispute"];
 export type DisputeStatus = components["schemas"]["DisputeStatus"];
-export type WorkOrderList = components["schemas"]["WorkOrderList"];
+export type LateOrderSummary = components["schemas"]["LateOrderSummary"];
+export type LateOrderList = components["schemas"]["LateOrderList"];
 export type CatalogItem = components["schemas"]["CatalogItem"];
 export type Review = components["schemas"]["Review"];
 export type ReviewList = components["schemas"]["ReviewList"];
@@ -84,7 +85,7 @@ export async function getDisputes(params?: { status?: DisputeStatus; cursor?: st
     return extractItems(response);
 }
 
-export async function getLateOrders(params?: { cursor?: string }): Promise<WorkOrderList> {
+export async function getLateOrders(params?: { cursor?: string }): Promise<LateOrderList> {
     const searchParams = new URLSearchParams();
 
     if (params?.cursor) {
@@ -93,7 +94,7 @@ export async function getLateOrders(params?: { cursor?: string }): Promise<WorkO
 
     const query = searchParams.toString();
 
-    return apiClient<WorkOrderList>(`/admin/late-orders${query ? `?${query}` : ""}`);
+    return apiClient<LateOrderList>(`/admin/late-orders${query ? `?${query}` : ""}`);
 }
 
 export async function decideVerification(requestId: string, data: VerificationDecisionRequest): Promise<VerificationRequest> {

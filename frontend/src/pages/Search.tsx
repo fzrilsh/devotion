@@ -91,7 +91,7 @@ function CandidateCard({ candidate, selected, onToggle }: { candidate: SearchCan
                     <LuStar className="size-3.5 text-amber-400" aria-hidden />
                     {reputation?.average_rating != null ? Number(reputation.average_rating).toFixed(1) : "-"}
                     <span className="text-slate-300">·</span>
-                    {reputation?.enough_data && reputation.completion_rate != null ? `${Math.round(reputation.completion_rate * 100)}% selesai` : "Tingkat penyelesaian belum cukup data"}
+                    {reputation?.enough_data && reputation.completion_rate != null ? `${Math.round(reputation.completion_rate)}% selesai` : "Tingkat penyelesaian belum cukup data"}
                 </p>
 
                 <button

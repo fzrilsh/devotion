@@ -9,7 +9,7 @@ import { useProfile } from "@hooks/useProfile";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
 import { profileSchema, type ProfileForm } from "@schemas/profile";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { LuCircleCheck, LuCircleX, LuClock3, LuMail, LuMapPin, LuPencil, LuPhone, LuShieldCheck, LuStar, LuX } from "react-icons/lu";
 import { Link } from "react-router-dom";
@@ -149,12 +149,22 @@ function AdminProfile() {
 export default function MyProfile() {
     const { user, isLoading: authLoading } = useAuth();
     const { needsVerification } = useAccountVerification();
-    const [provinceCode, setProvinceCode] = useState("");
-    const { provinces, cities } = useWilayah(provinceCode);
 
     const { profile, isLoading, updateProfile, updatePending } = useProfile();
     const [editMode, setEditMode] = useState(false);
-    const [syncedProfileId, setSyncedProfileId] = useState<string | null>(null);
+
+    // `values` menyinkronkan form begitu profil tiba, tanpa reset() di dalam efek.
+    const profileValues = useMemo<ProfileForm>(
+        () => ({
+            business_name: profile?.business_name || "",
+            description: profile?.description || "",
+            province_code: profile?.province_code || "",
+            city_code: profile?.city_code || "",
+            latitude: profile?.latitude ?? null,
+            longitude: profile?.longitude ?? null,
+        }),
+        [profile],
+    );
 
     const {
         register,
@@ -166,28 +176,12 @@ export default function MyProfile() {
         formState: { errors },
     } = useForm<ProfileForm>({
         resolver: zodResolver(profileSchema),
-        defaultValues: {
-            business_name: "",
-            description: "",
-            province_code: "",
-            city_code: "",
-            latitude: null,
-            longitude: null,
-        },
+        values: profileValues,
     });
 
-    if (profile && profile.profile_id !== syncedProfileId) {
-        setSyncedProfileId(profile.profile_id);
-        setProvinceCode(profile.province_code || "");
-        reset({
-            business_name: profile.business_name || "",
-            description: profile.description || "",
-            province_code: profile.province_code || "",
-            city_code: profile.city_code || "",
-            latitude: profile.latitude || null,
-            longitude: profile.longitude || null,
-        });
-    }
+    // Provinsi hanya penyaring kota di form, bukan kolom yang dikirim ke API.
+    const provinceCode = useWatch({ control, name: "province_code" }) ?? "";
+    const { provinces, cities } = useWilayah(provinceCode);
 
     async function onSubmit(values: ProfileForm) {
         try {
@@ -308,7 +302,7 @@ export default function MyProfile() {
                                 <label htmlFor="province_code" className={labelClassName}>
                                     Provinsi
                                 </label>
-                                <select id="province_code" className={cn(inputClassName, errors.province_code && "border-red-400 focus:border-red-500")} {...register("province_code", { onChange: (e) => setProvinceCode(e.target.value) })}>
+                                <select id="province_code" className={cn(inputClassName, errors.province_code && "border-red-400 focus:border-red-500")} {...register("province_code")}>
                                     <option value="">Pilih provinsi</option>
                                     {provinces.map((prov) => (
                                         <option key={prov.code} value={prov.code}>
@@ -420,7 +414,7 @@ export default function MyProfile() {
                                         <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tingkat penyelesaian</p>
 
                                         {profile.reputation.enough_data && profile.reputation.completion_rate != null ? (
-                                            <p className="mt-1 text-sm font-bold text-slate-800">{Math.round(profile.reputation.completion_rate * 100)}%</p>
+                                            <p className="mt-1 text-sm font-bold text-slate-800">{Math.round(profile.reputation.completion_rate)}%</p>
                                         ) : (
                                             <p className="mt-1 text-sm text-slate-500">Belum cukup data untuk menampilkan tingkat penyelesaian.</p>
                                         )}

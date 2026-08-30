@@ -166,7 +166,7 @@ export default function AdminDashboard() {
                                 <p className="text-xs text-slate-400">Tenggat kesiapan {formatDate(order.readiness_deadline ?? order.deadline)}</p>
                             </div>
 
-                            <Link to={`/orders/${order.work_order_id}`} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                            <Link to={`/admin/orders/${order.work_order_id}`} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
                                 Detail
                                 <LuArrowRight className="size-3.5" aria-hidden />
                             </Link>

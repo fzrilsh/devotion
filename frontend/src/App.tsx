@@ -53,6 +53,7 @@ import AdminLateOrders from "@pages/Admin/LateOrders";
 import AdminDisputes from "@pages/Admin/Disputes";
 import AdminReviewsModeration from "@pages/Admin/ReviewsModeration";
 import AdminWhatsApp from "@pages/Admin/WhatsApp";
+import AdminOrderDetail from "@pages/Admin/OrderDetail";
 
 // ──────────────────────────────────────────────
 // LEGENDA KOMENTAR PER ROUTE
@@ -133,6 +134,7 @@ export default function App() {
                         <Route path="master/items" element={<AdminMasterItems />} />
                         <Route path="proposals" element={<AdminProposals />} />
                         <Route path="late-orders" element={<AdminLateOrders />} />
+                        <Route path="orders/:workOrderId" element={<AdminOrderDetail />} />
                         <Route path="disputes" element={<AdminDisputes />} />
                         <Route path="reviews" element={<AdminReviewsModeration />} />
                         <Route path="whatsapp" element={<AdminWhatsApp />} />

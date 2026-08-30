@@ -8,6 +8,7 @@ import { useAuth, useLogout } from "@hooks/useAuth";
 import { getDefaultRedirectPath } from "@lib/roles";
 import logo from "@assets/logo.png";
 import HeaderMobile from "./HeaderMobile";
+import { Link } from "react-router-dom";
 
 export default function Header() {
     const { isScrolled, isOpen, setIsOpen } = useHeader();
@@ -29,9 +30,9 @@ export default function Header() {
         <>
             <motion.header {...fadeIn} className={cn("fixed top-0 left-0 right-0 mx-auto w-full z-50 transition-all duration-200", isScrolled ? "bg-white/80 backdrop-blur-xl" : "", isOpen ? "bg-white" : "")}>
                 <nav className="flex items-center max-w-7xl justify-between gap-4 mx-auto w-full px-4 py-8 sm:px-6 lg:px-8">
-                    <a href="/" className="flex items-center justify-center">
+                    <Link to="/" className="flex items-center justify-center">
                         <img src={logo} alt="Logo Image" className="w-42" />
-                    </a>
+                    </Link>
 
                     <ul className="flex items-center justify-center gap-2 max-lg:hidden">
                         <HeaderList items={mainNavigation} />
@@ -45,19 +46,19 @@ export default function Header() {
                                         {logoutMutation.isPending ? "Keluar..." : "Keluar"}
                                     </button>
 
-                                    <a href={dashboardPath} className={cn("inline-flex items-center justify-center rounded-md bg-industrial-blue-500 px-6 py-2 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-industrial-blue-600")}>
+                                    <Link to={dashboardPath} className={cn("inline-flex items-center justify-center rounded-md bg-industrial-blue-500 px-6 py-2 font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-industrial-blue-600")}>
                                         Dasbor
-                                    </a>
+                                    </Link>
                                 </>
                             ) : (
                                 <>
-                                    <a href="/auth/login" className={cn("inline-flex items-center justify-center rounded-md px-6 py-2 font-medium text-industrial-blue-500 hover:bg-primary/10  transition-all duration-200 hover:-translate-y-0.5")}>
+                                    <Link to="/auth/login" className={cn("inline-flex items-center justify-center rounded-md px-6 py-2 font-medium text-industrial-blue-500 hover:bg-primary/10  transition-all duration-200 hover:-translate-y-0.5")}>
                                         Masuk
-                                    </a>
+                                    </Link>
 
-                                    <a href="/auth/register" className={cn("inline-flex items-center justify-center rounded-md px-6 py-2 font-semibold bg-industrial-blue-500 text-white hover:bg-industrial-blue-600 transition-all duration-200 hover:-translate-y-0.5")}>
+                                    <Link to="/auth/register" className={cn("inline-flex items-center justify-center rounded-md px-6 py-2 font-semibold bg-industrial-blue-500 text-white hover:bg-industrial-blue-600 transition-all duration-200 hover:-translate-y-0.5")}>
                                         Daftar
-                                    </a>
+                                    </Link>
                                 </>
                             )}
                         </div>

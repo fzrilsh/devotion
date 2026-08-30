@@ -1,4 +1,5 @@
 import { LuSearch } from "react-icons/lu";
+import { Link } from "react-router-dom";
 
 export default function HeroSection() {
     return (
@@ -10,22 +11,20 @@ export default function HeroSection() {
                     </h1>
                     <p className="text-base text-slate-500 max-w-lg">Devotion menghubungkan UMKM konveksi dengan subkontraktor terpercaya yang siap memenuhi kebutuhan produksi Anda. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
-                        <a href="/search" className="inline-flex items-center justify-center gap-2 rounded-full bg-industrial-blue-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-blue-600 hover:-translate-y-0.5 transition-all duration-200">
+                        <Link to="/search" className="inline-flex items-center justify-center gap-2 rounded-full bg-industrial-blue-500 px-6 py-3.5 text-sm font-semibold text-white hover:bg-industrial-blue-600 hover:-translate-y-0.5 transition-all duration-200">
                             <LuSearch /> Cari SubKontraktor
-                        </a>
+                        </Link>
 
-                        <a href="/listing" className="inline-flex items-center justify-center rounded-full border-2 border-deep-navy-500 px-6 py-3.5 text-sm font-semibold text-deep-navy-500 hover:bg-deep-navy-500/5 transition-all duration-200">
+                        <Link to="/listing" className="inline-flex items-center justify-center rounded-full border-2 border-deep-navy-500 px-6 py-3.5 text-sm font-semibold text-deep-navy-500 hover:bg-deep-navy-500/5 transition-all duration-200">
                             Tawarkan Kapasitas
-                        </a>
+                        </Link>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 h-full md:p-16 w-full">
                     <div className="grid grid-cols-1 md:grid-cols-2 relative gap-4 items-center justify-center w-full min-h-full">
                         <div className="w-full h-full bg-slate-100 p-6 rounded-xl justify-between flex flex-col items-start">
-                            <h1 className="text-6xl font-extrabold tracking-tight text-industrial-blue-500">
-                                120<span className="text-industrial-blue-300">+</span>
-                            </h1>
-                            <p className="text-slate-500">Mitra industri terpercaya dengan kapasitas produksi yang siap digunakan</p>
+                            <h1 className="text-4xl font-extrabold tracking-tight text-industrial-blue-500">Kapasitas menganggur, terpakai</h1>
+                            <p className="text-slate-500">Subkontraktor mengisi kalender mingguannya, pemberi order melihat sisa kapasitas sampai deadline sebelum mengirim request.</p>
                         </div>
                         <div className="w-full h-full rounded-xl overflow-hidden">
                             <img src="https://images.unsplash.com/photo-1741275271362-bb17c416dca9?w=800&h=800&fit=crop&auto=format" alt="Penjahit wanita bekerja di pabrik garmen" className="w-full h-full object-cover" />

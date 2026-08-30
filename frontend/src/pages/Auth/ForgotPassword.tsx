@@ -81,7 +81,7 @@ export default function ForgotPassword() {
                     </Link>
 
                     <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Lupa kata sandi?</h2>
-                    <p className="mt-2 text-sm text-slate-500">Masukkan alamat email yang terdaftar dan kami akan mengirimkan tautan untuk membuat kata sandi baru.</p>
+                    <p className="mt-2 text-sm text-slate-500">Masukkan alamat email yang terdaftar dan kami akan mengirimkan kode enam digit untuk membuat kata sandi baru.</p>
 
                     <form onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-4" noValidate>
                         {errors.root?.message ? (
@@ -116,7 +116,7 @@ export default function ForgotPassword() {
                             disabled={recoverMutation.isPending}
                             className="w-full cursor-pointer rounded-xl bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 px-4 py-3.5 text-sm font-bold text-white transition-all duration-200 hover:from-deep-navy-600 hover:to-deep-navy-900 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                            {recoverMutation.isPending ? "Mengirim..." : "Kirim Tautan Reset"}
+                            {recoverMutation.isPending ? "Mengirim..." : "Kirim Kode Reset"}
                         </button>
                     </form>
 
@@ -128,7 +128,7 @@ export default function ForgotPassword() {
 
                             <div>
                                 <p className="text-sm font-semibold text-slate-700">Tetap aman</p>
-                                <p className="mt-1 text-xs leading-5 text-slate-500">Tautan reset kata sandi hanya dapat digunakan untuk akun yang terdaftar pada email tersebut.</p>
+                                <p className="mt-1 text-xs leading-5 text-slate-500">Kode reset kata sandi hanya dapat digunakan untuk akun yang terdaftar pada email tersebut.</p>
                             </div>
                         </div>
                     </div>
