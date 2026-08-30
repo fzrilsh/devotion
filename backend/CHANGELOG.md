@@ -33,6 +33,16 @@ perubahannya.
   audit blok E (`docs/utang-teknis.md`).
 
 ### Diperbaiki
+- Kontrak dan dokumen perencanaan diselaraskan dengan kode yang sudah terbit,
+  hasil audit backend. `ROLES_IN_USE` ditambahkan ke enum `Problem.code` di
+  `openapi.yaml` (kode ini sudah ditegakkan `PATCH /api/me/roles` dan ada di
+  `codes.go`, tetapi belum tercantum di kontrak). Hitungan di
+  `contracts/README.md` dikoreksi: 66 operasi pada 58 path, dan skema `Problem`
+  memuat 34 kode galat (sebelumnya tertulis 65 operasi, 57 path, dan skema
+  `ErrorCode` dengan 31 kode yang keduanya sudah basi). `plan.md` Gate IV kini
+  mencatat dua pustaka pengikut yang dituntut graf modul dan dipakai langsung,
+  `golang.org/x/term` (baca kata sandi admin tanpa gema di `admin:create`) dan
+  `google.golang.org/protobuf` (menyusun pesan WhatsApp keluar untuk whatsmeow).
 - Lima respons backend diselaraskan ke kontrak yang sudah benar, hasil audit
   drift enam domain (`docs/utang-teknis.md`), sehingga tipe TypeScript hasil
   generate frontend cocok dengan yang dikirim backend. `proposalQueueItem` kini
