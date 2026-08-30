@@ -54,7 +54,7 @@ func newAcceptHarness(t *testing.T, name string) *acceptHarness {
 	t.Helper()
 	pool := testdb.New(t, name)
 	clock := platform.NewTestClock(acceptBaseTime)
-	ls := listing.New(pool, clock)
+	ls := listing.New(pool, clock, noopNotifier{})
 	svc := New(pool, clock, noopNotifier{}, ls)
 
 	seedAcceptRegion(t, pool)

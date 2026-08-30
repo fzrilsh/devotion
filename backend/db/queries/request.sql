@@ -156,6 +156,33 @@ UPDATE request_candidate
 SET status = 'rejected', rejection_reason = $2, updated_at = $3
 WHERE id = $1;
 
+-- ListCandidatesToExpire returns candidates still awaiting a reply whose
+-- request's 72-hour window has lapsed, for the in-process ticker to expire and
+-- notify the buyer (FR-037). The before_cutoff bound is the current instant,
+-- passed from the injected Clock (Rule 5), matching order.IsRequestExpired's
+-- inclusive boundary via <=. Each row carries the candidate id (to expire), the
+-- request id (for the buyer's deep link), and the buyer account (to notify),
+-- ordered by request so a request's lapsed candidates group together.
+-- name: ListCandidatesToExpire :many
+SELECT c.id AS candidate_id, r.id AS request_id, buyer.account_id AS buyer_account
+FROM request_candidate c
+JOIN quota_request r        ON r.id = c.request_id
+JOIN business_profile buyer ON buyer.id = r.buyer_id
+WHERE c.status = 'awaiting_reply'
+  AND r.reply_due_at <= sqlc.arg(before_cutoff)::timestamptz
+ORDER BY r.id, c.id;
+
+-- ExpireCandidate moves an unanswered candidate to 'expired' once its reply
+-- window has lapsed (FR-037). The status = 'awaiting_reply' guard makes it a
+-- no-op if the subcontractor replied (offered/rejected) or a race already
+-- expired it between the scan and this update, so two overlapping ticker
+-- instances expire a candidate once. It reports the rows affected so the caller
+-- notifies the buyer only for a candidate this pass actually expired.
+-- name: ExpireCandidate :execrows
+UPDATE request_candidate
+SET status = 'expired', updated_at = $2
+WHERE id = $1 AND status = 'awaiting_reply';
+
 -- GetRequestForBuyer loads one request owned by a buyer account, for the detail
 -- view (FR-032). The buyer account guard makes a request that is not the
 -- caller's a 404 rather than leaking its existence.

@@ -2517,6 +2517,7 @@ components:
             - order_auto_closed
             - item_proposal_decision
             - calendar_stale
+            - request_expired
         title: { type: string }
         body: { type: string }
         link:

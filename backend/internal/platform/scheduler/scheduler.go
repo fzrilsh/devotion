@@ -54,6 +54,21 @@ const (
 	// two overlapping instances during a deploy rollover must not both send the
 	// late-delivery notice for the same order.
 	LockKeyLateOrder int32 = lockKeyBase + 3
+	// LockKeyCalendarStale guards the stale-calendar reminder job (FR-021): one tick
+	// scans published listings whose calendar has gone untouched past the stale
+	// window and reminds each owner once per staleness episode, so two overlapping
+	// instances during a deploy rollover must not both send the reminder.
+	LockKeyCalendarStale int32 = lockKeyBase + 4
+	// LockKeyRequestExpire guards the request-expiry job (FR-037): one tick moves
+	// candidates whose 72-hour reply window has lapsed to expired and notifies the
+	// buyer once, so two overlapping instances during a deploy rollover must not both
+	// expire a candidate or send the buyer the same expiry notice twice.
+	LockKeyRequestExpire int32 = lockKeyBase + 5
+	// LockKeyDeadlineApproaching guards the delivery-deadline warning job (FR-051):
+	// one tick scans active, not-yet-shipped orders whose deadline is within the
+	// 7-day lead and warns both parties once, so two overlapping instances during a
+	// deploy rollover must not both send the approaching-deadline notice.
+	LockKeyDeadlineApproaching int32 = lockKeyBase + 6
 )
 
 // Job is one unit of scheduled work. Run receives the pinned connection that
