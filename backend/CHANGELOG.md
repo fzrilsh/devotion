@@ -7,6 +7,19 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Endpoint `GET /api/work-orders/{workOrderId}/contacts` membuka pertukaran
+  kontak antar kedua pihak setelah pesanan terbentuk (FR-092, FR-040). Setiap
+  pihak melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk
+  mengatur pembayaran dan koordinasi yang terjadi langsung di luar platform.
+  Rute terautentikasi tanpa gerbang peran: penjaga pihak membandingkan akun
+  pemanggil dengan kedua pihak pesanan, sehingga bukan-pihak, id tak sah, dan
+  pesanan tak ada sama-sama jatuh ke 404 dan endpoint tak pernah membocorkan
+  keberadaan pesanan. Berbeda dari sisi baca detail, admin tidak diberi akses:
+  admin tak memegang peran usaha (`admin_has_no_business_role`) dan bukan pihak
+  bertransaksi, ia membaca pesanan lewat FR-045/FR-046, bukan lewat kontak
+  pribadi kedua pihak. Query `GetWorkOrderContacts` mengambil nama usaha, email,
+  dan telepon kedua pihak dalam satu query; respons hanya memuat blok pihak
+  lawan sehingga pemanggil tak melihat sisinya sendiri.
 - Sisi baca incoming-request kini membawa `quantity`, `deadline`,
   `capacity_in_range`, dan `can_fulfill` per kandidat, sehingga subkontraktor
   bisa menilai apakah kapasitasnya menutup permintaan sebelum membalas (T045,

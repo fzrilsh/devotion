@@ -254,6 +254,13 @@ type Querier interface {
 	// the bytes, so this query carries no access check of its own (FR-009 is
 	// enforced in Go, not SQL).
 	GetUploadedFile(ctx context.Context, id pgtype.UUID) (UploadedFile, error)
+	// Loads both parties' contact details for one work order (FR-092): each side's
+	// business name, email, and WhatsApp number, plus the account ids the handler
+	// needs for the party guard. The handler compares the caller's account id to
+	// buyer_account and subcontractor_account and returns only the counterparty's
+	// block, so a non-party (or a missing order) collapses to a 404 and the caller
+	// never sees their own side echoed back. Keyed on the work order id.
+	GetWorkOrderContacts(ctx context.Context, id pgtype.UUID) (GetWorkOrderContactsRow, error)
 	// Loads one work order with the fields WorkOrderDetail needs beyond the row
 	// itself: both parties' account ids (for the party guard), the request's product
 	// item, and the offer's readiness lead. Keyed on the work order id; the caller
