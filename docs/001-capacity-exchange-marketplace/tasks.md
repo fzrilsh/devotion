@@ -546,6 +546,22 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu fungsi domain dipakai kedua lapisan; `dikonfirmasi_otomatis` menandai yang mana
   **Hati-hati**: kalau perhitungan tenggat diduplikasi di beberapa handler, keduanya akan berbeda pada suatu titik dan pesanan yang sama tampak beda status di halaman berbeda.
 
+- [x] T055b [US5] [BE] Konfirmasi manual pemberi order
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-047, FR-068, FR-070
+  **Kemampuan**: pemberi order menutup pesanan berstatus Dikirim lewat `POST /work-orders/{id}/confirm`; `dikonfirmasi_otomatis` false membedakannya dari penutupan tujuh hari; sengketa terbuka menahan konfirmasi
+  **Dependency**: prasyarat T053, T055
+  **Selesai bila**: endpoint memeriksa peran (buyer), bukan pihak jadi 404, status bukan Dikirim jadi `INVALID_STATUS_TRANSITION`; test menyebut FR-047 dan FR-068
+  **Hati-hati**: transisi `shipped -> confirmed` dipakai bersama auto-confirm; jangan duplikasi perhitungan tenggat, pakai `deadline.go` apa adanya.
+
+- [x] T055c [US5] [BE] Pertukaran kontak antar pihak
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-092, FR-040
+  **Kemampuan**: kedua pihak pesanan yang sudah terbentuk saling melihat kontak (nama usaha, email, nomor WhatsApp) lewat `GET /work-orders/{id}/contacts`, prasyarat pembayaran dan koordinasi di luar platform
+  **Dependency**: prasyarat T053
+  **Selesai bila**: rute terautentikasi dengan penjaga pihak, bukan pihak jadi 404, admin juga 404 karena bukan pihak bertransaksi; respons hanya memuat blok pihak lawan; test menyebut FR-092
+  **Hati-hati**: nomor telepon dan email adalah PII sensitif. Endpoint harus dijaga ketat per pihak, tak pernah disajikan publik, dan tak boleh membocorkan keberadaan pesanan ke bukan-pihak.
+
 - [x] T056 [P] [US5] [BE] Catatan pembayaran
   **Modul**: `backend/internal/order/`
   **FR**: FR-040 sampai FR-043

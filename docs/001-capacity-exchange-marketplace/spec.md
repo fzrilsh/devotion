@@ -132,6 +132,7 @@ Setelah kesepakatan terbentuk, Bu Sari dan Pak Budi melihat pesanan yang sama di
 7. **Given** sebuah pesanan sudah berstatus "Produksi", **When** salah satu pihak ingin membatalkan, **Then** pembatalan sendiri tidak tersedia dan pihak itu diarahkan untuk melaporkan sengketa agar ditengahi admin.
 8. **Given** pembayaran dilakukan langsung antar pihak, **When** salah satu pihak menandai pembayaran terkirim atau diterima, **Then** catatan itu tampil pada pesanan bagi kedua pihak beserta keterangan bahwa platform tidak menahan maupun menjamin dana.
 9. **Given** sebuah transisi status tidak sah (misalnya dari "Menunggu" langsung ke "Dikirim"), **When** dicoba, **Then** sistem menolak dan menjelaskan urutan status yang diizinkan.
+10. **Given** sebuah pesanan sudah terbentuk, **When** salah satu pihak membuka detail pesanan, **Then** ia melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk berkoordinasi di luar platform, dan pihak ketiga mana pun tidak dapat mengakses kontak itu.
 
 ---
 
@@ -210,7 +211,7 @@ Tim Ops mengelola daftar jenis produk dan jenis mesin yang menjadi tulang punggu
 
 ## Requirements *(mandatory)*
 
-Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser. Revisi 2026-08-22 menambahkan FR-087 sampai FR-091 dari empat pertentangan antar artefak yang ditemukan `/analyze`, seluruhnya menyangkut rentang kapasitas, horizon kalender, propagasi perubahan kapasitas, kesiapan mulai pada penawaran, dan penggolongan notifikasi.
+Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser. Revisi 2026-08-22 menambahkan FR-087 sampai FR-091 dari empat pertentangan antar artefak yang ditemukan `/analyze`, seluruhnya menyangkut rentang kapasitas, horizon kalender, propagasi perubahan kapasitas, kesiapan mulai pada penawaran, dan penggolongan notifikasi. Revisi 2026-08-30 menambahkan FR-092 untuk pertukaran kontak antar kedua pihak setelah pesanan terbentuk, prasyarat pembayaran dan koordinasi yang terjadi di luar platform (FR-040).
 
 ### Istilah yang Mengikat
 
@@ -318,6 +319,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-068**: Sistem MUST menandai pesanan berstatus "Dikirim" sebagai dikonfirmasi diterima secara otomatis setelah 7 hari sejak status tersebut ditetapkan, dan MUST memberi tahu kedua pihak bahwa penutupan terjadi secara otomatis.
 - **FR-069**: Sistem MUST memberi tahu pemberi order sebelum tenggat konfirmasi otomatis jatuh, dengan menyebutkan tanggal pesanan akan dianggap diterima.
 - **FR-070**: Sistem MUST menghentikan hitungan konfirmasi otomatis ketika sengketa dilaporkan sebelum tenggat, dan pesanan MUST menunggu keputusan mediasi admin.
+- **FR-092**: Setelah sebuah pesanan terbentuk, sistem MUST menampilkan kontak pihak lawan (nama usaha, email, dan nomor WhatsApp) kepada masing-masing dari kedua pihak pesanan itu, agar pembayaran dan koordinasi yang terjadi langsung antar pihak di luar platform (FR-040) dapat dijalankan. Kontak ini MUST tersedia pada setiap status pesanan, termasuk dibatalkan dan dalam mediasi. Sistem MUST TIDAK menampilkan kontak ini kepada siapa pun selain kedua pihak pesanan tersebut, dan kontak MUST TIDAK dapat diakses sebelum pesanan terbentuk.
 
 **Reputasi**
 

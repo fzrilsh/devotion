@@ -21,8 +21,8 @@ sqlc di T011. Sudah tercantum di Primary Dependencies plan.md. (T010)
 
 Catatan versi Go: menarik `pgx/v5` menggeser direktif `go` di `go.mod` ke
 `1.24.0` dengan `toolchain go1.24.1`. Ini di atas `go 1.23.4` yang semula
-dipatok, tetapi tetap memenuhi batas bawah CLAUDE.md (Go 1.22+) dan diperlukan
-oleh graf modul; dibiarkan apa adanya, bukan dipaksa turun.
+dipatok, tetapi diperlukan oleh graf modul; dibiarkan apa adanya, bukan dipaksa
+turun.
 
 ### golang.org/x/crypto (v0.54.0)
 
@@ -61,8 +61,9 @@ Nomor layanan tidak pernah muncul di respons, log, maupun Sentry (FR-082):
 menyematkannya.
 
 Catatan versi Go: menarik whatsmeow menggeser direktif `go` di `go.mod` ke
-`1.25.0`, di atas `1.24.0` yang digeser pgx sebelumnya. Tetap memenuhi batas
-bawah CLAUDE.md (Go 1.22+); dibiarkan apa adanya karena dituntut graf modul.
+`1.25.0`, di atas `1.24.0` yang digeser pgx sebelumnya. Dibiarkan apa adanya
+karena dituntut graf modul, dan `1.25.0` inilah batas bawah yang berlaku
+sekarang di CLAUDE.md dan seluruh dokumen penyiapan.
 whatsmeow juga menaikkan `golang.org/x/crypto` ke v0.54.0, `golang.org/x/term`
 ke v0.45.0, dan menarik `google.golang.org/protobuf` (v1.36.11) sebagai
 dependency langsung untuk membangun payload pesan (`waE2E.Message`). (T024a)
