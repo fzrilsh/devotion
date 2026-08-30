@@ -1116,6 +1116,38 @@ paths:
               schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Pesanan belum berstatus dikirim }
 
+  /work-orders/{workOrderId}/contacts:
+    get:
+      tags: [work-order]
+      summary: Kontak pihak lawan pada sebuah pesanan
+      description: |
+        Setelah pesanan terbentuk, masing-masing pihak dapat melihat kontak pihak
+        lawan (nama usaha, email, nomor WhatsApp) untuk menjalankan pembayaran dan
+        koordinasi yang terjadi langsung antar pihak di luar platform (FR-040,
+        FR-092). Tersedia pada semua status pesanan, termasuk dibatalkan dan dalam
+        mediasi. Hanya kedua pihak pesanan yang boleh mengaksesnya; pemanggil lain,
+        termasuk admin dan subkontraktor lain, menerima 404 agar keberadaan pesanan
+        tidak terbocorkan.
+      x-fr: [FR-040, FR-092]
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkOrderContacts' }
+        '404':
+          description: Pesanan tidak ditemukan atau pemanggil bukan pihaknya
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/not-found'
+                title: Tidak ditemukan
+                status: 404
+                code: NOT_FOUND
+                detail: Pesanan tidak ditemukan.
+
   /work-orders/{workOrderId}/cancel:
     post:
       tags: [work-order]
@@ -1779,6 +1811,7 @@ components:
             - READINESS_AFTER_DEADLINE
             - PAYMENT_STATEMENT_EXISTS
             - DISPUTE_ALREADY_OPEN
+            - ROLES_IN_USE
         detail:
           type: string
           description: Penjelasan bahasa Indonesia yang dapat dikutip pengguna.
@@ -2347,6 +2380,30 @@ components:
           items: { $ref: '#/components/schemas/WorkOrderDetail' }
         pagination: { $ref: '#/components/schemas/Pagination' }
 
+    WorkOrderContacts:
+      type: object
+      description: |
+        Kontak pihak lawan pada sebuah pesanan (FR-092). Hanya kontak lawan yang
+        dikembalikan; pemanggil sudah tahu kontaknya sendiri. WhatsApp diambil dari
+        nomor telepon terverifikasi akun lawan.
+      required: [counterparty]
+      properties:
+        counterparty: { $ref: '#/components/schemas/ContactParty' }
+
+    ContactParty:
+      type: object
+      required: [role, business_name, email, whatsapp]
+      properties:
+        role:
+          type: string
+          enum: [buyer, subcontractor]
+          description: Posisi pihak lawan pada pesanan ini.
+        business_name: { type: string }
+        email: { type: string, format: email }
+        whatsapp:
+          type: string
+          description: Nomor WhatsApp dalam format 62xxxxxxxxxx.
+
     LateOrderSummary:
       type: object
       description: |
@@ -2460,6 +2517,7 @@ components:
             - order_auto_closed
             - item_proposal_decision
             - calendar_stale
+            - request_expired
         title: { type: string }
         body: { type: string }
         link:
