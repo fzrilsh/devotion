@@ -25,6 +25,10 @@ const (
 	AutoConfirmWindow   = 7 * 24 * time.Hour
 	AutoConfirmWarnLead = 2 * 24 * time.Hour
 	CalendarStaleWindow = 7 * 24 * time.Hour
+	// DeadlineApproachingLead is how far ahead of a delivery deadline the FR-051
+	// "deadline mendekat" notice goes out: an active, not-yet-shipped order enters
+	// the warning band seven days before its deadline day.
+	DeadlineApproachingLead = 7 * 24 * time.Hour
 )
 
 // ReadinessDeadline returns the Monday of the week production can start:
@@ -116,6 +120,18 @@ func IsPastDeadline(deadline, now time.Time) bool {
 	dy, dm, dd := deadline.In(platform.Jakarta).Date()
 	deadlineDay := time.Date(dy, dm, dd, 0, 0, 0, 0, platform.Jakarta)
 	return PastDeadlineCutoff(now).After(deadlineDay)
+}
+
+// DeadlineApproachingCutoff returns the latest deadline day still inside the
+// FR-051 warning band: the start of now's WIB calendar day plus the 7-day lead.
+// An active, not-yet-shipped order whose deadline (a date column) falls on or
+// before this day, but is not already past due, is warned once that its delivery
+// deadline is near. Computing it in Go keeps the wall clock out of SQL (Rule 5),
+// and the shared PastDeadlineCutoff excludes orders that are already late, so the
+// approaching notice and the past-deadline notice never both fire for one order
+// on the same tick.
+func DeadlineApproachingCutoff(now time.Time) time.Time {
+	return PastDeadlineCutoff(now).Add(DeadlineApproachingLead)
 }
 
 // IsCalendarStale reports whether a listing's calendar has gone untouched

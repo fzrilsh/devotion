@@ -49,6 +49,15 @@ func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+// noopNotifier satisfies Notifier without recording anything. The listing HTTP
+// tests exercise the calendar endpoints, not the stale-calendar reminder job, so
+// they only need the constructor to accept a notifier.
+type noopNotifier struct{}
+
+func (noopNotifier) Enqueue(_ context.Context, _ pgx.Tx, _ pgtype.UUID, _ sqlcgen.EventType, _, _ string, _ *string) error {
+	return nil
+}
+
 // harness wires a Service against an isolated schema and exposes the router
 // handler plus the pieces a test drives.
 type harness struct {
@@ -71,7 +80,7 @@ func newHarness(t *testing.T, name string) *harness {
 	t.Helper()
 	pool := testdb.New(t, name)
 	clock := platform.NewTestClock(baseTime)
-	svc := New(pool, clock)
+	svc := New(pool, clock, noopNotifier{})
 
 	seedRegion(t, pool)
 	accountID := seedAccount(t, pool, "subkon@contoh.test", "628110000001", true)

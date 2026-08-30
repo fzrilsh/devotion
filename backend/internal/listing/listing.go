@@ -7,6 +7,10 @@
 package listing
 
 import (
+	"context"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
@@ -26,18 +30,30 @@ const (
 	MaxPeriodBatch = 26
 )
 
+// Notifier queues an in-app notification (and its channel rows) inside the
+// caller's transaction. listing depends on this narrow interface rather than
+// the whole notification service so the two packages stay loosely coupled and
+// the enqueue can be recorded in a test. notification.Service satisfies it, and
+// it mirrors quota.Notifier so both write packages queue the same way.
+type Notifier interface {
+	Enqueue(ctx context.Context, tx pgx.Tx, accountID pgtype.UUID, event sqlcgen.EventType, title, body string, link *string) error
+}
+
 // Service owns the listing and calendar endpoints. It holds the pool and the
 // Clock; the Clock supplies every timestamp and the current week's Monday (Rule
-// 5), never time.Now. It carries no per-request state.
+// 5), never time.Now. It also holds the notifier for the stale-calendar
+// reminder job (FR-021). It carries no per-request state.
 type Service struct {
-	pool  *pgxpool.Pool
-	clock platform.Clock
+	pool     *pgxpool.Pool
+	clock    platform.Clock
+	notifier Notifier
 }
 
 // New builds a Service over pool. clock is injected so a test drives the
-// calendar by advancing time rather than reading the wall clock.
-func New(pool *pgxpool.Pool, clock platform.Clock) *Service {
-	return &Service{pool: pool, clock: clock}
+// calendar by advancing time rather than reading the wall clock; notifier
+// queues the FR-021 stale-calendar reminder inside the marking transaction.
+func New(pool *pgxpool.Pool, clock platform.Clock, notifier Notifier) *Service {
+	return &Service{pool: pool, clock: clock, notifier: notifier}
 }
 
 // queries returns a Queries bound to the pool for a standalone statement.

@@ -11,6 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const expireCandidate = `-- name: ExpireCandidate :execrows
+UPDATE request_candidate
+SET status = 'expired', updated_at = $2
+WHERE id = $1 AND status = 'awaiting_reply'
+`
+
+type ExpireCandidateParams struct {
+	ID        pgtype.UUID
+	UpdatedAt pgtype.Timestamptz
+}
+
+// ExpireCandidate moves an unanswered candidate to 'expired' once its reply
+// window has lapsed (FR-037). The status = 'awaiting_reply' guard makes it a
+// no-op if the subcontractor replied (offered/rejected) or a race already
+// expired it between the scan and this update, so two overlapping ticker
+// instances expire a candidate once. It reports the rows affected so the caller
+// notifies the buyer only for a candidate this pass actually expired.
+func (q *Queries) ExpireCandidate(ctx context.Context, arg ExpireCandidateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, expireCandidate, arg.ID, arg.UpdatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getCandidateForOffer = `-- name: GetCandidateForOffer :one
 SELECT
     c.id                  AS candidate_id,
@@ -380,6 +405,49 @@ func (q *Queries) ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtyp
 			&i.RejectionReason,
 			&i.BusinessName,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCandidatesToExpire = `-- name: ListCandidatesToExpire :many
+SELECT c.id AS candidate_id, r.id AS request_id, buyer.account_id AS buyer_account
+FROM request_candidate c
+JOIN quota_request r        ON r.id = c.request_id
+JOIN business_profile buyer ON buyer.id = r.buyer_id
+WHERE c.status = 'awaiting_reply'
+  AND r.reply_due_at <= $1::timestamptz
+ORDER BY r.id, c.id
+`
+
+type ListCandidatesToExpireRow struct {
+	CandidateID  pgtype.UUID
+	RequestID    pgtype.UUID
+	BuyerAccount pgtype.UUID
+}
+
+// ListCandidatesToExpire returns candidates still awaiting a reply whose
+// request's 72-hour window has lapsed, for the in-process ticker to expire and
+// notify the buyer (FR-037). The before_cutoff bound is the current instant,
+// passed from the injected Clock (Rule 5), matching order.IsRequestExpired's
+// inclusive boundary via <=. Each row carries the candidate id (to expire), the
+// request id (for the buyer's deep link), and the buyer account (to notify),
+// ordered by request so a request's lapsed candidates group together.
+func (q *Queries) ListCandidatesToExpire(ctx context.Context, beforeCutoff pgtype.Timestamptz) ([]ListCandidatesToExpireRow, error) {
+	rows, err := q.db.Query(ctx, listCandidatesToExpire, beforeCutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCandidatesToExpireRow{}
+	for rows.Next() {
+		var i ListCandidatesToExpireRow
+		if err := rows.Scan(&i.CandidateID, &i.RequestID, &i.BuyerAccount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

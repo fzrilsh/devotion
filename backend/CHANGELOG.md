@@ -7,6 +7,34 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Pekerjaan penjadwal peringatan tenggat pengiriman mendekat (FR-051) melengkapi
+  sisi notifikasi FR-051 di samping `deadline_passed`. Berbeda dari auto-confirm
+  dan pesanan telat, ia tak punya kembaran hitung-saat-baca: tenggat yang mendekat
+  tak mengubah status apa pun dan tak menggerakkan daftar mana pun, murni pengingat,
+  jadi hanya lapisan ticker. Satu tick memindai pesanan aktif belum-terkirim
+  (`accepted`, `production`, `completed`) yang deadline-nya di dalam masa peringatan
+  tujuh hari dan memberi tahu kedua pihak sekali. Penanda `deadline_warn_sent_at`
+  (migrasi 000022, dengan `idx_order_deadline_warn`) dikawal `IS NULL` sehingga dua
+  instance yang tumpang tindih saat deploy rollover hanya memperingatkan sekali.
+  Rentangnya `[PastDeadlineCutoff, DeadlineApproachingCutoff]`, aritmetika bersama
+  `deadline.go`, sehingga pesanan yang sudah telat diserahkan ke job FR-045 dan yang
+  mendekat ke job ini, tak pernah keduanya. Notifikasi non-transaksional (FR-091),
+  menghormati preferensi kanal tiap penerima saat pengiriman.
+- Dua pekerjaan penjadwal baru menutup temuan audit notifikasi, keduanya lapisan
+  kedua pola penjadwal dua lapis (research R-07): dihitung saat baca, plus
+  `time.Ticker` dalam proses yang sama, masing-masing dibungkus advisory lock.
+  Pengingat kalender basi (FR-021) mengirim pemilik listing tayang satu notifikasi
+  bila kalendernya tak tersentuh lebih dari tujuh hari, jendela yang sama dengan
+  yang dipakai lapisan baca pencarian, sehingga pengingat tak pernah menyala pada
+  kalender yang masih dianggap segar. Penanda `stale_notified_at` dikawal supaya
+  satu episode basi mengingatkan sekali, dan suntingan pemilik me-`re-arm`-nya.
+  Kedaluwarsa request kuota (FR-037) memindahkan kandidat yang lewat batas balas
+  72 jam dari `awaiting_reply` ke `expired` dan memberi tahu pembeli sekali; nilai
+  enum `event_type` baru `request_expired` ditambahkan (migrasi 000021) dan
+  bersifat transaksional, di-enqueue di dalam transaksi kedaluwarsa. Pengawal
+  `status='awaiting_reply'` memastikan kandidat yang sudah dibalas tak pernah
+  kedaluwarsa dan pembeli tak diberi tahu dua kali. Menutup temuan audit FR-021,
+  FR-037, dan persist `candidate_status` `expired`.
 - Endpoint `GET /api/work-orders/{workOrderId}/contacts` membuka pertukaran
   kontak antar kedua pihak setelah pesanan terbentuk (FR-092, FR-040). Setiap
   pihak melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk

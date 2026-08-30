@@ -478,6 +478,37 @@ UPDATE work_order
 SET late_notified_at = $2
 WHERE id = $1 AND late_notified_at IS NULL;
 
+-- name: ListWorkOrdersApproachingDeadlineToNotify :many
+-- The active, not-yet-shipped orders whose delivery deadline is within the FR-051
+-- warning lead and that have not yet had the "deadline mendekat" notice sent, for
+-- the in-process ticker to warn (FR-051). The band is [after_cutoff, before_cutoff]
+-- on the deadline date: after_cutoff is order.PastDeadlineCutoff (an order past due
+-- is handled by the late-order job, not warned), before_cutoff is
+-- order.DeadlineApproachingCutoff (the far edge of the 7-day lead). shipped orders
+-- are excluded because their clock is the auto-confirm warning, not the delivery
+-- deadline. deadline_warn_sent_at IS NULL keeps each order warned once, not on every
+-- tick. Returns both parties' account ids, since FR-051 warns both sides. Rides
+-- idx_order_deadline_warn.
+SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account, wo.deadline
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+WHERE wo.status IN ('accepted', 'production', 'completed')
+  AND wo.deadline >= sqlc.arg(after_cutoff)::date
+  AND wo.deadline <= sqlc.arg(before_cutoff)::date
+  AND wo.deadline_warn_sent_at IS NULL
+ORDER BY wo.deadline;
+
+-- name: MarkDeadlineWarnSent :exec
+-- Stamps deadline_warn_sent_at so the FR-051 approaching-deadline notice is sent
+-- once per order. The IS NULL guard keeps it idempotent if two overlapping ticker
+-- instances both scanned before either stamped (the advisory lock makes that rare,
+-- but the guard removes the race entirely). The stamp is never cleared, so an order
+-- is warned once even as it moves through the lead toward its deadline.
+UPDATE work_order
+SET deadline_warn_sent_at = $2
+WHERE id = $1 AND deadline_warn_sent_at IS NULL;
+
 -- name: InsertPaymentRecord :one
 -- Records one party's payment statement on a work order (FR-041). No money amount
 -- is stored: the platform neither holds nor verifies funds (FR-040, FR-042), so

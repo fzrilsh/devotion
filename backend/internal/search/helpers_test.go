@@ -4,18 +4,28 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
 	"github.com/fzrilsh/devotion/backend/internal/listing"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
+
+// noopNotifier satisfies listing.Notifier without a queue; the search suite only
+// borrows the real listing service as a horizon extender, never its reminder job.
+type noopNotifier struct{}
+
+func (noopNotifier) Enqueue(_ context.Context, _ pgx.Tx, _ pgtype.UUID, _ sqlcgen.EventType, _, _ string, _ *string) error {
+	return nil
+}
 
 // useRealHorizon rewires the harness Service to use the real listing.Service as
 // its horizon extender, so SC-021 can prove the passing candidate's periods are
 // actually materialized past the initial horizon (FR-088), not just recorded.
 func useRealHorizon(t *testing.T, h *harness) {
 	t.Helper()
-	ext := listing.New(h.pool, h.clock)
+	ext := listing.New(h.pool, h.clock, noopNotifier{})
 	h.svc = New(h.pool, h.clock, ext)
 	r := httpx.NewRouter(quietLogger())
 	h.svc.Register(r, h.auth)

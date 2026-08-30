@@ -63,6 +63,35 @@ UPDATE capacity_listing
 SET calendar_updated_at = $2, updated_at = $2
 WHERE id = $1;
 
+-- ListStaleListingsToNotify returns published listings whose calendar has gone
+-- untouched past the stale window and whose owner has not yet been reminded for
+-- the current staleness, for the in-process ticker to notify (FR-021). The
+-- before_cutoff bound is now - CalendarStaleWindow, computed in Go so the wall
+-- clock stays out of SQL (Rule 5) and matches order.IsCalendarStale exactly. The
+-- second guard sends one reminder per staleness episode: stale_notified_at IS
+-- NULL for a listing never reminded, or stale_notified_at < calendar_updated_at
+-- for one the owner edited and then let go stale again, so a fresh edit re-arms
+-- the reminder. Returns the listing id and its owning account to notify.
+-- name: ListStaleListingsToNotify :many
+SELECT l.id, p.account_id AS owner_account
+FROM capacity_listing l
+JOIN business_profile p ON p.id = l.profile_id
+WHERE l.published
+  AND l.calendar_updated_at < sqlc.arg(before_cutoff)::timestamptz
+  AND (l.stale_notified_at IS NULL OR l.stale_notified_at < l.calendar_updated_at)
+ORDER BY l.calendar_updated_at;
+
+-- MarkStaleNotified stamps stale_notified_at so the FR-021 reminder is sent once
+-- per staleness episode. The guard mirrors ListStaleListingsToNotify so two
+-- overlapping ticker instances remind only once, and a listing whose owner edits
+-- the calendar (advancing calendar_updated_at past this stamp) re-arms for a
+-- future reminder without ever clearing the column.
+-- name: MarkStaleNotified :exec
+UPDATE capacity_listing
+SET stale_notified_at = $2
+WHERE id = $1
+  AND (stale_notified_at IS NULL OR stale_notified_at < calendar_updated_at);
+
 -- RaiseHorizonUntil moves the horizon forward, never back: GREATEST keeps the
 -- result independent of commit order when two requests extend it at once.
 -- name: RaiseHorizonUntil :exec

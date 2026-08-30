@@ -131,13 +131,19 @@ func runServe(ctx context.Context, args []string) error {
 	// nil transport or a send failure never fails the request that issued the code.
 	acc := account.New(pool, clock, sessions, limiter, notification.NewCodeDelivery(email, wa), log, cfg.IsDevelopment())
 	acc.Register(router)
-	ls := listing.New(pool, clock)
+
+	// notif is built before listing and quota because both enqueue notifications:
+	// listing's stale-calendar reminder (FR-021) and quota's request-received
+	// (FR-029) and request-expiry (FR-037) notices all take it as their notifier.
+	notif := notification.New(pool, clock, acc, email, wa)
+	notif.Register(router)
+
+	// listing takes notif so its stale-calendar reminder job can enqueue the
+	// owner nudge (FR-021). The reference is kept so that job joins the scheduler.
+	ls := listing.New(pool, clock, notif)
 	ls.Register(router, acc)
 	search.New(pool, clock, ls).Register(router, acc)
 	wa.Register(router, acc)
-
-	notif := notification.New(pool, clock, acc, email, wa)
-	notif.Register(router)
 
 	// masterdata registers after notif because its proposal decision path
 	// enqueues a notification to the proposer (FR-061); the read routes are
@@ -146,8 +152,10 @@ func runServe(ctx context.Context, args []string) error {
 
 	// quota registers after notif because sending a request enqueues a
 	// request_received notification per candidate inside the request's
-	// transaction (FR-029); both routes are gated to the buyer role.
-	quota.New(pool, clock, notif).Register(router, acc)
+	// transaction (FR-029); both routes are gated to the buyer role. The
+	// reference is kept so its request-expiry job (FR-037) joins the scheduler.
+	quotaSvc := quota.New(pool, clock, notif)
+	quotaSvc.Register(router, acc)
 
 	// order registers after notif and takes ls as its HorizonEnsurer: accepting
 	// an offer grows the listing calendar to the deadline week under the listing
@@ -199,6 +207,9 @@ func runServe(ctx context.Context, args []string) error {
 	sched.Register(notif.DeliverJob())
 	sched.Register(orderSvc.AutoConfirmJob())
 	sched.Register(orderSvc.LateOrderJob())
+	sched.Register(ls.CalendarStaleJob())
+	sched.Register(quotaSvc.RequestExpireJob())
+	sched.Register(orderSvc.DeadlineApproachingJob())
 	go sched.Start(ctx)
 
 	dist, err := fs.Sub(web.FS, "webdist")

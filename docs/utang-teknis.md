@@ -200,6 +200,16 @@ yang berubah.
   `/confirm` tidak ada~~, sehingga FE yang render tombol dari array itu tidak
   punya tujuan kirim. **Sudah diperbaiki**: `/confirm` kini jadi tujuan kirim
   tombol itu. Gap alur order tertutup.
+- **Permukaan transisi status terbelah dua** (`/status` di `workorder.go` vs
+  `/confirm` di `confirm.go`). ~~Terlihat seperti dua mesin keadaan~~. **Bukan
+  cacat, ini desain**: keduanya bukan dua mesin keadaan, melainkan dua gerbang
+  peran atas satu mesin keadaan. `/status` digerbang subkontraktor untuk maju
+  di rantai `production -> completed -> shipped`; `/confirm` digerbang buyer
+  untuk `shipped -> confirmed`, karena hanya buyer yang boleh menyatakan barang
+  diterima (FR-070). Keduanya memvalidasi lewat `transitionAllowed`, membaca
+  tabel `allowedTransitions` yang sama, dan memakai body `INVALID_STATUS_TRANSITION`
+  yang identik, jadi tidak ada tabel transisi kedua yang bisa menyimpang.
+  Pemisahan endpoint mengikuti pemisahan peran, bukan menduplikasi logika.
 
 ### C. Field selalu null atau tak terdokumentasi
 

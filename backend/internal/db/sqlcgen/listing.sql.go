@@ -41,7 +41,7 @@ INSERT INTO capacity_listing (
 ) VALUES (
     gen_random_uuid(), $1, $2, $3, true, $4, $5, $4, $4
 )
-RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at
+RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at
 `
 
 type CreateListingParams struct {
@@ -81,6 +81,7 @@ func (q *Queries) CreateListing(ctx context.Context, arg CreateListingParams) (C
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }
@@ -139,7 +140,7 @@ func (q *Queries) FindFutureAllocatedPeriodOverCapacity(ctx context.Context, arg
 }
 
 const getListingByID = `-- name: GetListingByID :one
-SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at FROM capacity_listing WHERE id = $1
+SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at FROM capacity_listing WHERE id = $1
 `
 
 // GetListingByID loads any listing by its own id, for the public profile join.
@@ -156,12 +157,13 @@ func (q *Queries) GetListingByID(ctx context.Context, id pgtype.UUID) (CapacityL
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }
 
 const getListingByProfile = `-- name: GetListingByProfile :one
-SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at FROM capacity_listing WHERE profile_id = $1
+SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at FROM capacity_listing WHERE profile_id = $1
 `
 
 // GetListingByProfile loads a profile's listing, backing GET /listing/me. A
@@ -180,6 +182,7 @@ func (q *Queries) GetListingByProfile(ctx context.Context, profileID pgtype.UUID
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }
@@ -404,8 +407,52 @@ func (q *Queries) ListPeriodsInRange(ctx context.Context, arg ListPeriodsInRange
 	return items, nil
 }
 
+const listStaleListingsToNotify = `-- name: ListStaleListingsToNotify :many
+SELECT l.id, p.account_id AS owner_account
+FROM capacity_listing l
+JOIN business_profile p ON p.id = l.profile_id
+WHERE l.published
+  AND l.calendar_updated_at < $1::timestamptz
+  AND (l.stale_notified_at IS NULL OR l.stale_notified_at < l.calendar_updated_at)
+ORDER BY l.calendar_updated_at
+`
+
+type ListStaleListingsToNotifyRow struct {
+	ID           pgtype.UUID
+	OwnerAccount pgtype.UUID
+}
+
+// ListStaleListingsToNotify returns published listings whose calendar has gone
+// untouched past the stale window and whose owner has not yet been reminded for
+// the current staleness, for the in-process ticker to notify (FR-021). The
+// before_cutoff bound is now - CalendarStaleWindow, computed in Go so the wall
+// clock stays out of SQL (Rule 5) and matches order.IsCalendarStale exactly. The
+// second guard sends one reminder per staleness episode: stale_notified_at IS
+// NULL for a listing never reminded, or stale_notified_at < calendar_updated_at
+// for one the owner edited and then let go stale again, so a fresh edit re-arms
+// the reminder. Returns the listing id and its owning account to notify.
+func (q *Queries) ListStaleListingsToNotify(ctx context.Context, beforeCutoff pgtype.Timestamptz) ([]ListStaleListingsToNotifyRow, error) {
+	rows, err := q.db.Query(ctx, listStaleListingsToNotify, beforeCutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListStaleListingsToNotifyRow{}
+	for rows.Next() {
+		var i ListStaleListingsToNotifyRow
+		if err := rows.Scan(&i.ID, &i.OwnerAccount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockListingByProfile = `-- name: LockListingByProfile :one
-SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at FROM capacity_listing WHERE profile_id = $1 FOR UPDATE
+SELECT id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at FROM capacity_listing WHERE profile_id = $1 FOR UPDATE
 `
 
 // LockListingByProfile takes a row lock on the profile's listing so a capacity
@@ -425,6 +472,7 @@ func (q *Queries) LockListingByProfile(ctx context.Context, profileID pgtype.UUI
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }
@@ -458,6 +506,28 @@ func (q *Queries) LockPeriodByWeek(ctx context.Context, arg LockPeriodByWeekPara
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const markStaleNotified = `-- name: MarkStaleNotified :exec
+UPDATE capacity_listing
+SET stale_notified_at = $2
+WHERE id = $1
+  AND (stale_notified_at IS NULL OR stale_notified_at < calendar_updated_at)
+`
+
+type MarkStaleNotifiedParams struct {
+	ID              pgtype.UUID
+	StaleNotifiedAt pgtype.Timestamptz
+}
+
+// MarkStaleNotified stamps stale_notified_at so the FR-021 reminder is sent once
+// per staleness episode. The guard mirrors ListStaleListingsToNotify so two
+// overlapping ticker instances remind only once, and a listing whose owner edits
+// the calendar (advancing calendar_updated_at past this stamp) re-arms for a
+// future reminder without ever clearing the column.
+func (q *Queries) MarkStaleNotified(ctx context.Context, arg MarkStaleNotifiedParams) error {
+	_, err := q.db.Exec(ctx, markStaleNotified, arg.ID, arg.StaleNotifiedAt)
+	return err
 }
 
 const periodHasActiveAllocation = `-- name: PeriodHasActiveAllocation :one
@@ -532,7 +602,7 @@ const setListingPublished = `-- name: SetListingPublished :one
 UPDATE capacity_listing
 SET published = $2, updated_at = $3
 WHERE id = $1
-RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at
+RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at
 `
 
 type SetListingPublishedParams struct {
@@ -557,6 +627,7 @@ func (q *Queries) SetListingPublished(ctx context.Context, arg SetListingPublish
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }
@@ -586,7 +657,7 @@ SET weekly_capacity     = $2,
     readiness_lead_days = $3,
     updated_at          = $4
 WHERE id = $1
-RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at
+RETURNING id, profile_id, weekly_capacity, readiness_lead_days, published, calendar_updated_at, horizon_until, created_at, updated_at, stale_notified_at
 `
 
 type UpdateListingParams struct {
@@ -617,6 +688,7 @@ func (q *Queries) UpdateListing(ctx context.Context, arg UpdateListingParams) (C
 		&i.HorizonUntil,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaleNotifiedAt,
 	)
 	return i, err
 }

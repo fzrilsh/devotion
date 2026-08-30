@@ -150,6 +150,13 @@ type Querier interface {
 	// short, the capacity was definitively taken between the two reads
 	// (CAPACITY_ALREADY_TAKEN). Deadline is rounded to Monday in Go before calling.
 	EstimateCapacityInRange(ctx context.Context, arg EstimateCapacityInRangeParams) (EstimateCapacityInRangeRow, error)
+	// ExpireCandidate moves an unanswered candidate to 'expired' once its reply
+	// window has lapsed (FR-037). The status = 'awaiting_reply' guard makes it a
+	// no-op if the subcontractor replied (offered/rejected) or a race already
+	// expired it between the scan and this update, so two overlapping ticker
+	// instances expire a candidate once. It reports the rows affected so the caller
+	// notifies the buyer only for a candidate this pass actually expired.
+	ExpireCandidate(ctx context.Context, arg ExpireCandidateParams) (int64, error)
 	// FindFutureAllocatedPeriodOverCapacity returns the earliest future period whose
 	// used capacity already exceeds the proposed new weekly capacity, so a listing
 	// edit that would strand a running order is rejected with a 409 that names the
@@ -380,6 +387,14 @@ type Querier interface {
 	// to its subcontractor profile for the business name, ordered so a request's
 	// candidates group together deterministically.
 	ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtype.UUID) ([]ListCandidatesByRequestsRow, error)
+	// ListCandidatesToExpire returns candidates still awaiting a reply whose
+	// request's 72-hour window has lapsed, for the in-process ticker to expire and
+	// notify the buyer (FR-037). The before_cutoff bound is the current instant,
+	// passed from the injected Clock (Rule 5), matching order.IsRequestExpired's
+	// inclusive boundary via <=. Each row carries the candidate id (to expire), the
+	// request id (for the buyer's deep link), and the buyer account (to notify),
+	// ordered by request so a request's lapsed candidates group together.
+	ListCandidatesToExpire(ctx context.Context, beforeCutoff pgtype.Timestamptz) ([]ListCandidatesToExpireRow, error)
 	// ListCatalogItemsByType returns every item of one type, active and inactive,
 	// for the admin management surface (FR-059). Unlike ListActiveCatalogItems it
 	// does not filter on active, so an admin sees deactivated items to reactivate or
@@ -509,6 +524,16 @@ type Querier interface {
 	// (T071). Returns each order's id and both parties' account ids for the closure
 	// notice.
 	ListShippedDueForAutoConfirm(ctx context.Context, dueBefore pgtype.Timestamptz) ([]ListShippedDueForAutoConfirmRow, error)
+	// ListStaleListingsToNotify returns published listings whose calendar has gone
+	// untouched past the stale window and whose owner has not yet been reminded for
+	// the current staleness, for the in-process ticker to notify (FR-021). The
+	// before_cutoff bound is now - CalendarStaleWindow, computed in Go so the wall
+	// clock stays out of SQL (Rule 5) and matches order.IsCalendarStale exactly. The
+	// second guard sends one reminder per staleness episode: stale_notified_at IS
+	// NULL for a listing never reminded, or stale_notified_at < calendar_updated_at
+	// for one the owner edited and then let go stale again, so a fresh edit re-arms
+	// the reminder. Returns the listing id and its owning account to notify.
+	ListStaleListingsToNotify(ctx context.Context, beforeCutoff pgtype.Timestamptz) ([]ListStaleListingsToNotifyRow, error)
 	// ListVerificationQueue returns one keyset page of verification requests for the
 	// admin queue, newest first, joined to business_profile for the business name
 	// the contract's VerificationRequest carries (FR-007). An absent status_filter
@@ -530,6 +555,17 @@ type Querier interface {
 	// idx_status_history_order (work_order_id, created_at) so it stays ordered
 	// without a sort.
 	ListWorkOrderStatusHistory(ctx context.Context, workOrderID pgtype.UUID) ([]ListWorkOrderStatusHistoryRow, error)
+	// The active, not-yet-shipped orders whose delivery deadline is within the FR-051
+	// warning lead and that have not yet had the "deadline mendekat" notice sent, for
+	// the in-process ticker to warn (FR-051). The band is [after_cutoff, before_cutoff]
+	// on the deadline date: after_cutoff is order.PastDeadlineCutoff (an order past due
+	// is handled by the late-order job, not warned), before_cutoff is
+	// order.DeadlineApproachingCutoff (the far edge of the 7-day lead). shipped orders
+	// are excluded because their clock is the auto-confirm warning, not the delivery
+	// deadline. deadline_warn_sent_at IS NULL keeps each order warned once, not on every
+	// tick. Returns both parties' account ids, since FR-051 warns both sides. Rides
+	// idx_order_deadline_warn.
+	ListWorkOrdersApproachingDeadlineToNotify(ctx context.Context, arg ListWorkOrdersApproachingDeadlineToNotifyParams) ([]ListWorkOrdersApproachingDeadlineToNotifyRow, error)
 	// One party's work orders newest first, keyset paginated on (created_at, id) so
 	// the order is stable across pages (FR-038). role_filter selects the side:
 	// 'as_buyer' matches the buyer profile, 'as_subcontractor' the subcontractor
@@ -612,6 +648,12 @@ type Querier interface {
 	// instances both scanned before either stamped (the advisory lock makes that
 	// rare, but the guard removes the race entirely).
 	MarkConfirmWarnSent(ctx context.Context, arg MarkConfirmWarnSentParams) error
+	// Stamps deadline_warn_sent_at so the FR-051 approaching-deadline notice is sent
+	// once per order. The IS NULL guard keeps it idempotent if two overlapping ticker
+	// instances both scanned before either stamped (the advisory lock makes that rare,
+	// but the guard removes the race entirely). The stamp is never cleared, so an order
+	// is warned once even as it moves through the lead toward its deadline.
+	MarkDeadlineWarnSent(ctx context.Context, arg MarkDeadlineWarnSentParams) error
 	// Marks a reported dispute as in_mediation when the admin takes up the case
 	// (FR-046). Runs in the same transaction as MoveWorkOrderToMediation so an order
 	// in mediation always has its dispute in mediation. The status = 'reported' guard
@@ -639,6 +681,12 @@ type Querier interface {
 	// further change; a rejection never touches this, leaving the listing untouched
 	// (FR-010, FR-011).
 	MarkProfileVerified(ctx context.Context, arg MarkProfileVerifiedParams) error
+	// MarkStaleNotified stamps stale_notified_at so the FR-021 reminder is sent once
+	// per staleness episode. The guard mirrors ListStaleListingsToNotify so two
+	// overlapping ticker instances remind only once, and a listing whose owner edits
+	// the calendar (advancing calendar_updated_at past this stamp) re-arms for a
+	// future reminder without ever clearing the column.
+	MarkStaleNotified(ctx context.Context, arg MarkStaleNotifiedParams) error
 	// MemberRecorded reports whether member was already recorded under key in the
 	// current window. A re-send to a number already counted is not a new distinct
 	// number, so it does not consume more of the address budget.
