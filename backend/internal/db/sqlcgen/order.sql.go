@@ -374,6 +374,60 @@ func (q *Queries) GetStatusBeforeMediation(ctx context.Context, workOrderID pgty
 	return old_status, err
 }
 
+const getWorkOrderContacts = `-- name: GetWorkOrderContacts :one
+SELECT
+    wo.id,
+    buyer.account_id            AS buyer_account,
+    buyer.business_name         AS buyer_business_name,
+    ba.email                    AS buyer_email,
+    ba.phone                    AS buyer_phone,
+    sub.account_id              AS subcontractor_account,
+    sub.business_name           AS subcontractor_business_name,
+    sa.email                    AS subcontractor_email,
+    sa.phone                    AS subcontractor_phone
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+JOIN user_account ba        ON ba.id = buyer.account_id
+JOIN user_account sa        ON sa.id = sub.account_id
+WHERE wo.id = $1
+`
+
+type GetWorkOrderContactsRow struct {
+	ID                        pgtype.UUID
+	BuyerAccount              pgtype.UUID
+	BuyerBusinessName         string
+	BuyerEmail                string
+	BuyerPhone                string
+	SubcontractorAccount      pgtype.UUID
+	SubcontractorBusinessName string
+	SubcontractorEmail        string
+	SubcontractorPhone        string
+}
+
+// Loads both parties' contact details for one work order (FR-092): each side's
+// business name, email, and WhatsApp number, plus the account ids the handler
+// needs for the party guard. The handler compares the caller's account id to
+// buyer_account and subcontractor_account and returns only the counterparty's
+// block, so a non-party (or a missing order) collapses to a 404 and the caller
+// never sees their own side echoed back. Keyed on the work order id.
+func (q *Queries) GetWorkOrderContacts(ctx context.Context, id pgtype.UUID) (GetWorkOrderContactsRow, error) {
+	row := q.db.QueryRow(ctx, getWorkOrderContacts, id)
+	var i GetWorkOrderContactsRow
+	err := row.Scan(
+		&i.ID,
+		&i.BuyerAccount,
+		&i.BuyerBusinessName,
+		&i.BuyerEmail,
+		&i.BuyerPhone,
+		&i.SubcontractorAccount,
+		&i.SubcontractorBusinessName,
+		&i.SubcontractorEmail,
+		&i.SubcontractorPhone,
+	)
+	return i, err
+}
+
 const getWorkOrderForView = `-- name: GetWorkOrderForView :one
 SELECT
     wo.id,
