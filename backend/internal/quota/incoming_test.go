@@ -8,15 +8,20 @@ import (
 )
 
 // incomingResp mirrors IncomingCandidateList: the subcontractor's incoming
-// candidates plus the keyset page marker.
+// candidates plus the keyset page marker. Each item carries the request's
+// quantity and deadline plus the subcontractor's remaining capacity in range and
+// whether it covers the requested quantity (FR-035, FR-090).
 type incomingResp struct {
 	Items []struct {
-		CandidateID  string     `json:"candidate_id"`
-		ListingID    string     `json:"listing_id"`
-		ProfileID    string     `json:"profile_id"`
-		BusinessName string     `json:"business_name"`
-		Status       string     `json:"status"`
-		LatestOffer  *offerResp `json:"latest_offer"`
+		CandidateID     string `json:"candidate_id"`
+		ListingID       string `json:"listing_id"`
+		ProfileID       string `json:"profile_id"`
+		BusinessName    string `json:"business_name"`
+		Status          string `json:"status"`
+		Quantity        int32  `json:"quantity"`
+		Deadline        string `json:"deadline"`
+		CapacityInRange int64  `json:"capacity_in_range"`
+		CanFulfill      bool   `json:"can_fulfill"`
 	} `json:"items"`
 	Pagination struct {
 		HasNext    bool    `json:"has_next"`
@@ -52,6 +57,62 @@ func TestIncoming_ListsOwnCandidates_FR030(t *testing.T) {
 	}
 	if d.Items[0].Status != "awaiting_reply" {
 		t.Fatalf("status %q, mau awaiting_reply", d.Items[0].Status)
+	}
+}
+
+// TestIncoming_ExposesCapacityAndFulfilment_FR035_FR090 proves the read side
+// carries the request's quantity and deadline plus the subcontractor's remaining
+// capacity in the readiness..deadline range, and marks can_fulfill true when that
+// capacity covers the request. weekly_capacity 100 over weeks 1..4 with a 7-day
+// readiness lead leaves 400 in range, so a request for 50 is fulfillable.
+func TestIncoming_ExposesCapacityAndFulfilment_FR035_FR090(t *testing.T) {
+	h := newHarness(t, "incoming_capacity_ok")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	h.asSubcontractor(f.subconAcc)
+
+	rec := h.do(http.MethodGet, "/api/quota-requests/incoming")
+	mustStatus(t, rec, http.StatusOK)
+
+	d := decodeIncoming(t, rec)
+	if len(d.Items) != 1 {
+		t.Fatalf("mau 1 kandidat, dapat %d; body %s", len(d.Items), rec.Body.String())
+	}
+	it := d.Items[0]
+	if it.Quantity != 50 {
+		t.Fatalf("quantity %d, mau 50", it.Quantity)
+	}
+	if it.Deadline != deadlineParam(4) {
+		t.Fatalf("deadline %q, mau %q", it.Deadline, deadlineParam(4))
+	}
+	if it.CapacityInRange != 400 {
+		t.Fatalf("capacity_in_range %d, mau 400", it.CapacityInRange)
+	}
+	if !it.CanFulfill {
+		t.Fatalf("can_fulfill %v, mau true (50 <= 400)", it.CanFulfill)
+	}
+}
+
+// TestIncoming_MarksUnfulfillableBeyondCapacity_FR035 proves can_fulfill is false
+// when the requested quantity exceeds the remaining capacity in range: asking for
+// 500 against 400 available cannot be met.
+func TestIncoming_MarksUnfulfillableBeyondCapacity_FR035(t *testing.T) {
+	h := newHarness(t, "incoming_capacity_short")
+	f := h.seedCandidate(t, "alfa", 500, platform_deadline(4))
+	h.asSubcontractor(f.subconAcc)
+
+	rec := h.do(http.MethodGet, "/api/quota-requests/incoming")
+	mustStatus(t, rec, http.StatusOK)
+
+	d := decodeIncoming(t, rec)
+	if len(d.Items) != 1 {
+		t.Fatalf("mau 1 kandidat, dapat %d; body %s", len(d.Items), rec.Body.String())
+	}
+	it := d.Items[0]
+	if it.CapacityInRange != 400 {
+		t.Fatalf("capacity_in_range %d, mau 400", it.CapacityInRange)
+	}
+	if it.CanFulfill {
+		t.Fatalf("can_fulfill %v, mau false (500 > 400)", it.CanFulfill)
 	}
 }
 

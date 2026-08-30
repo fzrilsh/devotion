@@ -6,6 +6,19 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Ditambahkan
+- Sisi baca incoming-request kini membawa `quantity`, `deadline`,
+  `capacity_in_range`, dan `can_fulfill` per kandidat, sehingga subkontraktor
+  bisa menilai apakah kapasitasnya menutup permintaan sebelum membalas (T045,
+  FR-035, FR-090). `ListIncomingCandidates` diperluas mengambil kuantitas dan
+  tenggat request plus bentuk kapasitas listing (`weekly_capacity`,
+  `readiness_lead_days`, `horizon_until`) dalam satu query, lalu tiap baris
+  menghitung sisa kapasitas lintas minggu kesiapan sampai tenggat lewat
+  `RemainingCapacityForOffer` yang sebelumnya hanya dipakai jalur penawaran.
+  Kontrak menambahkan skema `IncomingCandidate` untuk daftar ini, terpisah dari
+  `RequestCandidate` sisi pembeli yang membawa rantai penawaran. Menutup temuan
+  audit blok E (`docs/utang-teknis.md`).
+
 ### Diperbaiki
 - Lima respons backend diselaraskan ke kontrak yang sudah benar, hasil audit
   drift enam domain (`docs/utang-teknis.md`), sehingga tipe TypeScript hasil

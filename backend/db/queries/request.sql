@@ -178,11 +178,16 @@ ORDER BY o.candidate_id, o.sequence ASC;
 -- ListIncomingCandidates returns one keyset page of candidates whose listing the
 -- subcontractor account owns, newest request first (FR-030). An optional status
 -- filter narrows to one candidate_status. The cursor tuple is (created_at, id)
--- of the request, matching the buyer-side list.
+-- of the request, matching the buyer-side list. It also carries the request's
+-- quantity and deadline plus the listing's capacity shape (weekly_capacity,
+-- readiness_lead_days, horizon_until) so the read side can mark whether the
+-- subcontractor can fulfil each request within its readiness..deadline range
+-- (FR-035, FR-090) without a second query per row.
 -- name: ListIncomingCandidates :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.created_at
+       r.created_at, r.quantity, r.deadline,
+       l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
 JOIN business_profile owner ON owner.id = l.profile_id

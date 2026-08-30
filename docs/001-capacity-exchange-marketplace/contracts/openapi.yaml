@@ -2253,13 +2253,44 @@ components:
           items: { $ref: '#/components/schemas/QuotaRequestDetail' }
         pagination: { $ref: '#/components/schemas/Pagination' }
 
+    IncomingCandidate:
+      type: object
+      required: [candidate_id, listing_id, profile_id, status, quantity, deadline, capacity_in_range, can_fulfill]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        listing_id: { type: string, format: uuid }
+        profile_id:
+          type: string
+          format: uuid
+          description: Profil pemesan yang mengirim permintaan ini.
+        business_name: { type: string }
+        status: { $ref: '#/components/schemas/CandidateStatus' }
+        rejection_reason:
+          type: string
+          nullable: true
+          description: Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035).
+        quantity:
+          type: integer
+          description: Jumlah potong yang diminta pemesan (FR-031).
+        deadline:
+          type: string
+          format: date
+          description: Tenggat pesanan dari permintaan pemesan.
+        capacity_in_range:
+          type: integer
+          format: int64
+          description: Sisa kapasitas subkontraktor dijumlah lintas minggu dari kesiapan sampai tenggat (FR-090). Nol bila kesiapan sudah melewati tenggat.
+        can_fulfill:
+          type: boolean
+          description: Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090).
+
     IncomingCandidateList:
       type: object
       required: [items, pagination]
       properties:
         items:
           type: array
-          items: { $ref: '#/components/schemas/RequestCandidate' }
+          items: { $ref: '#/components/schemas/IncomingCandidate' }
         pagination: { $ref: '#/components/schemas/Pagination' }
     # ── work order ──
 

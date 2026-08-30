@@ -397,7 +397,11 @@ type Querier interface {
 	// ListIncomingCandidates returns one keyset page of candidates whose listing the
 	// subcontractor account owns, newest request first (FR-030). An optional status
 	// filter narrows to one candidate_status. The cursor tuple is (created_at, id)
-	// of the request, matching the buyer-side list.
+	// of the request, matching the buyer-side list. It also carries the request's
+	// quantity and deadline plus the listing's capacity shape (weekly_capacity,
+	// readiness_lead_days, horizon_until) so the read side can mark whether the
+	// subcontractor can fulfil each request within its readiness..deadline range
+	// (FR-035, FR-090) without a second query per row.
 	ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error)
 	// ListItemProposalsPending returns the pending proposal queue oldest first, with
 	// the proposer's business name, keyset paginated by (created_at, id) for a stable
