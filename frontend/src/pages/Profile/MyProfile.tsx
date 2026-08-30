@@ -4,14 +4,14 @@ import LocationMap from "@components/common/LocationMap";
 import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
 import LocationPicker from "@components/common/LocationPicker";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@hooks/useAuth";
+import { useAuth, useUpdateMyRoles } from "@hooks/useAuth";
 import { useProfile } from "@hooks/useProfile";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
 import { profileSchema, type ProfileForm } from "@schemas/profile";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
-import { LuCircleCheck, LuCircleX, LuClock3, LuMail, LuMapPin, LuPencil, LuPhone, LuShieldCheck, LuStar, LuX } from "react-icons/lu";
+import { LuCircleCheck, LuCircleX, LuClock3, LuMail, LuMapPin, LuPencil, LuPhone, LuSearch, LuShieldCheck, LuStar, LuStore, LuX } from "react-icons/lu";
 import { Link } from "react-router-dom";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
@@ -104,6 +104,113 @@ function AccountCard({ admin }: { admin?: boolean }) {
             </div>
 
             {admin ? <p className="mt-4 text-xs leading-5 text-slate-400">Akun admin tidak memiliki profil usaha. Verifikasi email dan nomor HP tetap diperlukan untuk keamanan akun.</p> : null}
+        </div>
+    );
+}
+
+// Peran dapat ditambahkan sendiri, tetapi tidak dapat dicabut selama masih ada
+// pesanan aktif: backend menolak dengan ROLES_IN_USE (409) dan pesannya dikutip
+// apa adanya di sini.
+const roleOptions = [
+    {
+        key: "buyer" as const,
+        icon: LuSearch,
+        title: "Pemberi order",
+        description: "Mencari subkontraktor dan mengirim request kuota ketika order melebihi kapasitas sendiri.",
+    },
+    {
+        key: "subcontractor" as const,
+        icon: LuStore,
+        title: "Subkontraktor",
+        description: "Menayangkan kapasitas produksi yang menganggur dan menerima request kuota dari pemberi order.",
+    },
+];
+
+function RolesCard() {
+    const { user } = useAuth();
+    const updateRoles = useUpdateMyRoles();
+
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+
+    const roles = { buyer: Boolean(user?.roles?.buyer), subcontractor: Boolean(user?.roles?.subcontractor) };
+    const activeCount = Number(roles.buyer) + Number(roles.subcontractor);
+
+    async function toggleRole(key: "buyer" | "subcontractor") {
+        setError("");
+        setSuccess("");
+
+        const next = { ...roles, [key]: !roles[key] };
+
+        if (!next.buyer && !next.subcontractor) {
+            setError("Akun usaha harus memiliki setidaknya satu peran.");
+            return;
+        }
+
+        try {
+            await updateRoles.mutateAsync(next);
+            setSuccess(next[key] ? `Peran ${key === "buyer" ? "pemberi order" : "subkontraktor"} ditambahkan.` : `Peran ${key === "buyer" ? "pemberi order" : "subkontraktor"} dicabut.`);
+        } catch (err) {
+            setError(getProblemMessage(err));
+        }
+    }
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Peran Usaha</h3>
+            <p className="mt-2 text-xs leading-5 text-slate-500">Satu akun dapat menjalankan kedua peran sekaligus. Menu navigasi mengikuti peran yang aktif.</p>
+
+            {error ? (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700" role="alert" aria-live="polite">
+                    {error}
+                </div>
+            ) : null}
+
+            {success ? (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700" role="status" aria-live="polite">
+                    {success}
+                </div>
+            ) : null}
+
+            <div className="mt-4 space-y-3">
+                {roleOptions.map((option) => {
+                    const active = roles[option.key];
+                    const lastRole = active && activeCount === 1;
+
+                    return (
+                        <div key={option.key} className={cn("rounded-xl border p-4", active ? "border-industrial-blue-500/30 bg-industrial-blue-500/5" : "border-slate-200 bg-white")}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", active ? "bg-industrial-blue-500/10 text-industrial-blue-600" : "bg-slate-100 text-slate-400")}>
+                                        <option.icon className="size-4.5" aria-hidden />
+                                    </span>
+
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-slate-800">{option.title}</p>
+                                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{option.description}</p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => toggleRole(option.key)}
+                                    disabled={updateRoles.isPending || lastRole}
+                                    aria-pressed={active}
+                                    title={lastRole ? "Peran terakhir tidak dapat dicabut." : undefined}
+                                    className={cn(
+                                        "shrink-0 cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
+                                        active ? "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50" : "bg-industrial-blue-500 text-white hover:bg-industrial-blue-600",
+                                    )}
+                                >
+                                    {updateRoles.isPending ? "Memproses..." : active ? "Cabut" : "Aktifkan"}
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <p className="mt-4 text-xs leading-5 text-slate-400">Peran tidak dapat dicabut selama masih ada pesanan aktif pada peran tersebut.</p>
         </div>
     );
 }
@@ -393,6 +500,8 @@ export default function MyProfile() {
 
                     <div className="space-y-6">
                         <AccountCard />
+
+                        <RolesCard />
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-6">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Reputasi</h3>

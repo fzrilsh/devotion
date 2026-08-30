@@ -2,34 +2,11 @@ import type { Notification } from "@api/notifications";
 import Loading from "@components/common/Loading";
 import { useMarkNotificationRead, useNotifications } from "@hooks/useNotifications";
 import { useAuth } from "@hooks/useAuth";
+import { getNotificationLink } from "@lib/notificationLinks";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuBellOff, LuCalendarClock, LuCalendarX, LuCheck, LuCircleAlert, LuClipboardList, LuCreditCard, LuFileInput, LuFileOutput, LuFileText, LuInbox, LuLoaderCircle, LuSettings2, LuShieldCheck, LuStar } from "react-icons/lu";
 import { Link } from "react-router-dom";
-
-// Notification hanya membawa work_order_id; notifikasi request/penawaran tidak
-// punya id tujuan, jadi tautannya mengarah ke halaman daftar yang sesuai peran.
-function getNotificationLink(notification: Notification, isBuyer: boolean): { to: string; label: string } | null {
-    if (notification.work_order_id) {
-        return { to: `/orders/${notification.work_order_id.split("/").pop()}`, label: "Lihat pesanan" };
-    }
-
-    switch (notification.event) {
-        case "request_received":
-            return { to: "/requests/incoming", label: "Lihat request masuk" };
-        case "offer_received":
-        case "counter_offer":
-            return isBuyer ? { to: "/quota-requests", label: "Lihat request terkirim" } : { to: "/requests/incoming", label: "Lihat request masuk" };
-        case "calendar_stale":
-            return { to: "/listing", label: "Perbarui kalender" };
-        case "verification_decision":
-            return { to: "/verification", label: "Lihat verifikasi" };
-        case "item_proposal_decision":
-            return { to: "/listing", label: "Lihat listing" };
-        default:
-            return null;
-    }
-}
 
 const eventMeta: Record<Notification["event"], { label: string; icon: React.ElementType; className: string }> = {
     request_received: { label: "Request masuk", icon: LuFileInput, className: "bg-industrial-blue-500/10 text-industrial-blue-600" },
@@ -47,6 +24,7 @@ const eventMeta: Record<Notification["event"], { label: string; icon: React.Elem
     order_auto_closed: { label: "Pesanan ditutup otomatis", icon: LuCheck, className: "bg-slate-500/10 text-slate-600" },
     item_proposal_decision: { label: "Usulan item", icon: LuFileText, className: "bg-industrial-blue-500/10 text-industrial-blue-600" },
     calendar_stale: { label: "Kalender kedaluwarsa", icon: LuCalendarX, className: "bg-amber-500/10 text-amber-600" },
+    request_expired: { label: "Request kedaluwarsa", icon: LuCalendarX, className: "bg-amber-500/10 text-amber-600" },
 };
 
 function formatRelativeTime(isoDate: string): string {
@@ -135,19 +113,11 @@ export default function Notifications() {
 
                 <div className="flex items-center gap-2">
                     <div className="flex rounded-xl border border-slate-200 bg-white p-1">
-                        <button
-                            type="button"
-                            onClick={() => setUnreadOnly(false)}
-                            className={cn("cursor-pointer rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors", !unreadOnly ? "bg-industrial-blue-500 text-white" : "text-slate-500 hover:text-slate-700")}
-                        >
+                        <button type="button" onClick={() => setUnreadOnly(false)} className={cn("cursor-pointer rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors", !unreadOnly ? "bg-industrial-blue-500 text-white" : "text-slate-500 hover:text-slate-700")}>
                             Semua
                         </button>
 
-                        <button
-                            type="button"
-                            onClick={() => setUnreadOnly(true)}
-                            className={cn("cursor-pointer rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors", unreadOnly ? "bg-industrial-blue-500 text-white" : "text-slate-500 hover:text-slate-700")}
-                        >
+                        <button type="button" onClick={() => setUnreadOnly(true)} className={cn("cursor-pointer rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors", unreadOnly ? "bg-industrial-blue-500 text-white" : "text-slate-500 hover:text-slate-700")}>
                             Belum dibaca
                         </button>
                     </div>

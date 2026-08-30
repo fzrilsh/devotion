@@ -51,7 +51,6 @@ function CandidateCard({ candidate, selected, onToggle }: { candidate: SearchCan
                     <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                         <LuMapPin className="size-3.5 shrink-0 text-slate-400" aria-hidden />
                         {candidate.city_name || "Lokasi tidak tersedia"}
-                        {candidate.distance_km != null ? ` · ±${Math.round(candidate.distance_km)} km` : ""}
                     </p>
                 </div>
 

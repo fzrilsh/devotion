@@ -1,196 +1,287 @@
+import type { Dispute } from "@api/admin";
 import Loading from "@components/common/Loading";
+import { useDisputes } from "@hooks/useAdmin";
 import { useWorkOrder } from "@hooks/useWorkOrders";
-import { LuBanknote, LuCalendarDays, LuPackage } from "react-icons/lu";
-import { Link, useParams } from "react-router-dom";
+import { cn } from "@lib/utils";
+import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuEye, LuPackage, LuShieldAlert } from "react-icons/lu";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatDateId, formatDateTimeId, formatRupiah, workOrderStatusMeta } from "../WorkOrders/meta";
 
+const disputeStatusMeta: Record<Dispute["status"], { label: string; className: string }> = {
+    reported: { label: "Dilaporkan", className: "bg-red-500/10 text-red-600" },
+    in_mediation: { label: "Dalam Mediasi", className: "bg-amber-500/10 text-amber-600" },
+    resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
+};
+
+const disputeResultLabel: Record<string, string> = {
+    continued: "Pesanan dilanjutkan",
+    confirmed: "Pesanan dinyatakan selesai",
+    cancelled: "Pesanan dibatalkan",
+};
+
+function ErrorCard({ message, onBack }: { message: string; onBack: () => void }) {
+    return (
+        <div className="space-y-6">
+            <h1 className="text-xl font-bold text-slate-900">Detail Pesanan</h1>
+
+            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+                <p className="text-sm font-semibold text-red-700">{message}</p>
+
+                <button type="button" onClick={onBack} className="mt-3 inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-red-800 underline underline-offset-2">
+                    <LuArrowLeft className="size-4" aria-hidden />
+                    Kembali ke antrean
+                </button>
+            </div>
+        </div>
+    );
+}
+
 export default function AdminOrderDetail() {
-    const { workOrderId } = useParams<{ workOrderId: string }>();
-    const workOrderQuery = useWorkOrder(workOrderId || "");
+    const { workOrderId = "" } = useParams();
+    const navigate = useNavigate();
+    const workOrderQuery = useWorkOrder(workOrderId);
+
+    // Sengketa dibaca dari antrean admin lalu disaring, karena tidak ada endpoint
+    // sengketa per pesanan. Ini yang menyambungkan halaman pantau ke mediasi.
+    const disputesQuery = useDisputes();
+    const disputes = (disputesQuery.data ?? []).filter((dispute) => dispute.work_order_id === workOrderId);
+
+    function handleBack() {
+        navigate(-1);
+    }
 
     if (!workOrderId) {
-        return (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                <p className="text-sm font-semibold text-red-700">ID pesanan tidak valid.</p>
-            </div>
-        );
+        return <ErrorCard message="Id pesanan tidak ada pada alamat halaman." onBack={handleBack} />;
     }
 
     if (workOrderQuery.isLoading) {
         return <Loading />;
     }
 
-    if (workOrderQuery.isError) {
-        return (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                <p className="text-sm font-semibold text-red-700">Pesanan tidak dapat dimuat. Coba muat ulang halaman.</p>
-            </div>
-        );
+    if (workOrderQuery.isError || !workOrderQuery.data) {
+        return <ErrorCard message="Pesanan tidak dapat dimuat. Periksa kembali id pada alamat, lalu coba muat ulang halaman." onBack={handleBack} />;
     }
 
-    const workOrder = workOrderQuery.data;
-    if (!workOrder) {
-        return (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                <p className="text-sm font-semibold text-red-700">Pesanan tidak ditemukan.</p>
-            </div>
-        );
-    }
-
-    const statusMeta = workOrderStatusMeta[workOrder.status];
+    const order = workOrderQuery.data;
+    const statusMeta = workOrderStatusMeta[order.status];
 
     return (
         <div className="space-y-6">
-            <div className="space-y-2">
-                <h1 className="text-2xl font-bold text-slate-900">Detail Pesanan</h1>
-                <p className="text-sm text-slate-500">
-                    Status: <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold ${statusMeta?.className}`}>{statusMeta?.label}</span>
+            <div className="flex items-center gap-3">
+                <button type="button" onClick={handleBack} className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                    <LuArrowLeft className="size-3.5" aria-hidden />
+                    Kembali
+                </button>
+
+                <h1 className="text-xl font-bold text-slate-900">Detail Pesanan</h1>
+
+                <span className={cn("ml-auto shrink-0 rounded-full px-3 py-1 text-xs font-bold", statusMeta.className)}>{statusMeta.label}</span>
+            </div>
+
+            <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <LuEye className="mt-0.5 size-5 shrink-0 text-industrial-blue-500" aria-hidden />
+                <p className="text-xs leading-5 text-slate-500">
+                    Anda membuka pesanan ini sebagai admin pengawas, bukan sebagai pihak pesanan. Halaman ini baca saja: perubahan status tetap dilakukan subkontraktor dan pemberi order. Admin mengubah nasib pesanan lewat keputusan sengketa.
                 </p>
             </div>
 
-            {/* Main Content */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                {/* Left Column - Pesanan */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Informasi Pesanan */}
+                <div className="space-y-6 lg:col-span-2">
                     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                        <h2 className="text-lg font-bold text-slate-900 mb-4">Informasi Pesanan</h2>
+                        <div className="flex items-start gap-4">
+                            <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-industrial-blue-500/10 text-industrial-blue-600">
+                                <LuPackage className="size-6" aria-hidden />
+                            </span>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="min-w-0">
+                                <p className="text-lg font-extrabold text-slate-900">{order.quantity.toLocaleString("id-ID")} unit</p>
+                                <p className="mt-0.5 text-xs text-slate-400">Nilai {formatRupiah(order.total_price)}</p>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-3">
                             <div>
-                                <p className="text-xs font-semibold text-slate-500 uppercase">Jumlah</p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">{workOrder.quantity?.toLocaleString("id-ID") ?? "-"} unit</p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Jeda Kesiapan</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800">{order.readiness_lead_days != null ? `${order.readiness_lead_days} hari` : "-"}</p>
                             </div>
 
                             <div>
-                                <p className="text-xs font-semibold text-slate-500 uppercase">Nilai Pesanan</p>
-                                <p className="mt-1 text-lg font-bold text-slate-900">{formatRupiah(workOrder.total_price ?? 0)}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tenggat Kesiapan</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800">{formatDateId(order.readiness_deadline)}</p>
                             </div>
 
-                            {workOrder.readiness_lead_days !== undefined && (
-                                <div>
-                                    <p className="text-xs font-semibold text-slate-500 uppercase">Jeda Kesiapan</p>
-                                    <p className="mt-1 text-sm text-slate-700">{workOrder.readiness_lead_days} hari</p>
-                                </div>
-                            )}
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tenggat Pesanan</p>
+                                <p className="mt-1 text-sm font-bold text-slate-800">{formatDateId(order.deadline)}</p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Riwayat Status */}
+                    {order.status === "shipped" && order.auto_confirm_at ? (
+                        <div className="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                            <LuCalendarDays className="mt-0.5 size-5 shrink-0 text-sky-600" aria-hidden />
+                            <p className="text-xs leading-5 text-sky-800">Pesanan dikonfirmasi diterima secara otomatis pada {formatDateTimeId(order.auto_confirm_at)} bila tidak ada konfirmasi atau sengketa sebelumnya.</p>
+                        </div>
+                    ) : null}
+
                     <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                        <h2 className="text-lg font-bold text-slate-900 mb-4">Riwayat Status</h2>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Riwayat Status</h2>
 
-                        <div className="space-y-3">
-                            {workOrder.status_history && workOrder.status_history.length > 0 ? (
-                                workOrder.status_history.map((history, idx) => (
-                                    <div key={idx} className="flex gap-3 pb-3 border-b border-slate-100 last:border-0 last:pb-0">
-                                        <div className="flex-1">
-                                            <p className="text-sm font-semibold text-slate-800">{history.status ? workOrderStatusMeta[history.status]?.label || history.status : "-"}</p>
-                                            <p className="mt-0.5 text-xs text-slate-500">{formatDateTimeId(history.at)}</p>
-                                            {history.note && <p className="mt-1 text-xs text-slate-600">{history.note}</p>}
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm text-slate-500">Belum ada perubahan status.</p>
-                            )}
-                        </div>
+                        {order.status_history && order.status_history.length > 0 ? (
+                            <ol className="mt-4 space-y-0">
+                                {order.status_history.map((entry, index) => {
+                                    const entryMeta = entry.status ? workOrderStatusMeta[entry.status] : null;
+
+                                    return (
+                                        <li key={index} className="relative flex gap-4 pb-5 last:pb-0">
+                                            {index < order.status_history!.length - 1 ? <span className="absolute left-1.75 top-5 h-full w-px bg-slate-200" aria-hidden /> : null}
+
+                                            <span className={cn("relative mt-1 size-3.5 shrink-0 rounded-full border-2 border-white ring-2", index === 0 ? "bg-industrial-blue-500 ring-industrial-blue-500/30" : "bg-slate-300 ring-slate-200")} aria-hidden />
+
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    {entryMeta ? <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", entryMeta.className)}>{entryMeta.label}</span> : null}
+                                                    <span className="text-xs text-slate-400">{formatDateTimeId(entry.at)}</span>
+                                                </div>
+
+                                                {entry.note ? <p className="mt-1 text-xs leading-5 text-slate-500">{entry.note}</p> : null}
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ol>
+                        ) : (
+                            <p className="mt-3 text-sm text-slate-500">Belum ada perubahan status yang tercatat.</p>
+                        )}
                     </div>
 
-                    {/* Alokasi Kapasitas */}
-                    {workOrder.allocations && workOrder.allocations.length > 0 && (
+                    {order.allocations && order.allocations.length > 0 ? (
                         <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                            <h2 className="text-lg font-bold text-slate-900 mb-4">Alokasi Kapasitas</h2>
+                            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Alokasi Kapasitas</h2>
 
-                            <div className="overflow-x-auto">
+                            <div className="mt-3 overflow-x-auto">
                                 <table className="w-full text-sm">
+                                    <caption className="sr-only">Alokasi kapasitas pesanan ini per minggu</caption>
                                     <thead>
-                                        <tr className="border-b border-slate-200">
-                                            <th className="text-left py-3 px-3 font-semibold text-slate-700">Minggu</th>
-                                            <th className="text-right py-3 px-3 font-semibold text-slate-700">Kapasitas</th>
-                                            <th className="text-right py-3 px-3 font-semibold text-slate-700">Dialokasikan</th>
-                                            <th className="text-right py-3 px-3 font-semibold text-slate-700">Sisa</th>
+                                        <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-400">
+                                            <th scope="col" className="px-3 py-3 text-left font-semibold">
+                                                Minggu
+                                            </th>
+                                            <th scope="col" className="px-3 py-3 text-right font-semibold">
+                                                Kapasitas
+                                            </th>
+                                            <th scope="col" className="px-3 py-3 text-right font-semibold">
+                                                Dialokasikan
+                                            </th>
+                                            <th scope="col" className="px-3 py-3 text-right font-semibold">
+                                                Sisa
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {workOrder.allocations.map((alloc, idx) => (
-                                            <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50">
-                                                <td className="py-3 px-3 text-slate-800">{formatDateId(alloc.week_start)}</td>
-                                                <td className="text-right py-3 px-3 text-slate-800">{alloc.capacity?.toLocaleString("id-ID") ?? "-"}</td>
-                                                <td className="text-right py-3 px-3 text-slate-800">{alloc.allocated?.toLocaleString("id-ID") ?? "-"}</td>
-                                                <td className="text-right py-3 px-3 text-slate-800">{alloc.remaining?.toLocaleString("id-ID") ?? "-"}</td>
+                                        {order.allocations.map((period) => (
+                                            <tr key={period.week_start} className="border-b border-slate-100 last:border-0">
+                                                <th scope="row" className="px-3 py-3 text-left font-medium text-slate-800">
+                                                    {formatDateId(period.week_start)}
+                                                </th>
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800">{period.capacity.toLocaleString("id-ID")}</td>
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800">{period.allocated.toLocaleString("id-ID")}</td>
+                                                <td className="px-3 py-3 text-right tabular-nums text-slate-800">{period.remaining.toLocaleString("id-ID")}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
-                    )}
+                    ) : null}
                 </div>
 
-                {/* Right Column - Pihak & Pembayaran */}
                 <div className="space-y-6">
-                    {/* Pemberi Order */}
                     <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                        <h3 className="text-sm font-bold text-slate-900 mb-3">Pemberi Order</h3>
-                        <Link to={`/profile/${workOrder.buyer_profile_id}`} className="text-sm font-semibold text-industrial-blue-600 hover:underline">
-                            Lihat Profil
-                        </Link>
-                    </div>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Pihak Pesanan</h2>
 
-                    {/* Subkontraktor */}
-                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                        <h3 className="text-sm font-bold text-slate-900 mb-3">Subkontraktor</h3>
-                        <Link to={`/profile/${workOrder.subcontractor_profile_id}`} className="text-sm font-semibold text-industrial-blue-600 hover:underline">
-                            Lihat Profil
-                        </Link>
-                    </div>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <p className="text-xs font-semibold text-slate-500">Pemberi Order</p>
+                                <Link to={`/profile/${order.buyer_profile_id}`} className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold text-industrial-blue-600 hover:underline">
+                                    Lihat profil
+                                    <LuArrowRight className="size-3.5" aria-hidden />
+                                </Link>
+                            </div>
 
-                    {/* Riwayat Pembayaran */}
-                    {workOrder.payments && workOrder.payments.length > 0 && (
-                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                <LuBanknote className="size-4" aria-hidden />
-                                Pernyataan Pembayaran
-                            </h3>
-
-                            <div className="space-y-2">
-                                {workOrder.payments.map((payment, idx) => (
-                                    <div key={idx} className="text-xs pb-2 border-b border-slate-100 last:border-0 last:pb-0">
-                                        <p className="font-semibold text-slate-700">
-                                            {payment.direction === "sent" ? "Terkirim" : "Diterima"} - {formatDateId(payment.date)}
-                                        </p>
-                                        {payment.note && <p className="mt-1 text-slate-600">{payment.note}</p>}
-                                    </div>
-                                ))}
+                            <div className="border-t border-slate-100 pt-3">
+                                <p className="text-xs font-semibold text-slate-500">Subkontraktor</p>
+                                <Link to={`/profile/${order.subcontractor_profile_id}`} className="mt-0.5 inline-flex items-center gap-1.5 text-sm font-semibold text-industrial-blue-600 hover:underline">
+                                    Lihat profil
+                                    <LuArrowRight className="size-3.5" aria-hidden />
+                                </Link>
                             </div>
                         </div>
-                    )}
+                    </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                        <h2 className="text-lg font-bold text-slate-900 mb-4">Tenggat Waktu</h2>
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-400">
+                            <LuShieldAlert className="size-4" aria-hidden />
+                            Sengketa
+                        </h2>
 
-                        <div className="space-y-3">
-                            {workOrder.readiness_deadline && (
-                                <div className="flex items-center gap-3">
-                                    <LuCalendarDays className="size-5 text-slate-400" aria-hidden />
-                                    <div>
-                                        <p className="text-xs font-semibold text-slate-500">Kesiapan Produksi</p>
-                                        <p className="mt-0.5 text-sm text-slate-800">{formatDateId(workOrder.readiness_deadline)}</p>
-                                    </div>
-                                </div>
-                            )}
+                        {disputesQuery.isLoading ? (
+                            <p className="mt-3 text-xs text-slate-500">Memuat antrean sengketa...</p>
+                        ) : disputesQuery.isError ? (
+                            <p className="mt-3 text-xs text-red-600">Antrean sengketa tidak dapat dimuat, jadi laporan pada pesanan ini belum tentu tampil.</p>
+                        ) : disputes.length === 0 ? (
+                            <p className="mt-3 text-xs text-slate-500">Tidak ada laporan sengketa pada pesanan ini.</p>
+                        ) : (
+                            <ul className="mt-3 space-y-3">
+                                {disputes.map((dispute) => {
+                                    const meta = disputeStatusMeta[dispute.status];
 
-                            {workOrder.deadline && (
-                                <div className="flex items-center gap-3">
-                                    <LuPackage className="size-5 text-slate-400" aria-hidden />
-                                    <div>
-                                        <p className="text-xs font-semibold text-slate-500">Deadline Pesanan</p>
-                                        <p className="mt-0.5 text-sm text-slate-800">{formatDateId(workOrder.deadline)}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                                    return (
+                                        <li key={dispute.dispute_id} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", meta.className)}>{meta.label}</span>
+                                                <span className="text-xs text-slate-400">{formatDateTimeId(dispute.created_at)}</span>
+                                            </div>
+
+                                            <p className="mt-1.5 text-xs leading-5 text-slate-600">{dispute.report_body}</p>
+
+                                            {dispute.result ? <p className="mt-1.5 text-xs font-semibold text-slate-500">Hasil: {disputeResultLabel[dispute.result] ?? dispute.result}</p> : null}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+
+                        <Link to="/admin/disputes" className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                            Buka antrean sengketa
+                            <LuArrowRight className="size-3.5" aria-hidden />
+                        </Link>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-400">
+                            <LuBanknote className="size-4" aria-hidden />
+                            Pernyataan Pembayaran
+                        </h2>
+
+                        {order.payments && order.payments.length > 0 ? (
+                            <ul className="mt-3 space-y-2">
+                                {order.payments.map((payment) => (
+                                    <li key={payment.payment_id} className="rounded-xl bg-slate-50 px-3 py-2.5">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-xs font-semibold text-slate-700">{payment.direction === "sent" ? "Pembayaran dikirim" : "Pembayaran diterima"}</p>
+                                            <span className="shrink-0 text-xs text-slate-500">{formatDateId(payment.date)}</span>
+                                        </div>
+
+                                        {payment.note ? <p className="mt-1 text-xs text-slate-500">{payment.note}</p> : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="mt-3 text-xs text-slate-500">Belum ada pernyataan pembayaran dari kedua pihak.</p>
+                        )}
+
+                        <p className="mt-3 text-[11px] leading-4 text-slate-400">Platform tidak menahan maupun memproses dana. Yang tercatat hanya pernyataan kedua pihak, tanpa jumlah uang, jadi pernyataan yang bertentangan diselesaikan lewat mediasi.</p>
                     </div>
                 </div>
             </div>

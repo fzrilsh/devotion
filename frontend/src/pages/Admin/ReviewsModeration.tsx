@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
-import { useHideReview, useProfileReviews } from "@hooks/useAdmin";
+import { useHideReview } from "@hooks/useAdmin";
+import { useProfileReviews } from "@hooks/useProfile";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuEyeOff, LuInbox, LuSearch, LuStar } from "react-icons/lu";

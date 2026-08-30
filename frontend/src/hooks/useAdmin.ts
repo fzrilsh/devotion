@@ -1,5 +1,5 @@
-import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getProfileReviews, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const adminKeys = {
     verification: (status?: VerificationStatus) => ["admin", "verification", status ?? "all"] as const,
@@ -7,7 +7,6 @@ export const adminKeys = {
     disputes: (status?: DisputeStatus) => ["admin", "disputes", status ?? "all"] as const,
     lateOrders: ["admin", "late-orders"] as const,
     masterItems: (kind?: "product" | "machine") => ["admin", "master-items", kind ?? "all"] as const,
-    reviews: (profileId: string) => ["admin", "reviews", profileId] as const,
     whatsapp: ["admin", "whatsapp"] as const,
 };
 
@@ -126,25 +125,13 @@ export function useUpdateMasterItem() {
     });
 }
 
-export function useProfileReviews(profileId: string) {
-    return useInfiniteQuery({
-        queryKey: adminKeys.reviews(profileId),
-        queryFn: ({ pageParam }) => getProfileReviews(profileId, pageParam),
-        initialPageParam: undefined as string | undefined,
-        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
-        enabled: Boolean(profileId),
-        staleTime: 30 * 1000,
-        retry: false,
-    });
-}
-
 export function useHideReview() {
     const queryClient = useQueryClient();
 
     return useMutation({
         mutationFn: ({ reviewId, reason }: { reviewId: string; reason: string }) => hideReview(reviewId, reason),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["admin", "reviews"] });
+            queryClient.invalidateQueries({ queryKey: ["profile", "reviews"] });
         },
     });
 }

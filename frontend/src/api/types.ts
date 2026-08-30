@@ -73,7 +73,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verifikasi alamat email dengan kode enam digit */
+        /**
+         * Verifikasi alamat email dengan kode enam digit
+         * @description Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -94,7 +97,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                400: components["responses"]["ValidationFailed"];
+                401: components["responses"]["NotAuthenticated"];
                 /** @description Kode kedaluwarsa atau sudah dipakai */
                 410: {
                     headers: {
@@ -104,6 +107,7 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                422: components["responses"]["ValidationFailed"];
             };
         };
         delete?: never;
@@ -121,7 +125,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Verifikasi nomor HP dengan kode enam digit dari WhatsApp */
+        /**
+         * Verifikasi nomor HP dengan kode enam digit dari WhatsApp
+         * @description Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
+         */
         post: {
             parameters: {
                 query?: never;
@@ -142,7 +149,7 @@ export interface paths {
                     };
                     content?: never;
                 };
-                400: components["responses"]["ValidationFailed"];
+                401: components["responses"]["NotAuthenticated"];
                 /** @description Kode kedaluwarsa atau sudah dipakai */
                 410: {
                     headers: {
@@ -150,6 +157,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                422: components["responses"]["ValidationFailed"];
             };
         };
         delete?: never;
@@ -1360,7 +1368,8 @@ export interface paths {
                         "application/json": components["schemas"]["SearchResult"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
+                403: components["responses"]["Forbidden"];
+                422: components["responses"]["ValidationFailed"];
             };
         };
         put?: never;
@@ -2003,6 +2012,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/work-orders/{workOrderId}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kontak pihak lawan pada sebuah pesanan
+         * @description Setelah pesanan terbentuk, masing-masing pihak dapat melihat kontak pihak
+         *     lawan (nama usaha, email, nomor WhatsApp) untuk menjalankan pembayaran dan
+         *     koordinasi yang terjadi langsung antar pihak di luar platform (FR-040,
+         *     FR-092). Tersedia pada semua status pesanan, termasuk dibatalkan dan dalam
+         *     mediasi. Hanya kedua pihak pesanan yang boleh mengaksesnya; pemanggil lain,
+         *     termasuk admin dan subkontraktor lain, menerima 404 agar keberadaan pesanan
+         *     tidak terbocorkan.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    workOrderId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkOrderContacts"];
+                    };
+                };
+                /** @description Pesanan tidak ditemukan atau pemanggil bukan pihaknya */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        /**
+                         * @example {
+                         *       "type": "https://devotion/errors/not-found",
+                         *       "title": "Tidak ditemukan",
+                         *       "status": 404,
+                         *       "code": "NOT_FOUND",
+                         *       "detail": "Pesanan tidak ditemukan."
+                         *     }
+                         */
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/work-orders/{workOrderId}/cancel": {
         parameters: {
             query?: never;
@@ -2119,7 +2192,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["PaymentRecord"];
+                        "application/json": components["schemas"]["WorkOrderDetail"];
                     };
                 };
                 /** @description Pernyataan dengan arah yang sama sudah dicatat */
@@ -2173,7 +2246,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Dispute"];
+                        "application/json": components["schemas"]["WorkOrderDetail"];
                     };
                 };
                 /** @description Sudah ada sengketa terbuka pada pesanan ini */
@@ -2661,7 +2734,10 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ItemProposal"][];
+                        "application/json": {
+                            items: components["schemas"]["ItemProposal"][];
+                            pagination: components["schemas"]["Pagination"];
+                        };
                     };
                 };
                 403: components["responses"]["Forbidden"];
@@ -3110,7 +3186,7 @@ export interface components {
              * @description Kode mesin yang stabil untuk penanganan di klien.
              * @enum {string}
              */
-            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "LISTING_ALREADY_EXISTS" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED" | "READINESS_AFTER_DEADLINE" | "PAYMENT_STATEMENT_EXISTS" | "DISPUTE_ALREADY_OPEN";
+            code: "VALIDATION_FAILED" | "NOT_AUTHENTICATED" | "FORBIDDEN" | "NOT_FOUND" | "RATE_LIMIT_EXCEEDED" | "EMAIL_ALREADY_REGISTERED" | "INVALID_CREDENTIALS" | "INVALID_VERIFICATION_CODE" | "VERIFICATION_CODE_EXPIRED" | "EMAIL_NOT_VERIFIED" | "PHONE_NOT_VERIFIED" | "IDENTITY_NOT_VERIFIED" | "IDENTITY_ALREADY_VERIFIED" | "VERIFICATION_PENDING" | "FILE_TOO_LARGE" | "UNSUPPORTED_FILE_TYPE" | "STORAGE_QUOTA_FULL" | "LISTING_NOT_FOUND" | "LISTING_ALREADY_EXISTS" | "CAPACITY_ALREADY_ALLOCATED" | "PERIOD_ALREADY_ALLOCATED" | "SELF_REQUEST" | "INSUFFICIENT_CAPACITY" | "REQUEST_EXPIRED" | "REQUEST_ALREADY_AGREED" | "CAPACITY_ALREADY_TAKEN" | "INVALID_STATUS_TRANSITION" | "CANCELLATION_AFTER_PRODUCTION" | "WORK_ORDER_NOT_COMPLETED" | "REVIEW_ALREADY_SUBMITTED" | "READINESS_AFTER_DEADLINE" | "PAYMENT_STATEMENT_EXISTS" | "DISPUTE_ALREADY_OPEN" | "ROLES_IN_USE";
             /** @description Penjelasan bahasa Indonesia yang dapat dikutip pengguna. */
             detail: string;
             instance?: string;
@@ -3253,6 +3329,7 @@ export interface components {
             proposed_name: string;
             /** @enum {string} */
             status: "pending" | "approved" | "rejected";
+            proposer_name?: string;
             reason?: string | null;
             /** Format: date-time */
             created_at?: string;
@@ -3364,10 +3441,24 @@ export interface components {
         SearchResult: {
             items: components["schemas"]["SearchCandidate"][];
             pagination: components["schemas"]["Pagination"];
+            /**
+             * @description Tingkat cakupan wilayah yang benar-benar dipakai pencarian ini (FR-063).
+             * @enum {string}
+             */
+            region_level: "city" | "province" | "national";
+            /**
+             * @description Saran pelonggaran, hadir hanya bila pencarian di tingkat national tetap kosong
+             *     (FR-028). Menyebut kriteria keras paling membatasi dan satu langkah pelonggaran
+             *     konkret.
+             */
+            relaxation?: {
+                most_restrictive: string;
+                suggestion: string;
+            } | null;
         };
         /**
          * @description Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
-         *     jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
+         *     jarak (FR-034). Field criteria menjelaskan kriteria keras
          *     mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
          *     Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
          *     memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
@@ -3404,8 +3495,6 @@ export interface components {
             reputation?: components["schemas"]["Reputation"];
             /** @description Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan. */
             stale_calendar?: boolean;
-            /** Format: double */
-            distance_km?: number | null;
             identity_verified?: boolean;
             criteria: {
                 name: string;
@@ -3461,6 +3550,8 @@ export interface components {
             profile_id: string;
             business_name?: string;
             status: components["schemas"]["CandidateStatus"];
+            /** @description Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035). */
+            rejection_reason?: string | null;
             latest_offer?: components["schemas"]["Offer"];
             /** @description Seluruh rantai penawaran kandidat terurut sequence naik, sehingga riwayat ronde sebelumnya tetap terlihat setelah counter-offer (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini. */
             offers?: components["schemas"]["Offer"][];
@@ -3489,8 +3580,40 @@ export interface components {
             items: components["schemas"]["QuotaRequestDetail"][];
             pagination: components["schemas"]["Pagination"];
         };
+        IncomingCandidate: {
+            /** Format: uuid */
+            candidate_id: string;
+            /** Format: uuid */
+            listing_id: string;
+            /**
+             * Format: uuid
+             * @description Profil pemesan yang mengirim permintaan ini.
+             */
+            profile_id: string;
+            business_name?: string;
+            status: components["schemas"]["CandidateStatus"];
+            /** @description Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035). */
+            rejection_reason?: string | null;
+            /** @description Jumlah potong yang diminta pemesan (FR-031). */
+            quantity: number;
+            /**
+             * Format: date
+             * @description Tenggat pesanan dari permintaan pemesan.
+             */
+            deadline: string;
+            /**
+             * Format: int64
+             * @description Sisa kapasitas subkontraktor dijumlah lintas minggu dari kesiapan sampai tenggat (FR-090). Nol bila kesiapan sudah melewati tenggat.
+             */
+            capacity_in_range: number;
+            /** @description Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090). */
+            can_fulfill: boolean;
+            latest_offer?: components["schemas"]["Offer"];
+            /** @description Rantai penawaran kandidat terurut sequence naik, supaya subkontraktor melihat ronde sebelumnya saat membalas atau meng-counter (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini. */
+            offers?: components["schemas"]["Offer"][];
+        };
         IncomingCandidateList: {
-            items: components["schemas"]["RequestCandidate"][];
+            items: components["schemas"]["IncomingCandidate"][];
             pagination: components["schemas"]["Pagination"];
         };
         /** @enum {string} */
@@ -3520,6 +3643,10 @@ export interface components {
             allowed_transitions: components["schemas"]["WorkOrderStatus"][];
             /** @description Benar hanya selama status accepted (FR-066). */
             self_cancellable: boolean;
+            /** @description Benar bila pemanggil adalah pihak pesanan dan status saat ini masih menerima pernyataan pembayaran (FR-041). Klien merender tombolnya dari sini, tidak menyusun ulang aturannya. */
+            can_record_payment: boolean;
+            /** @description Benar bila pemanggil boleh mengulas pesanan ini, yaitu pesanan sudah dikonfirmasi diterima dan pemanggil belum pernah mengulasnya (FR-047). */
+            can_review: boolean;
             /** Format: date-time */
             auto_confirm_at?: string | null;
             allocations?: components["schemas"]["AvailabilityPeriod"][];
@@ -3534,6 +3661,26 @@ export interface components {
         WorkOrderList: {
             items: components["schemas"]["WorkOrderDetail"][];
             pagination: components["schemas"]["Pagination"];
+        };
+        /**
+         * @description Kontak pihak lawan pada sebuah pesanan (FR-092). Hanya kontak lawan yang
+         *     dikembalikan; pemanggil sudah tahu kontaknya sendiri. WhatsApp diambil dari
+         *     nomor telepon terverifikasi akun lawan.
+         */
+        WorkOrderContacts: {
+            counterparty: components["schemas"]["ContactParty"];
+        };
+        ContactParty: {
+            /**
+             * @description Posisi pihak lawan pada pesanan ini.
+             * @enum {string}
+             */
+            role: "buyer" | "subcontractor";
+            business_name: string;
+            /** Format: email */
+            email: string;
+            /** @description Nomor WhatsApp dalam format 62xxxxxxxxxx. */
+            whatsapp: string;
         };
         /**
          * @description Ringkasan satu pesanan telat untuk daftar pantau admin (FR-045). Sengaja
@@ -3627,11 +3774,11 @@ export interface components {
             /** Format: uuid */
             notification_id: string;
             /** @enum {string} */
-            event: "request_received" | "offer_received" | "counter_offer" | "agreement_formed" | "order_status_changed" | "payment_record" | "deadline_approaching" | "deadline_passed" | "verification_decision" | "rating_request" | "order_cancelled" | "confirmation_due_approaching" | "order_auto_closed" | "item_proposal_decision" | "calendar_stale";
+            event: "request_received" | "offer_received" | "counter_offer" | "agreement_formed" | "order_status_changed" | "payment_record" | "deadline_approaching" | "deadline_passed" | "verification_decision" | "rating_request" | "order_cancelled" | "confirmation_due_approaching" | "order_auto_closed" | "item_proposal_decision" | "calendar_stale" | "request_expired";
             title?: string;
             body?: string;
-            /** Format: uuid */
-            work_order_id?: string | null;
+            /** @description Deep link generik ke sumber notifikasi (mis. pesanan atau request kuota); null bila tidak ada tujuan. */
+            link?: string | null;
             read: boolean;
             /** Format: date-time */
             created_at: string;

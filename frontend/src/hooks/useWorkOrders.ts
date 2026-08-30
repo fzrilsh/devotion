@@ -1,9 +1,10 @@
-import { cancelWorkOrder, changeWorkOrderStatus, confirmWorkOrder, getWorkOrder, getWorkOrders, recordPayment, reportDispute, submitReview, type WorkOrderStatus } from "@api/workOrders";
+import { cancelWorkOrder, changeWorkOrderStatus, confirmWorkOrder, getWorkOrder, getWorkOrderContacts, getWorkOrders, recordPayment, reportDispute, submitReview, type WorkOrderStatus } from "@api/workOrders";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const workOrderKeys = {
     list: (status: WorkOrderStatus[], role?: string) => ["work-orders", "list", status.join(","), role ?? "all"] as const,
     detail: (id: string) => ["work-orders", "detail", id] as const,
+    contacts: (id: string) => ["work-orders", "contacts", id] as const,
 };
 
 export function useWorkOrders(status: WorkOrderStatus[], role?: "as_buyer" | "as_subcontractor") {
@@ -26,6 +27,18 @@ export function useWorkOrder(workOrderId: string) {
     });
 }
 
+// Kontak lawan memuat email dan nomor WhatsApp, jadi hanya diminta ketika
+// pemanggil memang pihak pesanan. Bukan-pihak menerima 404 dan tidak diulang.
+export function useWorkOrderContacts(workOrderId: string, enabled: boolean) {
+    return useQuery({
+        queryKey: workOrderKeys.contacts(workOrderId),
+        queryFn: () => getWorkOrderContacts(workOrderId),
+        enabled: Boolean(workOrderId) && enabled,
+        staleTime: 5 * 60 * 1000,
+        retry: false,
+    });
+}
+
 function useDetailInvalidator(workOrderId: string) {
     const queryClient = useQueryClient();
 
@@ -34,7 +47,13 @@ function useDetailInvalidator(workOrderId: string) {
             queryClient.setQueryData(workOrderKeys.detail(workOrderId), updated);
         }
 
-        queryClient.invalidateQueries({ queryKey: ["work-orders", "list"] });
+        queryClient.invalidateQueries({
+            queryKey: workOrderKeys.detail(workOrderId),
+        });
+
+        queryClient.invalidateQueries({
+            queryKey: ["work-orders", "list"],
+        });
     };
 }
 
@@ -70,7 +89,7 @@ export function useRecordPayment(workOrderId: string) {
 
     return useMutation({
         mutationFn: (data: { direction: "sent" | "received"; date: string; note?: string }) => recordPayment(workOrderId, data),
-        onSuccess: () => invalidate(),
+        onSuccess: (updated) => invalidate(updated),
     });
 }
 
@@ -79,7 +98,7 @@ export function useReportDispute(workOrderId: string) {
 
     return useMutation({
         mutationFn: (reportBody: string) => reportDispute(workOrderId, reportBody),
-        onSuccess: () => invalidate(),
+        onSuccess: (updated) => invalidate(updated),
     });
 }
 

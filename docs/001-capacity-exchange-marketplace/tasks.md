@@ -546,6 +546,22 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu fungsi domain dipakai kedua lapisan; `dikonfirmasi_otomatis` menandai yang mana
   **Hati-hati**: kalau perhitungan tenggat diduplikasi di beberapa handler, keduanya akan berbeda pada suatu titik dan pesanan yang sama tampak beda status di halaman berbeda.
 
+- [x] T055b [US5] [BE] Konfirmasi manual pemberi order
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-047, FR-068, FR-070
+  **Kemampuan**: pemberi order menutup pesanan berstatus Dikirim lewat `POST /work-orders/{id}/confirm`; `dikonfirmasi_otomatis` false membedakannya dari penutupan tujuh hari; sengketa terbuka menahan konfirmasi
+  **Dependency**: prasyarat T053, T055
+  **Selesai bila**: endpoint memeriksa peran (buyer), bukan pihak jadi 404, status bukan Dikirim jadi `INVALID_STATUS_TRANSITION`; test menyebut FR-047 dan FR-068
+  **Hati-hati**: transisi `shipped -> confirmed` dipakai bersama auto-confirm; jangan duplikasi perhitungan tenggat, pakai `deadline.go` apa adanya.
+
+- [x] T055c [US5] [BE] Pertukaran kontak antar pihak
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-092, FR-040
+  **Kemampuan**: kedua pihak pesanan yang sudah terbentuk saling melihat kontak (nama usaha, email, nomor WhatsApp) lewat `GET /work-orders/{id}/contacts`, prasyarat pembayaran dan koordinasi di luar platform
+  **Dependency**: prasyarat T053
+  **Selesai bila**: rute terautentikasi dengan penjaga pihak, bukan pihak jadi 404, admin juga 404 karena bukan pihak bertransaksi; respons hanya memuat blok pihak lawan; test menyebut FR-092
+  **Hati-hati**: nomor telepon dan email adalah PII sensitif. Endpoint harus dijaga ketat per pihak, tak pernah disajikan publik, dan tak boleh membocorkan keberadaan pesanan ke bukan-pihak.
+
 - [x] T056 [P] [US5] [BE] Catatan pembayaran
   **Modul**: `backend/internal/order/`
   **FR**: FR-040 sampai FR-043
@@ -554,6 +570,22 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tidak ada satu pun kolom jumlah uang maupun integrasi pembayaran
   **Hati-hati**: Batas Keuangan konstitusi. Dokumen sumber menempatkan escrow wajib sebagai mitigasi gagal bayar dan penipuan [1], sekaligus sebagai alat tawar dalam sengketa kualitas produk [1]. Keduanya sengaja tidak dibangun di versi ini, dan konsekuensinya tercatat di Assumptions spec. Jangan menambahkannya kembali tanpa mengubah spec lebih dulu.
   **Hati-hati (payments sudah ada di kontrak)**: `WorkOrderDetail` sudah punya field `payments`, dan jalur accept (T041) sudah mengisinya sebagai array kosong supaya kontrak dihormati. Task ini yang mengisinya sungguhan (FR-041..FR-043). Pastikan setiap jalur yang mengembalikan `WorkOrderDetail` menyertakan `payments` dari data, bukan lagi array kosong.
+
+- [ ] T056b [US5] [BE] Bendera kapabilitas pesanan pada WorkOrderDetail
+  **Modul**: `backend/internal/order/`, `backend/internal/reputation/`
+  **FR**: FR-039, FR-041, FR-047
+  **Kemampuan**: setiap jalur yang mengembalikan `WorkOrderDetail` mengisi `can_record_payment` (pemanggil adalah pihak pesanan dan statusnya masih menerima pernyataan) dan `can_review` (pesanan sudah dikonfirmasi dan pemanggil belum pernah mengulas)
+  **Dependency**: prasyarat T053, T056, T062
+  **Selesai bila**: kedua bendera false bagi bukan-pihak; `can_review` false setelah pemanggil mengulas sekali; test menyebut FR-041 dan FR-047
+  **Hati-hati**: aturannya sudah ada di penjaga endpoint `payments` dan `reviews`. Bendera ini wajib memakai fungsi yang sama, bukan salinan kedua, supaya tombol di klien tidak pernah menawarkan aksi yang endpoint-nya menolak. Klien merender kedua tombol murni dari bendera ini (FR-039).
+
+- [ ] T056c [US3] [BE] Rantai penawaran pada IncomingCandidate
+  **Modul**: `backend/internal/quota/`
+  **FR**: FR-032, FR-035
+  **Kemampuan**: `GET /quota-requests/incoming` mengisi `latest_offer` dan `offers` terurut sequence naik, sama seperti sisi pemberi order
+  **Dependency**: prasyarat T042
+  **Selesai bila**: subkontraktor melihat ronde sebelumnya saat meng-counter; `latest_offer` selalu elemen terakhir `offers`; test menyebut FR-032
+  **Hati-hati**: halaman request masuk sudah merender rantai ini. Tanpa pengisian di backend, ronde penawaran hilang dari tampilan subkontraktor tanpa galat apa pun.
 
 - [x] T057 [P] [US5] [BE] Pelaporan sengketa
   **Modul**: `backend/internal/order/`

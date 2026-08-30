@@ -2,10 +2,10 @@ import { ApiError } from "@api/client";
 import type { WorkOrderDetail } from "@api/workOrders";
 import Loading from "@components/common/Loading";
 import { useAuth } from "@hooks/useAuth";
-import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder } from "@hooks/useWorkOrders";
+import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder, useWorkOrderContacts } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
-import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuPackage, LuShieldAlert, LuStar, LuTriangleAlert } from "react-icons/lu";
+import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuMail, LuPackage, LuPhone, LuShieldAlert, LuStar, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
 import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
@@ -55,6 +55,86 @@ function ActionPanel({ title, icon: Icon, tone = "slate", error, onClose, childr
             ) : null}
 
             <div className="mt-4">{children}</div>
+        </div>
+    );
+}
+
+// Nomor WhatsApp datang dalam format 62xxxxxxxxxx (FR-092). wa.me memakai format
+// yang sama, jadi hanya digit non-angka yang dibuang, tanpa mengubah kode negara.
+function waLink(whatsapp: string): string {
+    return `https://wa.me/${whatsapp.replace(/\D/g, "")}`;
+}
+
+const counterpartyRoleLabel = { buyer: "Pemberi order", subcontractor: "Subkontraktor" } as const;
+
+function CounterpartyContacts({ workOrderId, isParty }: { workOrderId: string; isParty: boolean }) {
+    const contactsQuery = useWorkOrderContacts(workOrderId, isParty);
+
+    if (!isParty) return null;
+
+    if (contactsQuery.isLoading) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Kontak Pihak Lawan</h2>
+                <p className="mt-3 text-sm text-slate-500">Memuat kontak...</p>
+            </div>
+        );
+    }
+
+    if (contactsQuery.isError || !contactsQuery.data) {
+        return (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Kontak Pihak Lawan</h2>
+                <p className="mt-3 text-sm text-slate-500">Kontak pihak lawan tidak dapat dimuat. Coba muat ulang halaman.</p>
+            </div>
+        );
+    }
+
+    const { counterparty } = contactsQuery.data;
+
+    return (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Kontak Pihak Lawan</h2>
+            <p className="mt-2 text-xs leading-5 text-slate-500">Pembayaran dan koordinasi produksi berjalan langsung antar kedua pihak di luar platform. Hubungi lewat kontak di bawah.</p>
+
+            <div className="mt-4 flex items-center gap-3 border-b border-slate-100 pb-4">
+                <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-deep-navy-500/10 text-deep-navy-600">
+                    <LuUser className="size-5" aria-hidden />
+                </span>
+
+                <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-800">{counterparty.business_name}</p>
+                    <p className="text-xs text-slate-400">{counterpartyRoleLabel[counterparty.role]}</p>
+                </div>
+            </div>
+
+            <dl className="mt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <dt className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        <LuMail className="size-4" aria-hidden />
+                        Email
+                    </dt>
+
+                    <dd className="min-w-0">
+                        <a href={`mailto:${counterparty.email}`} className="truncate text-sm font-semibold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                            {counterparty.email}
+                        </a>
+                    </dd>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                    <dt className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        <LuPhone className="size-4" aria-hidden />
+                        WhatsApp
+                    </dt>
+
+                    <dd className="min-w-0">
+                        <a href={waLink(counterparty.whatsapp)} target="_blank" rel="noreferrer" className="truncate text-sm font-semibold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
+                            {counterparty.whatsapp}
+                        </a>
+                    </dd>
+                </div>
+            </dl>
         </div>
     );
 }
@@ -143,6 +223,8 @@ export default function Detail() {
     const availableStatusActions = statusActions.filter((action) => transitions.includes(action.status));
     const canConfirm = transitions.includes("confirmed");
     const canDispute = transitions.includes("in_mediation");
+    const canRecordPayment = order.can_record_payment;
+    const canReview = order.can_review;
     const anyPending = changeStatus.isPending || confirmOrder.isPending || cancelOrder.isPending || recordPayment.isPending || reportDispute.isPending || submitReview.isPending;
 
     return (
@@ -196,9 +278,7 @@ export default function Detail() {
             {order.status === "shipped" && order.auto_confirm_at ? (
                 <div className="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4">
                     <LuCalendarDays className="mt-0.5 size-5 shrink-0 text-sky-600" aria-hidden />
-                    <p className="text-xs leading-5 text-sky-800">
-                        Pesanan akan dikonfirmasi diterima secara otomatis pada {formatDateTimeId(order.auto_confirm_at)} bila tidak ada konfirmasi atau sengketa sebelumnya.
-                    </p>
+                    <p className="text-xs leading-5 text-sky-800">Pesanan akan dikonfirmasi diterima secara otomatis pada {formatDateTimeId(order.auto_confirm_at)} bila tidak ada konfirmasi atau sengketa sebelumnya.</p>
                 </div>
             ) : null}
 
@@ -241,10 +321,12 @@ export default function Detail() {
                     </button>
                 ) : null}
 
-                <button type="button" onClick={() => openPanel("payment")} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
-                    <LuBanknote className="size-4" aria-hidden />
-                    Catat Pembayaran
-                </button>
+                {canRecordPayment ? (
+                    <button type="button" onClick={() => openPanel("payment")} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                        <LuBanknote className="size-4" aria-hidden />
+                        Catat Pembayaran
+                    </button>
+                ) : null}
 
                 {canDispute ? (
                     <button type="button" onClick={() => openPanel("dispute")} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50">
@@ -253,7 +335,7 @@ export default function Detail() {
                     </button>
                 ) : null}
 
-                {order.status === "confirmed" ? (
+                {canReview ? (
                     <button type="button" onClick={() => openPanel("review")} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
                         <LuStar className="size-4" aria-hidden />
                         Beri Ulasan
@@ -296,7 +378,10 @@ export default function Detail() {
                                 key={option.value}
                                 type="button"
                                 onClick={() => setPaymentDirection(option.value)}
-                                className={cn("cursor-pointer rounded-xl border px-3 py-2.5 text-xs font-semibold transition", paymentDirection === option.value ? "border-industrial-blue-500 bg-industrial-blue-500 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-industrial-blue-500/50")}
+                                className={cn(
+                                    "cursor-pointer rounded-xl border px-3 py-2.5 text-xs font-semibold transition",
+                                    paymentDirection === option.value ? "border-industrial-blue-500 bg-industrial-blue-500 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-industrial-blue-500/50",
+                                )}
                             >
                                 {option.label}
                             </button>
@@ -378,6 +463,8 @@ export default function Detail() {
                 </div>
             ) : null}
 
+            <CounterpartyContacts workOrderId={workOrderId} isParty={side !== null} />
+
             {order.allocations && order.allocations.length > 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-6">
                     <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Alokasi Kapasitas</h2>
@@ -443,9 +530,7 @@ export default function Detail() {
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <LuTriangleAlert className="mt-0.5 size-5 shrink-0 text-industrial-blue-500" aria-hidden />
-                <p className="text-xs leading-5 text-slate-500">
-                    Pembayaran terjadi langsung antar pihak, platform hanya mencatat pernyataan. Bila terjadi masalah setelah produksi dimulai, gunakan laporan sengketa agar ditengahi admin.
-                </p>
+                <p className="text-xs leading-5 text-slate-500">Pembayaran terjadi langsung antar pihak, platform hanya mencatat pernyataan. Bila terjadi masalah setelah produksi dimulai, gunakan laporan sengketa agar ditengahi admin.</p>
             </div>
         </div>
     );

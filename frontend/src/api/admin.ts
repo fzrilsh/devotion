@@ -121,18 +121,6 @@ export async function decideProposal(proposalId: string, data: ProposalDecisionR
     return apiClient<ItemProposal>(`/admin/proposals/${encodeURIComponent(proposalId)}/decision`, { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function getProfileReviews(profileId: string, cursor?: string): Promise<ReviewList> {
-    const searchParams = new URLSearchParams();
-
-    if (cursor) {
-        searchParams.set("cursor", cursor);
-    }
-
-    const query = searchParams.toString();
-
-    return apiClient<ReviewList>(`/profile/${profileId}/reviews${query ? `?${query}` : ""}`);
-}
-
 export async function hideReview(reviewId: string, reason: string): Promise<Review> {
     return apiClient<Review>(`/admin/reviews/${encodeURIComponent(reviewId)}/hide`, { method: "POST", body: JSON.stringify({ reason }) });
 }

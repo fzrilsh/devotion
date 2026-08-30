@@ -5,7 +5,7 @@ import { useWorkOrders } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuClipboardList, LuInbox } from "react-icons/lu";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { formatDateId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const statusFilters: { value: WorkOrderStatus | "all"; label: string }[] = [
@@ -25,10 +25,22 @@ const roleFilters = [
     { value: "as_subcontractor" as const, label: "Sebagai Subkontraktor" },
 ];
 
+function parseStatusParam(value: string | null): WorkOrderStatus | "all" {
+    return statusFilters.some((filter) => filter.value === value) ? (value as WorkOrderStatus | "all") : "all";
+}
+
 export default function List() {
     const { user } = useAuth();
-    const [status, setStatus] = useState<WorkOrderStatus | "all">("all");
+
+    // Notifikasi permintaan ulasan menautkan ke ?status=confirmed supaya pengguna
+    // mendarat pada pesanan yang memang bisa diulas (FR-047).
+    const [searchParams, setSearchParams] = useSearchParams();
+    const status = parseStatusParam(searchParams.get("status"));
     const [role, setRole] = useState<"as_buyer" | "as_subcontractor" | undefined>(undefined);
+
+    function setStatus(next: WorkOrderStatus | "all") {
+        setSearchParams(next === "all" ? {} : { status: next }, { replace: true });
+    }
 
     const ordersQuery = useWorkOrders(status === "all" ? [] : [status], role);
     const orders = ordersQuery.data?.pages.flatMap((page) => page.items) ?? [];

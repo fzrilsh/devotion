@@ -95,7 +95,7 @@ paths:
     post:
       tags: [auth]
       summary: Verifikasi alamat email dengan kode enam digit
-      security: []
+      description: Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
       x-fr: [FR-002]
       requestBody:
         required: true
@@ -104,7 +104,8 @@ paths:
             schema: { $ref: '#/components/schemas/VerificationCodeRequest' }
       responses:
         '204': { description: Email terverifikasi }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '410':
           description: Kode kedaluwarsa atau sudah dipakai
           content:
@@ -115,7 +116,7 @@ paths:
     post:
       tags: [auth]
       summary: Verifikasi nomor HP dengan kode enam digit dari WhatsApp
-      security: []
+      description: Menuntut sesi, akun yang diverifikasi adalah pemegang sesi.
       x-fr: [FR-002]
       requestBody:
         required: true
@@ -124,7 +125,8 @@ paths:
             schema: { $ref: '#/components/schemas/VerificationCodeRequest' }
       responses:
         '204': { description: Nomor HP terverifikasi }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '401': { $ref: '#/components/responses/NotAuthenticated' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '410': { description: Kode kedaluwarsa atau sudah dipakai }
 
   /auth/resend-code:
@@ -754,7 +756,7 @@ paths:
           schema: { type: string, format: date }
         - name: max_lead_days
           in: query
-          schema: { type: integer, minimum: 0, default: 365 }
+          schema: { type: integer, minimum: 0 }
         - name: region_level
           in: query
           required: true
@@ -779,7 +781,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SearchResult' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
 
   # ─────────────────────────── quota request ───────────────────────────
 
@@ -885,7 +888,7 @@ paths:
               properties:
                 total_price: { type: integer, format: int64, minimum: 1, description: Rupiah bulat }
                 readiness_lead_days: { type: integer, minimum: 0, maximum: 365 }
-                note: { type: string, maxLength: 1000 }
+                note: { type: string, maxLength: 500 }
       responses:
         '201':
           content:
@@ -953,7 +956,7 @@ paths:
               required: [total_price]
               properties:
                 total_price: { type: integer, format: int64, minimum: 1 }
-                note: { type: string, maxLength: 1000 }
+                note: { type: string, maxLength: 500 }
       responses:
         '201':
           content:
@@ -1113,6 +1116,38 @@ paths:
               schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Pesanan belum berstatus dikirim }
 
+  /work-orders/{workOrderId}/contacts:
+    get:
+      tags: [work-order]
+      summary: Kontak pihak lawan pada sebuah pesanan
+      description: |
+        Setelah pesanan terbentuk, masing-masing pihak dapat melihat kontak pihak
+        lawan (nama usaha, email, nomor WhatsApp) untuk menjalankan pembayaran dan
+        koordinasi yang terjadi langsung antar pihak di luar platform (FR-040,
+        FR-092). Tersedia pada semua status pesanan, termasuk dibatalkan dan dalam
+        mediasi. Hanya kedua pihak pesanan yang boleh mengaksesnya; pemanggil lain,
+        termasuk admin dan subkontraktor lain, menerima 404 agar keberadaan pesanan
+        tidak terbocorkan.
+      x-fr: [FR-040, FR-092]
+      parameters:
+        - { name: workOrderId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkOrderContacts' }
+        '404':
+          description: Pesanan tidak ditemukan atau pemanggil bukan pihaknya
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'https://devotion/errors/not-found'
+                title: Tidak ditemukan
+                status: 404
+                code: NOT_FOUND
+                detail: Pesanan tidak ditemukan.
+
   /work-orders/{workOrderId}/cancel:
     post:
       tags: [work-order]
@@ -1186,7 +1221,7 @@ paths:
         '201':
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PaymentRecord' }
+              schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Pernyataan dengan arah yang sama sudah dicatat }
 
   /work-orders/{workOrderId}/disputes:
@@ -1212,7 +1247,7 @@ paths:
         '201':
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Dispute' }
+              schema: { $ref: '#/components/schemas/WorkOrderDetail' }
         '409': { description: Sudah ada sengketa terbuka pada pesanan ini }
 
   # ─────────────────────────── reputation ───────────────────────────
@@ -1442,8 +1477,13 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items: { $ref: '#/components/schemas/ItemProposal' }
+                type: object
+                required: [items, pagination]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ItemProposal' }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /admin/proposals/{proposalId}/decision:
@@ -1771,6 +1811,7 @@ components:
             - READINESS_AFTER_DEADLINE
             - PAYMENT_STATEMENT_EXISTS
             - DISPUTE_ALREADY_OPEN
+            - ROLES_IN_USE
         detail:
           type: string
           description: Penjelasan bahasa Indonesia yang dapat dikutip pengguna.
@@ -1944,6 +1985,7 @@ components:
         kind: { type: string, enum: [product, machine] }
         proposed_name: { type: string }
         status: { type: string, enum: [pending, approved, rejected] }
+        proposer_name: { type: string }
         reason: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
 
@@ -2084,18 +2126,33 @@ components:
 
     SearchResult:
       type: object
-      required: [items, pagination]
+      required: [items, pagination, region_level]
       properties:
         items:
           type: array
           items: { $ref: '#/components/schemas/SearchCandidate' }
         pagination: { $ref: '#/components/schemas/Pagination' }
+        region_level:
+          type: string
+          enum: [city, province, national]
+          description: Tingkat cakupan wilayah yang benar-benar dipakai pencarian ini (FR-063).
+        relaxation:
+          type: object
+          nullable: true
+          description: |
+            Saran pelonggaran, hadir hanya bila pencarian di tingkat national tetap kosong
+            (FR-028). Menyebut kriteria keras paling membatasi dan satu langkah pelonggaran
+            konkret.
+          required: [most_restrictive, suggestion]
+          properties:
+            most_restrictive: { type: string }
+            suggestion: { type: string }
 
     SearchCandidate:
       type: object
       description: |
         Skor kecocokan tidak dipengaruhi reputasi, verifikasi, kebaruan kalender, maupun
-        jarak (FR-034). Jarak informatif saja. Field criteria menjelaskan kriteria keras
+        jarak (FR-034). Field criteria menjelaskan kriteria keras
         mana yang terpenuhi agar klien dapat menampilkan alasannya (FR-026, FR-030).
         Selain skor, tiap hasil membawa atribut yang dipakai pemberi order untuk
         memutuskan (FR-027): kota/kabupaten, jenis mesin, kapasitas mingguan, total
@@ -2126,7 +2183,6 @@ components:
         stale_calendar:
           type: boolean
           description: Kalender tidak diperbarui lebih dari 7 hari (FR-021); informatif, tidak mengubah urutan.
-        distance_km: { type: number, format: double, nullable: true }
         identity_verified: { type: boolean }
         criteria:
           type: array
@@ -2191,6 +2247,10 @@ components:
         profile_id: { type: string, format: uuid }
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
+        rejection_reason:
+          type: string
+          nullable: true
+          description: Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035).
         latest_offer: { $ref: '#/components/schemas/Offer' }
         offers:
           type: array
@@ -2226,13 +2286,49 @@ components:
           items: { $ref: '#/components/schemas/QuotaRequestDetail' }
         pagination: { $ref: '#/components/schemas/Pagination' }
 
+    IncomingCandidate:
+      type: object
+      required: [candidate_id, listing_id, profile_id, status, quantity, deadline, capacity_in_range, can_fulfill]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        listing_id: { type: string, format: uuid }
+        profile_id:
+          type: string
+          format: uuid
+          description: Profil pemesan yang mengirim permintaan ini.
+        business_name: { type: string }
+        status: { $ref: '#/components/schemas/CandidateStatus' }
+        rejection_reason:
+          type: string
+          nullable: true
+          description: Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035).
+        quantity:
+          type: integer
+          description: Jumlah potong yang diminta pemesan (FR-031).
+        deadline:
+          type: string
+          format: date
+          description: Tenggat pesanan dari permintaan pemesan.
+        capacity_in_range:
+          type: integer
+          format: int64
+          description: Sisa kapasitas subkontraktor dijumlah lintas minggu dari kesiapan sampai tenggat (FR-090). Nol bila kesiapan sudah melewati tenggat.
+        can_fulfill:
+          type: boolean
+          description: Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090).
+        latest_offer: { $ref: '#/components/schemas/Offer' }
+        offers:
+          type: array
+          description: Rantai penawaran kandidat terurut sequence naik, supaya subkontraktor melihat ronde sebelumnya saat membalas atau meng-counter (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          items: { $ref: '#/components/schemas/Offer' }
+
     IncomingCandidateList:
       type: object
       required: [items, pagination]
       properties:
         items:
           type: array
-          items: { $ref: '#/components/schemas/RequestCandidate' }
+          items: { $ref: '#/components/schemas/IncomingCandidate' }
         pagination: { $ref: '#/components/schemas/Pagination' }
     # ── work order ──
 
@@ -2242,7 +2338,7 @@ components:
 
     WorkOrderDetail:
       type: object
-      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, allowed_transitions, self_cancellable]
+      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, allowed_transitions, self_cancellable, can_record_payment, can_review]
       properties:
         work_order_id: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/WorkOrderStatus' }
@@ -2264,6 +2360,12 @@ components:
         self_cancellable:
           type: boolean
           description: Benar hanya selama status accepted (FR-066).
+        can_record_payment:
+          type: boolean
+          description: Benar bila pemanggil adalah pihak pesanan dan status saat ini masih menerima pernyataan pembayaran (FR-041). Klien merender tombolnya dari sini, tidak menyusun ulang aturannya.
+        can_review:
+          type: boolean
+          description: Benar bila pemanggil boleh mengulas pesanan ini, yaitu pesanan sudah dikonfirmasi diterima dan pemanggil belum pernah mengulasnya (FR-047).
         auto_confirm_at: { type: string, format: date-time, nullable: true }
         allocations:
           type: array
@@ -2288,6 +2390,30 @@ components:
           type: array
           items: { $ref: '#/components/schemas/WorkOrderDetail' }
         pagination: { $ref: '#/components/schemas/Pagination' }
+
+    WorkOrderContacts:
+      type: object
+      description: |
+        Kontak pihak lawan pada sebuah pesanan (FR-092). Hanya kontak lawan yang
+        dikembalikan; pemanggil sudah tahu kontaknya sendiri. WhatsApp diambil dari
+        nomor telepon terverifikasi akun lawan.
+      required: [counterparty]
+      properties:
+        counterparty: { $ref: '#/components/schemas/ContactParty' }
+
+    ContactParty:
+      type: object
+      required: [role, business_name, email, whatsapp]
+      properties:
+        role:
+          type: string
+          enum: [buyer, subcontractor]
+          description: Posisi pihak lawan pada pesanan ini.
+        business_name: { type: string }
+        email: { type: string, format: email }
+        whatsapp:
+          type: string
+          description: Nomor WhatsApp dalam format 62xxxxxxxxxx.
 
     LateOrderSummary:
       type: object
@@ -2402,9 +2528,13 @@ components:
             - order_auto_closed
             - item_proposal_decision
             - calendar_stale
+            - request_expired
         title: { type: string }
         body: { type: string }
-        work_order_id: { type: string, format: uuid, nullable: true }
+        link:
+          type: string
+          nullable: true
+          description: Deep link generik ke sumber notifikasi (mis. pesanan atau request kuota); null bila tidak ada tujuan.
         read: { type: boolean }
         created_at: { type: string, format: date-time }
 

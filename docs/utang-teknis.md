@@ -150,3 +150,127 @@ sampai penyusuran terasa, kandidat perbaikannya cache pendek atas hasil
 `checkStorage` (mis. beberapa detik) supaya health check tidak menyusuri disk
 tiap kali dipanggil.
 
+## Hasil audit `openapi.yaml` vs kode backend (6 domain)
+
+Audit menyeluruh membandingkan `contracts/openapi.yaml` dengan handler Go
+sebenarnya di seluruh domain (quota, account/verification, admin/masterdata,
+notification, listing, search, order, reputation). Tujuannya memverifikasi
+kontrak sudah cocok dengan implementasi sebelum jalur [FE] men-generate ulang
+tipe dari kontrak. Temuan dikelompokkan menurut dampaknya. Yang belum
+diputuskan arah perbaikannya (kontrak vs kode) ditandai jelas.
+
+### A. Bentuk respons berbeda dari kontrak (paling berisiko bagi tipe FE)
+
+Ini yang paling berbahaya: klien hasil generate akan salah tipe.
+
+- **POST `/work-orders/{id}/payments`** balikin `WorkOrderDetail` penuh
+  (`internal/order/payment.go:77-82`), kontrak bilang `PaymentRecord`
+  (`openapi.yaml:1189`). **Sudah diperbaiki**: kontrak diselaraskan ke
+  `WorkOrderDetail`.
+- **POST `/work-orders/{id}/disputes`** balikin `WorkOrderDetail` penuh
+  (`internal/order/dispute.go:58-63`), kontrak bilang `Dispute`
+  (`openapi.yaml:1215`). **Sudah diperbaiki**: kontrak diselaraskan ke
+  `WorkOrderDetail`.
+- **GET `/admin/proposals`** balikin envelope `{items, pagination}` dengan
+  `proposer_name` dan tanpa `reason` (`internal/masterdata/admin.go:209-216,265`),
+  kontrak bilang array `ItemProposal` telanjang dengan `reason`
+  (`openapi.yaml:1440-1447`). **Sudah diperbaiki**: kontrak jadi envelope
+  `{items, pagination}` dengan `ItemProposal` bertambah `proposer_name`, dan
+  `proposalQueueItem` kini mengisi `reason` dari `admin_note` yang sudah di-SELECT
+  `ListItemProposalsPending`, jadi kontrak dan kode sepakat penuh.
+- **`Notification.work_order_id`** diemit backend sebagai path, bukan UUID
+  sebagaimana skema menuntut. **Sudah diperbaiki**: skema dan field respons
+  diganti nama jadi `link`, string nullable tanpa `format: uuid`.
+
+Kedua kasus order (payments, disputes) adalah pilihan desain yang konsisten di
+kode: tiap mutasi pesanan memuat ulang dan balikin detail. Keputusan diambil:
+kontrak diselaraskan ke `WorkOrderDetail`, sesuai aturan spec-first hanya bila
+kontrak keliru; di sini kode yang benar dan kontrak yang menyimpang, jadi kontrak
+yang berubah.
+
+### B. Endpoint didokumentasikan tapi tidak ada di backend
+
+- **POST `/work-orders/{id}/confirm`** ~~didokumentasikan
+  (`openapi.yaml:1098-1114`) tetapi tidak ada handler mana pun~~. **Sudah
+  diperbaiki**: handler ditambahkan di `internal/order/confirm.go` (gate peran
+  buyer, query `PartyConfirmWorkOrder`, sengketa terbuka menahan konfirmasi).
+  Konfirmasi manual buyer kini punya endpoint, di samping auto-confirm tujuh hari.
+- **`confirmed` muncul di `allowed_transitions`** dari status `shipped`
+  (`internal/order/accept.go:465-469`). ~~`/status` menolak `confirmed` dan
+  `/confirm` tidak ada~~, sehingga FE yang render tombol dari array itu tidak
+  punya tujuan kirim. **Sudah diperbaiki**: `/confirm` kini jadi tujuan kirim
+  tombol itu. Gap alur order tertutup.
+- **Permukaan transisi status terbelah dua** (`/status` di `workorder.go` vs
+  `/confirm` di `confirm.go`). ~~Terlihat seperti dua mesin keadaan~~. **Bukan
+  cacat, ini desain**: keduanya bukan dua mesin keadaan, melainkan dua gerbang
+  peran atas satu mesin keadaan. `/status` digerbang subkontraktor untuk maju
+  di rantai `production -> completed -> shipped`; `/confirm` digerbang buyer
+  untuk `shipped -> confirmed`, karena hanya buyer yang boleh menyatakan barang
+  diterima (FR-070). Keduanya memvalidasi lewat `transitionAllowed`, membaca
+  tabel `allowedTransitions` yang sama, dan memakai body `INVALID_STATUS_TRANSITION`
+  yang identik, jadi tidak ada tabel transisi kedua yang bisa menyimpang.
+  Pemisahan endpoint mengikuti pemisahan peran, bukan menduplikasi logika.
+
+### C. Field selalu null atau tak terdokumentasi
+
+- **`distance_km`** ada di skema SearchCandidate tetapi `viewOf` tidak pernah
+  set (`internal/search/search.go:86,257-274`), selalu null. Sesuai catatan
+  bahwa jarak informatif saja.
+- **`verification_status`** di respons profil ~~hardcoded nil
+  (`internal/account/profile_http.go:114,170`)~~. **Sudah diperbaiki**: query
+  `LatestVerificationStatusByProfile` mengisi field dari pengajuan verifikasi
+  terbaru; null selama profil belum pernah mengajukan.
+- **`region_level` dan `relaxation`** diemit search
+  (`search.go:100-103,111-112,202,220`) tetapi tidak ada di kontrak. Justru
+  `relaxation` (menyimpan `most_restrictive` + `suggestion`) yang dibutuhkan T037
+  untuk tombol perluas tier wilayah. **Sudah diperbaiki**: kontrak diperluas.
+- **`rejection_reason`** ~~di-SELECT (`db/queries/request.sql:45,184`) tetapi tak
+  pernah diserialisasi ke respons~~. **Sudah diperbaiki**: `candidateView` dan
+  `detailCandidateView` menserialisasi `rejection_reason` (null sebelum ditolak),
+  dan kontrak menambahkan field itu ke `RequestCandidate` (FR-035).
+
+### D. Kode status dan security berbeda
+
+- **Endpoint verify** wajib session padahal kontrak menandai `security: []`
+  (`internal/account/handlers.go:156-166`).
+- **PATCH `/me/roles`** ~~balikin 422, kontrak bilang 409
+  (`handlers.go:388-389`)~~. **Sudah diperbaiki**: kode galat `ROLES_IN_USE`
+  (409) ditambahkan dan dipakai `errRolesActive`; kasus kedua peran false tetap
+  422 karena itu validasi masukan.
+- **`/search`** balikin 422 untuk query buruk, kontrak dokumentasikan 400 dan
+  tidak punya 403 (`internal/search/http.go:29`). Terkait entri "Kode status
+  `'400'` pada path di luar User Story 1" di atas.
+- **Offer note maxLength 500** di backend (`internal/quota/offer.go:51`) vs 1000
+  di kontrak (`openapi.yaml:888`).
+- **`max_lead_days`** default 365 di kontrak, backend memperlakukannya sebagai
+  unset.
+
+### E. Minor dan kosmetik
+
+- **T045**: ~~sisi baca incoming-request tidak pernah expose quantity, deadline,
+  kapasitas-dalam-rentang, maupun can-fulfill (`internal/quota/detail.go:81-89`).
+  Butuh perubahan backend plus kontrak, bukan FE saja.~~ **Sudah diperbaiki**:
+  `ListIncomingCandidates` diperluas membawa quantity dan deadline request plus
+  bentuk kapasitas listing, dan `listIncoming` menghitung `capacity_in_range`
+  serta `can_fulfill` per baris lewat `RemainingCapacityForOffer`. Kontrak
+  menambah skema `IncomingCandidate` terpisah dari `RequestCandidate` (FR-035,
+  FR-090).
+- **`WorkOrderList` items** ~~menserialisasi `product_item_id: ""` (bukan UUID
+  valid) dan `readiness_lead_days: 0` karena `workOrderView` tanpa `omitempty`
+  (`internal/order/workorder.go:453-478`)~~. **Sudah diperbaiki**: kedua field
+  diberi `omitempty` sehingga baris daftar tidak lagi mengirim UUID kosong.
+
+### Yang sudah cocok (tidak perlu diapa-apakan)
+
+WorkOrderDetail (`allowed_transitions`, `self_cancellable`, `auto_confirm_at`),
+`completion_rate` sebagai integer persen 0..100, PaymentRecord, Review
+(termasuk `transaction_date`), meta galat `INVALID_STATUS_TRANSITION` dan
+`CANCELLATION_AFTER_PRODUCTION`, criteria per kandidat, AvailabilityPeriod,
+stale_calendar, dan kursor keyset semua sudah selaras field demi field.
+
+**Akibat:** sampai temuan A sampai D direkonsiliasi, tipe hasil generate FE akan
+menyimpang dari respons backend pada endpoint terkait. Prioritas perbaikan:
+kategori A (salah tipe), lalu B (alur order buntu), lalu C dan D. Rekonsiliasi
+mengikuti aturan spec-first: bila kontrak yang benar, kode diubah; bila kode
+yang benar dan spec keliru, spec diamandemen lebih dulu.
+
