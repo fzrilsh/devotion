@@ -117,7 +117,7 @@ Turunan yang mengikat urutan: pengisian daftar baku dan wilayah adalah prasyarat
 
 ### Gate IV: Minimal Dependencies
 
-Sebelas dependency runtime, seluruhnya dengan pembenaran di `plan.md` versi ini dan `docs/dependencies.md`. Yang diselesaikan tanpa dependency: log terstruktur, email, pembuangan EXIF, token acak, UUID, jarak haversine, pembatasan laju, router.
+Sebelas dependency runtime utama, seluruhnya dengan pembenaran di `plan.md` versi ini dan `docs/dependencies.md`, ditambah dua pustaka pengikut yang dituntut graf modul (`golang.org/x/term`, `google.golang.org/protobuf`). Yang diselesaikan tanpa dependency: log terstruktur, email, pembuangan EXIF, token acak, UUID, jarak haversine, pembatasan laju, router.
 
 | Dependency | Pembenaran | Alternatif yang ditolak |
 |------------|------------|-------------------------|
@@ -127,6 +127,8 @@ Sebelas dependency runtime, seluruhnya dengan pembenaran di `plan.md` versi ini 
 | `bcrypt` | Hash kata sandi yang memang untuk itu | argon2id, lebih baik, tetapi biaya memorinya perlu penyetelan hati-hati pada 2GB |
 | `whatsmeow` | Satu-satunya cara mengirim WhatsApp tanpa verifikasi bisnis; library, bukan layanan | API resmi Meta, verifikasi tidak selesai sebelum tenggat |
 | `sentry-go`, `@sentry/react` | Mengetahui kerusakan sebelum juri menemukannya | Self-host Sentry, beberapa layanan, melanggar Gate I |
+| `golang.org/x/term` | Membaca kata sandi admin tanpa gema saat `admin:create` di terminal | `bufio` biasa, kata sandi ikut tercetak ke layar |
+| `google.golang.org/protobuf` | Dituntut `whatsmeow`, dipakai langsung untuk menyusun pesan WhatsApp keluar | Tidak ada, whatsmeow bicara dalam Protobuf |
 | TanStack Query | Hasil pencarian, daftar pesanan, status kandidat semuanya perlu disegarkan | `useEffect` manual, menulis ulang cache dan invalidasi |
 | Zod + React Hook Form | Skema yang sama memvalidasi form dan bentuk respons | Validasi manual, rawan pada belasan form |
 | Tailwind CSS | FR-055 menuntut mobile-first | Component library, hanya bila tenggat menekan |

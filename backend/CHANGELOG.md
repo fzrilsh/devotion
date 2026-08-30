@@ -6,7 +6,103 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Ditambahkan
+- Dua kejadian notifikasi FR-051 yang selama ini terdefinisi di enum `event_type`
+  tapi tak pernah di-enqueue kini tersambung. `verification_decision` dikirim ke
+  akun pemohon di dalam transaksi keputusan admin, baik saat disetujui maupun
+  ditolak, dan pada penolakan mengutip alasan yang ditulis admin. Query keputusan
+  mengembalikan `applicant_account` (subquery ke `business_profile`) sehingga
+  profil dipetakan ke akun tanpa baca tambahan; kejadian ini transaksional,
+  ikut rollback bila keputusan gagal. `rating_request` dikirim ke kedua pihak saat
+  pesanan dikonfirmasi, baik oleh pembeli secara manual maupun oleh penutupan
+  otomatis tujuh hari (US5 AS-1), mengundang keduanya saling menilai. Kejadian ini
+  non-transaksional (FR-091), jadi tiap pihak tetap menghormati preferensi
+  kanalnya, dan menumpang transaksi konfirmasi sehingga tak pernah terkirim untuk
+  penutupan yang di-rollback.
+- Pekerjaan penjadwal peringatan tenggat pengiriman mendekat (FR-051) melengkapi
+  sisi notifikasi FR-051 di samping `deadline_passed`. Berbeda dari auto-confirm
+  dan pesanan telat, ia tak punya kembaran hitung-saat-baca: tenggat yang mendekat
+  tak mengubah status apa pun dan tak menggerakkan daftar mana pun, murni pengingat,
+  jadi hanya lapisan ticker. Satu tick memindai pesanan aktif belum-terkirim
+  (`accepted`, `production`, `completed`) yang deadline-nya di dalam masa peringatan
+  tujuh hari dan memberi tahu kedua pihak sekali. Penanda `deadline_warn_sent_at`
+  (migrasi 000022, dengan `idx_order_deadline_warn`) dikawal `IS NULL` sehingga dua
+  instance yang tumpang tindih saat deploy rollover hanya memperingatkan sekali.
+  Rentangnya `[PastDeadlineCutoff, DeadlineApproachingCutoff]`, aritmetika bersama
+  `deadline.go`, sehingga pesanan yang sudah telat diserahkan ke job FR-045 dan yang
+  mendekat ke job ini, tak pernah keduanya. Notifikasi non-transaksional (FR-091),
+  menghormati preferensi kanal tiap penerima saat pengiriman.
+- Dua pekerjaan penjadwal baru menutup temuan audit notifikasi, keduanya lapisan
+  kedua pola penjadwal dua lapis (research R-07): dihitung saat baca, plus
+  `time.Ticker` dalam proses yang sama, masing-masing dibungkus advisory lock.
+  Pengingat kalender basi (FR-021) mengirim pemilik listing tayang satu notifikasi
+  bila kalendernya tak tersentuh lebih dari tujuh hari, jendela yang sama dengan
+  yang dipakai lapisan baca pencarian, sehingga pengingat tak pernah menyala pada
+  kalender yang masih dianggap segar. Penanda `stale_notified_at` dikawal supaya
+  satu episode basi mengingatkan sekali, dan suntingan pemilik me-`re-arm`-nya.
+  Kedaluwarsa request kuota (FR-037) memindahkan setiap kandidat yang lewat batas
+  balas 72 jam dari `awaiting_reply` ke `expired`; nilai enum `event_type` baru
+  `request_expired` ditambahkan (migrasi 000021) dan bersifat transaksional,
+  di-enqueue di dalam transaksi kedaluwarsa. Pengawal `status='awaiting_reply'`
+  memastikan kandidat yang sudah dibalas tak pernah kedaluwarsa dan re-run maupun
+  dua instance yang tumpang tindih tak memberi tahu dua kali. Pemberitahuan "tanpa
+  penawaran" bersifat per-request, bukan per-kandidat (AS-7): satu request yang
+  dikirim ke banyak kandidat dan semuanya diam memberi tahu pembeli sekali dengan
+  tautan ke request itu, dan bila ada kandidat yang sudah membalas dengan penawaran
+  (`offered`/`agreed`) notifikasi ditahan agar pembeli tak diberi tahu keliru bahwa
+  requestnya lewat "tanpa penawaran". Menutup temuan audit FR-021, FR-037, dan
+  persist `candidate_status` `expired`.
+- Endpoint `GET /api/work-orders/{workOrderId}/contacts` membuka pertukaran
+  kontak antar kedua pihak setelah pesanan terbentuk (FR-092, FR-040). Setiap
+  pihak melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk
+  mengatur pembayaran dan koordinasi yang terjadi langsung di luar platform.
+  Rute terautentikasi tanpa gerbang peran: penjaga pihak membandingkan akun
+  pemanggil dengan kedua pihak pesanan, sehingga bukan-pihak, id tak sah, dan
+  pesanan tak ada sama-sama jatuh ke 404 dan endpoint tak pernah membocorkan
+  keberadaan pesanan. Berbeda dari sisi baca detail, admin tidak diberi akses:
+  admin tak memegang peran usaha (`admin_has_no_business_role`) dan bukan pihak
+  bertransaksi, ia membaca pesanan lewat FR-045/FR-046, bukan lewat kontak
+  pribadi kedua pihak. Query `GetWorkOrderContacts` mengambil nama usaha, email,
+  dan telepon kedua pihak dalam satu query; respons hanya memuat blok pihak
+  lawan sehingga pemanggil tak melihat sisinya sendiri.
+- Sisi baca incoming-request kini membawa `quantity`, `deadline`,
+  `capacity_in_range`, dan `can_fulfill` per kandidat, sehingga subkontraktor
+  bisa menilai apakah kapasitasnya menutup permintaan sebelum membalas (T045,
+  FR-035, FR-090). `ListIncomingCandidates` diperluas mengambil kuantitas dan
+  tenggat request plus bentuk kapasitas listing (`weekly_capacity`,
+  `readiness_lead_days`, `horizon_until`) dalam satu query, lalu tiap baris
+  menghitung sisa kapasitas lintas minggu kesiapan sampai tenggat lewat
+  `RemainingCapacityForOffer` yang sebelumnya hanya dipakai jalur penawaran.
+  Kontrak menambahkan skema `IncomingCandidate` untuk daftar ini, terpisah dari
+  `RequestCandidate` sisi pembeli yang membawa rantai penawaran. Menutup temuan
+  audit blok E (`docs/utang-teknis.md`).
+
 ### Diperbaiki
+- Kontrak dan dokumen perencanaan diselaraskan dengan kode yang sudah terbit,
+  hasil audit backend. `ROLES_IN_USE` ditambahkan ke enum `Problem.code` di
+  `openapi.yaml` (kode ini sudah ditegakkan `PATCH /api/me/roles` dan ada di
+  `codes.go`, tetapi belum tercantum di kontrak). Hitungan di
+  `contracts/README.md` dikoreksi: 66 operasi pada 58 path, dan skema `Problem`
+  memuat 34 kode galat (sebelumnya tertulis 65 operasi, 57 path, dan skema
+  `ErrorCode` dengan 31 kode yang keduanya sudah basi). `plan.md` Gate IV kini
+  mencatat dua pustaka pengikut yang dituntut graf modul dan dipakai langsung,
+  `golang.org/x/term` (baca kata sandi admin tanpa gema di `admin:create`) dan
+  `google.golang.org/protobuf` (menyusun pesan WhatsApp keluar untuk whatsmeow).
+- Lima respons backend diselaraskan ke kontrak yang sudah benar, hasil audit
+  drift enam domain (`docs/utang-teknis.md`), sehingga tipe TypeScript hasil
+  generate frontend cocok dengan yang dikirim backend. `proposalQueueItem` kini
+  mengisi `reason` dari `admin_note` yang sebelumnya sudah di-SELECT
+  `ListItemProposalsPending` lalu dibuang, jadi antrean usulan admin membawa
+  alasan usulan. `PATCH /api/me/roles` menolak pencabutan peran yang masih
+  dipakai order aktif dengan 409 `ROLES_IN_USE`, bukan lagi 422; kasus kedua
+  peran dikosongkan tetap 422 karena itu validasi masukan. Respons profil
+  mengisi `verification_status` dari pengajuan verifikasi terbaru lewat query
+  `LatestVerificationStatusByProfile`, null selama profil belum pernah mengajukan,
+  bukan lagi hardcoded null. Detail dan daftar request kuota menserialisasi
+  `rejection_reason` (null sebelum kandidat ditolak, berisi alasan verbatim
+  sesudahnya, FR-035). `product_item_id` dan `readiness_lead_days` di
+  `workOrderView` diberi `omitempty` sehingga baris daftar pesanan tidak lagi
+  mengirim UUID kosong yang menjegal validator klien ketat.
 - Kode QR WhatsApp kini muncul kapan pun admin membukanya, bukan hanya beberapa
   menit pertama setelah proses menyala. `Manager.Start` memanggil
   `GetQRChannel` tepat satu kali saat boot, sedangkan whatsmeow mengirim
@@ -28,6 +124,20 @@ perubahannya.
   terhapus demi menampilkan QR.
 
 ### Ditambahkan
+- `POST /api/work-orders/{workOrderId}/confirm`, khusus pemberi order, menutup
+  pesanan berstatus Dikirim sebagai diterima manual (FR-047, US5 AS-2). Endpoint
+  ini sudah didokumentasikan di kontrak dan diwajibkan spec, tetapi tidak punya
+  handler: konfirmasi hanya terjadi lewat auto-confirm tujuh hari, padahal
+  `allowed_transitions` menawarkan `confirmed` dari `shipped` sehingga tombol di
+  frontend tidak punya tujuan kirim. Handler memakai gate peran buyer, guard
+  pihak (bukan buyer pesanan ini jadi 404), dan mesin keadaan yang sama dengan
+  `/status` sehingga status bukan Dikirim ditolak `INVALID_STATUS_TRANSITION`.
+  Query `PartyConfirmWorkOrder` men-set `confirmed_at` dan `auto_confirmed=false`
+  dengan guard `status='shipped'` plus tanpa sengketa terbuka, meniru guard
+  auto-confirm, jadi sengketa terbuka menahan konfirmasi manual sama seperti
+  konfirmasi otomatis (FR-070). Riwayat status mencatat pelaku manusia
+  (`by_system=false`, `changed_by` = akun buyer, FR-039), dan subkontraktor
+  diberi tahu.
 - `POST /api/admin/whatsapp/reconnect`, khusus admin, membuang siklus pemasangan
   yang berjalan dan memulai yang baru, atau menjatuhkan lalu menyambungkan ulang
   soket bila tautan sudah terpasangkan. Ini tombol "sambung ulang" yang dituntut
@@ -36,6 +146,30 @@ perubahannya.
   `contracts/README.md` menjadi 65 pada 57 path.
 
 ### Diubah
+- `contracts/openapi.yaml` diselaraskan dengan respons backend sebenarnya, hasil
+  audit kontrak-vs-kode enam domain (`docs/utang-teknis.md`). Ini kelompok drift
+  yang kode-nya benar dan kontraknya menyimpang, jadi hanya kontrak yang berubah,
+  tanpa perubahan perilaku backend. Penting sekarang karena jalur [FE]
+  men-generate tipe TypeScript dari kontrak, sehingga tiap drift membuat tipe FE
+  menyimpang diam-diam dari respons: `POST /work-orders/{id}/payments` dan
+  `POST /work-orders/{id}/disputes` kini balikin `WorkOrderDetail` penuh (backend
+  konsisten memuat ulang detail di tiap mutasi pesanan), bukan `PaymentRecord`
+  atau `Dispute`; `SearchResult` bertambah `region_level` dan `relaxation`
+  (`most_restrictive` + `suggestion`) yang memang diemit search untuk tombol
+  perluas tier wilayah (FR-028, FR-063); `SearchCandidate.distance_km` dihapus
+  karena selalu null dan jarak informatif saja; `GET /admin/proposals` jadi
+  envelope `{items, pagination}` dengan `proposer_name`, cocok dengan endpoint
+  admin berpaginasi lain; `Notification.work_order_id` diganti `link`, string
+  nullable tanpa `format: uuid`, karena nilainya deep link generik yang bisa
+  menunjuk `/quota-requests/...`; `/auth/verify-email` dan `/auth/verify-phone`
+  membuang `security: []` (keduanya menuntut sesi), mendokumentasikan 401, dan
+  mengubah 400 jadi 422; `/search` mengubah 400 jadi 422 dan menambah 403; catatan
+  penawaran (`POST /candidates/{id}/offer`, `POST /offers/{id}/counter`)
+  `maxLength` 1000 jadi 500 sesuai batas backend; `max_lead_days` membuang default
+  365 karena backend memperlakukannya sebagai unset. `RequestCandidate` bertambah
+  `rejection_reason` (string nullable) seiring backend mulai menserialisasinya.
+  Field respons `link` di
+  `internal/notification/http.go` ikut diganti namanya dari `work_order_id`.
 - `GET /api/work-orders/{workOrderId}` kini boleh dibaca admin, bukan hanya pihak
   pesanan. FR-045 menaruh pesanan telat di depan admin dan FR-046 menuntut admin
   membaca riwayat lengkap pesanan yang ia bukan pihaknya, tetapi tidak ada jalan

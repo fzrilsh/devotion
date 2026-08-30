@@ -13,9 +13,11 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -28,6 +30,38 @@ import (
 
 // baseTime is a fixed instant so any clock-derived created_at is deterministic.
 var baseTime = time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC)
+
+// recordingNotifier captures every Enqueue so a decision test can assert the
+// applicant was told their request was decided (FR-051). It satisfies Notifier
+// without a queue; the tests assert on who was notified of what, not delivery.
+type recordingNotifier struct {
+	mu    sync.Mutex
+	calls []recordedNotice
+}
+
+type recordedNotice struct {
+	account pgtype.UUID
+	event   sqlcgen.EventType
+}
+
+func (n *recordingNotifier) Enqueue(_ context.Context, _ pgx.Tx, account pgtype.UUID, event sqlcgen.EventType, _, _ string, _ *string) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	n.calls = append(n.calls, recordedNotice{account: account, event: event})
+	return nil
+}
+
+func (n *recordingNotifier) countFor(account pgtype.UUID, event sqlcgen.EventType) int {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	c := 0
+	for _, call := range n.calls {
+		if call.account == account && call.event == event {
+			c++
+		}
+	}
+	return c
+}
 
 var phoneSeq int
 
@@ -57,6 +91,7 @@ type harness struct {
 	handler http.Handler
 	pool    *pgxpool.Pool
 	auth    *mockAuth
+	notif   *recordingNotifier
 	acc     pgtype.UUID
 	profile pgtype.UUID
 }
@@ -72,7 +107,8 @@ func newHarness(t *testing.T, name string) *harness {
 	if err != nil {
 		t.Fatalf("storage.New: %v", err)
 	}
-	svc := New(pool, clock, store)
+	notif := &recordingNotifier{}
+	svc := New(pool, clock, store, notif)
 
 	acc, prof := seedProfile(t, pool, "buyer@contoh.test", false)
 	auth := &mockAuth{principal: &httpx.Principal{
@@ -84,7 +120,7 @@ func newHarness(t *testing.T, name string) *harness {
 	svc.Register(r, auth)
 
 	return &harness{
-		svc: svc, handler: r.Handler(), pool: pool, auth: auth,
+		svc: svc, handler: r.Handler(), pool: pool, auth: auth, notif: notif,
 		acc: acc, profile: prof,
 	}
 }

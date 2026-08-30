@@ -196,6 +196,11 @@ func TestDecide_Approve_GrantsBadge_FR007_FR008(t *testing.T) {
 	if decidedBy != adminAcc {
 		t.Fatalf("decided_by %v, mau admin %v", decidedBy, adminAcc)
 	}
+
+	// The applicant is told their request was decided (FR-051).
+	if got := h.notif.countFor(h.acc, sqlcgen.EventTypeVerificationDecision); got != 1 {
+		t.Fatalf("pemohon diberi tahu %d kali atas persetujuan, mau 1 (FR-051)", got)
+	}
 }
 
 // TestDecide_RejectRecordsReason_FR007 proves a rejection records the reason the
@@ -222,6 +227,11 @@ func TestDecide_RejectRecordsReason_FR007(t *testing.T) {
 	}
 	if profileVerified(t, h, h.profile) {
 		t.Fatal("verified true padahal ditolak")
+	}
+
+	// The applicant is told the outcome even on a rejection (FR-051).
+	if got := h.notif.countFor(h.acc, sqlcgen.EventTypeVerificationDecision); got != 1 {
+		t.Fatalf("pemohon diberi tahu %d kali atas penolakan, mau 1 (FR-051)", got)
 	}
 }
 

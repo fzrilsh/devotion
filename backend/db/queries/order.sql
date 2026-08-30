@@ -210,6 +210,30 @@ JOIN quota_request r        ON r.id = c.request_id
 JOIN offer o                ON o.id = wo.offer_id
 WHERE wo.id = $1;
 
+-- name: GetWorkOrderContacts :one
+-- Loads both parties' contact details for one work order (FR-092): each side's
+-- business name, email, and WhatsApp number, plus the account ids the handler
+-- needs for the party guard. The handler compares the caller's account id to
+-- buyer_account and subcontractor_account and returns only the counterparty's
+-- block, so a non-party (or a missing order) collapses to a 404 and the caller
+-- never sees their own side echoed back. Keyed on the work order id.
+SELECT
+    wo.id,
+    buyer.account_id            AS buyer_account,
+    buyer.business_name         AS buyer_business_name,
+    ba.email                    AS buyer_email,
+    ba.phone                    AS buyer_phone,
+    sub.account_id              AS subcontractor_account,
+    sub.business_name           AS subcontractor_business_name,
+    sa.email                    AS subcontractor_email,
+    sa.phone                    AS subcontractor_phone
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+JOIN user_account ba        ON ba.id = buyer.account_id
+JOIN user_account sa        ON sa.id = sub.account_id
+WHERE wo.id = $1;
+
 -- name: LockWorkOrderForStatusChange :one
 -- Row-locks a work order before a status transition so a concurrent status
 -- change or cancellation on the same order serializes, matching the reversal
@@ -342,6 +366,26 @@ WHERE work_order.id = $1 AND work_order.status = 'shipped'
   )
 RETURNING *;
 
+-- name: PartyConfirmWorkOrder :one
+-- Closes one shipped order as buyer-confirmed (FR-047, FR-068): status to
+-- 'confirmed', auto_confirmed false (this is the buyer's manual acceptance, not
+-- the system's 7-day closure, so the two are distinguishable in the trail), and
+-- confirmed_at stamped from the caller's Clock instant. The status = 'shipped'
+-- guard makes the write a no-op if the order left 'shipped' since the caller read
+-- it (e.g. the ticker already auto-confirmed, or a dispute moved it to mediation),
+-- so a returned row means this call did the closing. The NOT EXISTS open-dispute
+-- guard mirrors AutoConfirmWorkOrder: an order with an unresolved dispute stays
+-- open even while its status is still 'shipped' (FR-070). confirmed_at >= shipped_at
+-- holds by the shipped_before_confirmed CHECK since the order had shipped.
+UPDATE work_order
+SET status = 'confirmed', auto_confirmed = false, confirmed_at = $2
+WHERE work_order.id = $1 AND work_order.status = 'shipped'
+  AND NOT EXISTS (
+        SELECT 1 FROM dispute d
+        WHERE d.work_order_id = work_order.id AND d.status <> 'resolved'
+  )
+RETURNING *;
+
 -- name: ListShippedApproachingAutoConfirm :many
 -- The shipped orders inside the FR-069 warning lead that have not yet been warned:
 -- the effective base COALESCE(auto_confirm_base_at, shipped_at) is within
@@ -433,6 +477,37 @@ ORDER BY wo.deadline;
 UPDATE work_order
 SET late_notified_at = $2
 WHERE id = $1 AND late_notified_at IS NULL;
+
+-- name: ListWorkOrdersApproachingDeadlineToNotify :many
+-- The active, not-yet-shipped orders whose delivery deadline is within the FR-051
+-- warning lead and that have not yet had the "deadline mendekat" notice sent, for
+-- the in-process ticker to warn (FR-051). The band is [after_cutoff, before_cutoff]
+-- on the deadline date: after_cutoff is order.PastDeadlineCutoff (an order past due
+-- is handled by the late-order job, not warned), before_cutoff is
+-- order.DeadlineApproachingCutoff (the far edge of the 7-day lead). shipped orders
+-- are excluded because their clock is the auto-confirm warning, not the delivery
+-- deadline. deadline_warn_sent_at IS NULL keeps each order warned once, not on every
+-- tick. Returns both parties' account ids, since FR-051 warns both sides. Rides
+-- idx_order_deadline_warn.
+SELECT wo.id, buyer.account_id AS buyer_account, sub.account_id AS subcontractor_account, wo.deadline
+FROM work_order wo
+JOIN business_profile buyer ON buyer.id = wo.buyer_id
+JOIN business_profile sub   ON sub.id = wo.subcontractor_id
+WHERE wo.status IN ('accepted', 'production', 'completed')
+  AND wo.deadline >= sqlc.arg(after_cutoff)::date
+  AND wo.deadline <= sqlc.arg(before_cutoff)::date
+  AND wo.deadline_warn_sent_at IS NULL
+ORDER BY wo.deadline;
+
+-- name: MarkDeadlineWarnSent :exec
+-- Stamps deadline_warn_sent_at so the FR-051 approaching-deadline notice is sent
+-- once per order. The IS NULL guard keeps it idempotent if two overlapping ticker
+-- instances both scanned before either stamped (the advisory lock makes that rare,
+-- but the guard removes the race entirely). The stamp is never cleared, so an order
+-- is warned once even as it moves through the lead toward its deadline.
+UPDATE work_order
+SET deadline_warn_sent_at = $2
+WHERE id = $1 AND deadline_warn_sent_at IS NULL;
 
 -- name: InsertPaymentRecord :one
 -- Records one party's payment statement on a work order (FR-041). No money amount

@@ -386,7 +386,7 @@ func (s *Service) handlePatchRoles(w http.ResponseWriter, r *http.Request, acc s
 	if err != nil {
 		switch {
 		case errors.Is(err, errRolesActive):
-			httpx.WriteProblem(w, httpx.CodeValidationFailed, "Tidak dapat mencabut peran selama masih ada order aktif.")
+			httpx.WriteProblem(w, httpx.CodeRolesInUse, "Tidak dapat mencabut peran selama masih ada order aktif.")
 		default:
 			httpx.WriteInternal(w)
 		}

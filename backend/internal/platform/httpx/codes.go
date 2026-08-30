@@ -45,6 +45,7 @@ const (
 	CodeReadinessAfterDeadline    Code = "READINESS_AFTER_DEADLINE"
 	CodePaymentStatementExists    Code = "PAYMENT_STATEMENT_EXISTS"
 	CodeDisputeAlreadyOpen        Code = "DISPUTE_ALREADY_OPEN"
+	CodeRolesInUse                Code = "ROLES_IN_USE"
 )
 
 // codeMeta binds a code to its HTTP status and Indonesian title. Deriving both
@@ -92,6 +93,7 @@ var codes = map[Code]codeMeta{
 	CodeReadinessAfterDeadline:      {422, "Kesiapan melewati tenggat"},
 	CodePaymentStatementExists:      {409, "Pernyataan sudah dicatat"},
 	CodeDisputeAlreadyOpen:          {409, "Sengketa sudah terbuka"},
+	CodeRolesInUse:                  {409, "Peran tidak dapat dicabut"},
 }
 
 // StatusFor returns the HTTP status bound to code, or 500 if the code is

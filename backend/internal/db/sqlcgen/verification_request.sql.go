@@ -71,7 +71,8 @@ SET status = $1::verification_status,
     decided_at = $4::timestamptz
 WHERE id = $5::uuid AND status = 'pending'
 RETURNING id, profile_id, identity_number, identity_file_id, location_file_id, status, admin_note, decided_by, decided_at, applicant_source_address, created_at,
-    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name
+    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name,
+    (SELECT account_id FROM business_profile WHERE id = profile_id) AS applicant_account
 `
 
 type DecideVerificationRequestParams struct {
@@ -95,6 +96,7 @@ type DecideVerificationRequestRow struct {
 	ApplicantSourceAddress *netip.Addr
 	CreatedAt              pgtype.Timestamptz
 	BusinessName           string
+	ApplicantAccount       pgtype.UUID
 }
 
 // DecideVerificationRequest records an admin's approval or rejection: it stamps
@@ -125,8 +127,28 @@ func (q *Queries) DecideVerificationRequest(ctx context.Context, arg DecideVerif
 		&i.ApplicantSourceAddress,
 		&i.CreatedAt,
 		&i.BusinessName,
+		&i.ApplicantAccount,
 	)
 	return i, err
+}
+
+const latestVerificationStatusByProfile = `-- name: LatestVerificationStatusByProfile :one
+SELECT status
+FROM verification_request
+WHERE profile_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+// LatestVerificationStatusByProfile returns the status of the profile's most
+// recent verification submission, or no row when the profile never submitted one.
+// The caller maps the no-row case to a null verification_status on MyProfile,
+// distinct from a profile that has a pending or decided request (FR-006).
+func (q *Queries) LatestVerificationStatusByProfile(ctx context.Context, profileID pgtype.UUID) (VerificationStatus, error) {
+	row := q.db.QueryRow(ctx, latestVerificationStatusByProfile, profileID)
+	var status VerificationStatus
+	err := row.Scan(&status)
+	return status, err
 }
 
 const listVerificationQueue = `-- name: ListVerificationQueue :many

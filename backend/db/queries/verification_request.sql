@@ -13,6 +13,17 @@ INSERT INTO verification_request (
 )
 RETURNING *;
 
+-- LatestVerificationStatusByProfile returns the status of the profile's most
+-- recent verification submission, or no row when the profile never submitted one.
+-- The caller maps the no-row case to a null verification_status on MyProfile,
+-- distinct from a profile that has a pending or decided request (FR-006).
+-- name: LatestVerificationStatusByProfile :one
+SELECT status
+FROM verification_request
+WHERE profile_id = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1;
+
 -- ListVerificationRequestsByProfile returns every submission a profile has made,
 -- newest first, joined to business_profile for the business_name the contract's
 -- VerificationRequest carries (the verification_request table has no such
@@ -78,7 +89,8 @@ SET status = sqlc.arg(status)::verification_status,
     decided_at = sqlc.arg(decided_at)::timestamptz
 WHERE id = sqlc.arg(id)::uuid AND status = 'pending'
 RETURNING *,
-    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name;
+    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name,
+    (SELECT account_id FROM business_profile WHERE id = profile_id) AS applicant_account;
 
 -- MarkProfileVerified flips the verified badge on approval (FR-008). It is called
 -- inside the same transaction as DecideVerificationRequest so an approved

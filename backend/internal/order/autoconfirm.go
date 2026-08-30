@@ -152,6 +152,20 @@ func (s *Service) closeDueOrders(ctx context.Context, dueBefore pgtype.Timestamp
 					return err
 				}
 			}
+
+			// An auto-closed order is reviewable too, so invite both parties to rate
+			// each other (FR-051 "permintaan rating", US5 AS-1). Non-transactional, so
+			// each party's channel preferences still apply (FR-091).
+			reviewLink := "/work-orders/" + uuidString(updated.ID) + "/review"
+			for _, account := range [2]pgtype.UUID{row.BuyerAccount, row.SubcontractorAccount} {
+				if err := s.notifier.Enqueue(ctx, tx, account,
+					sqlcgen.EventTypeRatingRequest,
+					"Beri ulasan untuk pesanan ini",
+					"Pesanan telah selesai. Beri rating dan ulasan untuk pihak lain agar reputasi keduanya terbentuk.",
+					&reviewLink); err != nil {
+					return err
+				}
+			}
 			return nil
 		}); err != nil {
 			return err

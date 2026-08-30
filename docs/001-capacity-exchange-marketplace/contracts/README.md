@@ -7,9 +7,9 @@ requirement, memenuhi Gate III konstitusi.
 
 ## Cakupan
 
-65 operasi pada 57 path. Seluruh 91 FR spec tercakup, kecuali tiga belas yang memang bukan
+66 operasi pada 58 path. Seluruh 91 FR spec tercakup, kecuali tiga belas yang memang bukan
 kontrak API, dan itu disebut eksplisit di bawah agar `/analyze` tidak melaporkannya
-sebagai celah. Skema `ErrorCode` di `openapi.yaml` memuat 31 kode galat mesin yang stabil.
+sebagai celah. Skema `Problem` di `openapi.yaml` memuat 34 kode galat mesin yang stabil.
 
 ## FR yang tidak diwujudkan sebagai endpoint
 
@@ -42,7 +42,7 @@ sebagai celah. Skema `ErrorCode` di `openapi.yaml` memuat 31 kode galat mesin ya
 
 Konstitusi mewajibkan setiap endpoint punya minimal dua pengujian, satu jalur berhasil dan
 satu penolakan peran, dan satu penolakan masukan tidak sah bagi endpoint yang menerima
-masukan. Dengan 65 operasi, itu sekitar 150 pengujian endpoint, di luar pengujian aturan
+masukan. Dengan 66 operasi, itu sekitar 150 pengujian endpoint, di luar pengujian aturan
 yang disebut khusus konstitusi.
 
 ## Endpoint yang wajib diuji secara khusus

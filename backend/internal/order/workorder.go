@@ -36,6 +36,8 @@ func (s *Service) registerWorkOrder(r *httpx.Router, auth httpx.Authenticator) {
 	r.Gated("GET /api/work-orders", authed, s.handleListWorkOrders)
 	r.Gated("GET /api/work-orders/{workOrderId}", authed, s.handleWorkOrderDetail)
 	r.Gated("POST /api/work-orders/{workOrderId}/status", subGate, s.handleWorkOrderStatus)
+	s.registerContacts(r, auth)
+	s.registerConfirm(r, auth)
 	s.registerCancel(r, auth)
 	s.registerPayment(r, auth)
 	s.registerDispute(r, auth)

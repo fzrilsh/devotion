@@ -315,6 +315,7 @@ CREATE TABLE capacity_listing (
     readiness_lead_days integer NOT NULL,
     published           boolean NOT NULL DEFAULT true,
     calendar_updated_at timestamptz NOT NULL,
+    stale_notified_at   timestamptz,
     horizon_until       date NOT NULL,
     created_at          timestamptz NOT NULL,
     updated_at          timestamptz NOT NULL,
@@ -337,6 +338,8 @@ Satu angka `weekly_capacity` untuk seluruh listing, tanpa kolom kapasitas per je
 `one_listing_per_profile` adalah penyederhanaan model: spec tidak pernah menyebut satu usaha punya beberapa listing, dan seluruh Acceptance Scenario memakai bentuk tunggal. Melepasnya nanti tidak mengubah tabel lain, tetapi kueri pencarian dan alokasi perlu disesuaikan.
 
 `calendar_updated_at` terpisah dari `updated_at` karena FR-021 mengukur kebaruan kalender: mengubah harga atau deskripsi tidak boleh menghapus penanda "Data Belum Diperbarui".
+
+`stale_notified_at` adalah penanda dedup untuk pekerjaan pengingat kalender basi (FR-021). Job menandainya di bawah guard `IS NULL` saat mengirim satu pengingat, dan `calendar_updated_at` yang baru mengalahkannya kembali menjadi `NULL` di jalur pembaruan kalender, sehingga pemilik diingatkan sekali per episode basi, bukan sekali per tick. Nullable karena listing yang kalendernya masih segar belum pernah diingatkan.
 
 ```sql
 CREATE TABLE listing_product (
@@ -611,6 +614,7 @@ CREATE TABLE work_order (
     confirm_warn_sent_at timestamptz,
     auto_confirm_base_at timestamptz,
     late_notified_at    timestamptz,
+    deadline_warn_sent_at timestamptz,
     cancelled_by_id     uuid REFERENCES business_profile(id),
     cancellation_reason text,
     cancelled_at        timestamptz,
@@ -647,6 +651,8 @@ CREATE INDEX idx_order_auto_confirm ON work_order (COALESCE(auto_confirm_base_at
     WHERE status = 'shipped';
 CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
     WHERE status = 'shipped' AND confirm_warn_sent_at IS NULL;
+CREATE INDEX idx_order_deadline_warn ON work_order (deadline)
+    WHERE status IN ('accepted', 'production', 'completed') AND deadline_warn_sent_at IS NULL;
 ```
 
 **`readiness_week_start` adalah kolom baru untuk FR-087.** Ia dihitung sekali saat kesepakatan terbentuk, dari tanggal kesepakatan ditambah `readiness_lead_days` listing, lalu dibulatkan ke Senin minggu yang memuatnya. Disimpan alih-alih dihitung ulang karena `readiness_lead_days` pada listing dapat berubah kemudian, sementara alokasi pesanan yang sudah terbentuk tidak boleh bergeser. Ini juga yang menutup salah satu edge case spec: subkontraktor mengubah jeda kesiapan setelah punya alokasi berjalan.
@@ -663,7 +669,9 @@ CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
 
 `late_notified_at` menandai kapan pemberitahuan pesanan telat (FR-045) sudah dikirim, sehingga pemberitahuan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali setelah deadline terlewat.
 
-Tiga indeks parsial jalur penjadwal R-07: `idx_order_auto_confirm` untuk penutupan otomatis FR-068, `idx_order_confirm_warn` untuk peringatan FR-069 (hanya baris yang belum diperingatkan), `idx_order_deadline_active` untuk FR-045.
+`deadline_warn_sent_at` menandai kapan peringatan tenggat pengiriman mendekat (FR-051) sudah dikirim ke kedua pihak, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam masa peringatan tujuh hari. Job menandainya di bawah guard `IS NULL`. Nullable karena pesanan yang deadline-nya masih di luar masa peringatan belum pernah diperingatkan. Rentang peringatannya adalah `[PastDeadlineCutoff, DeadlineApproachingCutoff]`: pesanan yang sudah lewat deadline diserahkan ke job pesanan telat (FR-045), pesanan yang deadline-nya masih di luar tujuh hari belum disentuh, sehingga kedua pemberitahuan tidak pernah menimpa satu sama lain.
+
+Tiga indeks parsial jalur penjadwal R-07: `idx_order_auto_confirm` untuk penutupan otomatis FR-068, `idx_order_confirm_warn` untuk peringatan FR-069 (hanya baris yang belum diperingatkan), `idx_order_deadline_active` untuk FR-045. Ditambah `idx_order_deadline_warn` untuk peringatan tenggat mendekat FR-051 (hanya pesanan aktif belum-terkirim yang belum diperingatkan).
 
 **Transisi status yang sah** (FR-044). Semua transisi lain ditolak beserta penjelasan urutan yang diizinkan:
 
@@ -838,7 +846,7 @@ CREATE TYPE event_type AS ENUM (
     'order_status_changed', 'payment_record', 'deadline_approaching', 'deadline_passed',
     'verification_decision', 'rating_request', 'order_cancelled',
     'confirmation_due_approaching', 'order_auto_closed', 'item_proposal_decision',
-    'calendar_stale'
+    'calendar_stale', 'request_expired'
 );
 
 CREATE TABLE notification (
@@ -865,6 +873,7 @@ CREATE INDEX idx_notification_unread ON notification (account_id) WHERE read_at 
 | `order_status_changed`, `order_cancelled`, `payment_record` | Transaksional |
 | `deadline_passed`, `confirmation_due_approaching`, `order_auto_closed` | Transaksional |
 | `verification_decision`, `item_proposal_decision` | Transaksional |
+| `request_expired` | Transaksional |
 | `calendar_stale`, `deadline_approaching`, `rating_request` | Non-transaksional |
 
 Hanya yang non-transaksional dapat dimatikan pengguna (FR-053). Perhatikan bahwa `deadline_approaching` non-transaksional sementara `confirmation_due_approaching` transaksional, karena yang kedua berujung pada penutupan pesanan otomatis, sehingga tidak boleh dapat dimatikan.
@@ -1092,6 +1101,9 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 017_late_notified         work_order.late_notified_at
 018_auto_confirm_base     work_order.auto_confirm_base_at (+ constraint, idx_order_auto_confirm)
 019_dispute_result        dispute.result (+ dispute_result enum, resolution_complete)
+020_listing_stale_notified capacity_listing.stale_notified_at
+021_request_expired_event  request_expired ditambahkan ke enum event_type
+022_deadline_warn_sent     work_order.deadline_warn_sent_at (+ idx_order_deadline_warn)
 ```
 
 `item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.

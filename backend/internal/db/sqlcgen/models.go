@@ -205,6 +205,7 @@ const (
 	EventTypeOrderAutoClosed            EventType = "order_auto_closed"
 	EventTypeItemProposalDecision       EventType = "item_proposal_decision"
 	EventTypeCalendarStale              EventType = "calendar_stale"
+	EventTypeRequestExpired             EventType = "request_expired"
 )
 
 func (e *EventType) Scan(src interface{}) error {
@@ -715,6 +716,7 @@ type CapacityListing struct {
 	HorizonUntil      pgtype.Date
 	CreatedAt         pgtype.Timestamptz
 	UpdatedAt         pgtype.Timestamptz
+	StaleNotifiedAt   pgtype.Timestamptz
 }
 
 type CatalogItem struct {
@@ -946,6 +948,7 @@ type WorkOrder struct {
 	ConfirmWarnSentAt  pgtype.Timestamptz
 	LateNotifiedAt     pgtype.Timestamptz
 	AutoConfirmBaseAt  pgtype.Timestamptz
+	DeadlineWarnSentAt pgtype.Timestamptz
 }
 
 type WorkOrderStatusHistory struct {

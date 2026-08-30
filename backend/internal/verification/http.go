@@ -11,10 +11,12 @@
 package verification
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -24,19 +26,30 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/storage"
 )
 
-// Service owns the verification and file endpoints. It holds the pool for the
-// verification_request rows, the clock for the submission timestamp, and the
-// storage service that validates and stores the files.
-type Service struct {
-	pool    *pgxpool.Pool
-	clock   platform.Clock
-	storage *storage.Service
+// Notifier enqueues one notification inside the caller's transaction. The
+// verification package depends on this narrow interface, not the whole
+// notification.Service, so a decision can tell the applicant it was decided
+// (FR-051) without importing the notification package's full surface. It matches
+// the interface order and quota depend on, and notification.Service satisfies it.
+type Notifier interface {
+	Enqueue(ctx context.Context, tx pgx.Tx, accountID pgtype.UUID, event sqlcgen.EventType, title, body string, link *string) error
 }
 
-// New builds the Service. The storage service is constructed once at startup and
-// shared, so it is passed in rather than built here.
-func New(pool *pgxpool.Pool, clock platform.Clock, store *storage.Service) *Service {
-	return &Service{pool: pool, clock: clock, storage: store}
+// Service owns the verification and file endpoints. It holds the pool for the
+// verification_request rows, the clock for the submission timestamp, the storage
+// service that validates and stores the files, and the notifier that tells an
+// applicant their request was decided.
+type Service struct {
+	pool     *pgxpool.Pool
+	clock    platform.Clock
+	storage  *storage.Service
+	notifier Notifier
+}
+
+// New builds the Service. The storage service and notifier are constructed once
+// at startup and shared, so they are passed in rather than built here.
+func New(pool *pgxpool.Pool, clock platform.Clock, store *storage.Service, notifier Notifier) *Service {
+	return &Service{pool: pool, clock: clock, storage: store, notifier: notifier}
 }
 
 func (s *Service) queries() *sqlcgen.Queries { return sqlcgen.New(s.pool) }

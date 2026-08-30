@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
+	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
 
@@ -79,13 +80,14 @@ func validCandidateStatus(raw string) bool {
 // chain; latest_offer is its last element, omitted when the candidate has no
 // reply yet. offers is omitted on the incoming list, which carries no chain.
 type detailCandidateView struct {
-	CandidateID  string      `json:"candidate_id"`
-	ListingID    string      `json:"listing_id"`
-	ProfileID    string      `json:"profile_id"`
-	BusinessName string      `json:"business_name"`
-	Status       string      `json:"status"`
-	Offers       []offerView `json:"offers,omitempty"`
-	LatestOffer  *offerView  `json:"latest_offer,omitempty"`
+	CandidateID     string      `json:"candidate_id"`
+	ListingID       string      `json:"listing_id"`
+	ProfileID       string      `json:"profile_id"`
+	BusinessName    string      `json:"business_name"`
+	Status          string      `json:"status"`
+	RejectionReason *string     `json:"rejection_reason"`
+	Offers          []offerView `json:"offers,omitempty"`
+	LatestOffer     *offerView  `json:"latest_offer,omitempty"`
 }
 
 // detailView is the QuotaRequestDetail response: the request fields plus every
@@ -102,11 +104,32 @@ type detailView struct {
 	ExpiresAt     time.Time             `json:"expires_at"`
 }
 
+// incomingCandidateView is one candidate on the subcontractor's incoming list:
+// the shared candidate fields plus what the subcontractor needs to judge the
+// request before replying (FR-031, FR-035, FR-090). quantity and deadline are
+// the request's own; capacity_in_range is the subcontractor's remaining capacity
+// summed across the readiness..deadline week range, and can_fulfill is whether
+// that covers the requested quantity. The readiness lead is the listing's own
+// (readiness_lead_days), so the marker reflects the earliest the subcontractor
+// could start without an offer being sent yet.
+type incomingCandidateView struct {
+	CandidateID     string  `json:"candidate_id"`
+	ListingID       string  `json:"listing_id"`
+	ProfileID       string  `json:"profile_id"`
+	BusinessName    string  `json:"business_name"`
+	Status          string  `json:"status"`
+	RejectionReason *string `json:"rejection_reason"`
+	Quantity        int32   `json:"quantity"`
+	Deadline        string  `json:"deadline"`
+	CapacityInRange int64   `json:"capacity_in_range"`
+	CanFulfill      bool    `json:"can_fulfill"`
+}
+
 // incomingView is the IncomingCandidateList response: one keyset page of the
 // subcontractor's incoming candidates plus the page marker (FR-030).
 type incomingView struct {
-	Items      []detailCandidateView `json:"items"`
-	Pagination pagination            `json:"pagination"`
+	Items      []incomingCandidateView `json:"items"`
+	Pagination pagination              `json:"pagination"`
 }
 
 // requestDetail loads one of the buyer's own requests with every candidate and
@@ -146,11 +169,12 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 	candidates := make([]detailCandidateView, 0, len(candRows))
 	for _, c := range candRows {
 		view := detailCandidateView{
-			CandidateID:  uuidString(c.CandidateID),
-			ListingID:    uuidString(c.ListingID),
-			ProfileID:    uuidString(c.SubcontractorID),
-			BusinessName: c.BusinessName,
-			Status:       string(c.Status),
+			CandidateID:     uuidString(c.CandidateID),
+			ListingID:       uuidString(c.ListingID),
+			ProfileID:       uuidString(c.SubcontractorID),
+			BusinessName:    c.BusinessName,
+			Status:          string(c.Status),
+			RejectionReason: textPtr(c.RejectionReason),
 		}
 		if chain, ok := chainByCandidate[uuidString(c.CandidateID)]; ok && len(chain) > 0 {
 			view.Offers = chain
@@ -208,15 +232,43 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 		rows = rows[:q.size]
 	}
 
-	items := make([]detailCandidateView, 0, len(rows))
+	now := s.clock.Now()
+	items := make([]incomingCandidateView, 0, len(rows))
 	for _, c := range rows {
-		items = append(items, detailCandidateView{
-			CandidateID:  uuidString(c.CandidateID),
-			ListingID:    uuidString(c.ListingID),
-			ProfileID:    uuidString(c.SubcontractorID),
-			BusinessName: c.BusinessName,
-			Status:       string(c.Status),
-		})
+		item := incomingCandidateView{
+			CandidateID:     uuidString(c.CandidateID),
+			ListingID:       uuidString(c.ListingID),
+			ProfileID:       uuidString(c.SubcontractorID),
+			BusinessName:    c.BusinessName,
+			Status:          string(c.Status),
+			RejectionReason: textPtr(c.RejectionReason),
+			Quantity:        c.Quantity,
+			Deadline:        c.Deadline.Time.Format(dateLayout),
+		}
+
+		// Remaining capacity in the readiness..deadline window, keyed on the
+		// listing's own readiness lead so the marker reflects the earliest the
+		// subcontractor could start (FR-035, FR-090). Week rounding stays in
+		// platform.WeekStart (Rule 4). If readiness runs past the deadline there
+		// is no week to fill, so capacity is zero and can_fulfill is false.
+		readinessWeek := platform.WeekStart(now.AddDate(0, 0, int(c.ReadinessLeadDays)))
+		deadlineWeek := platform.WeekStart(c.Deadline.Time)
+		if !readinessWeek.After(deadlineWeek) {
+			remaining, err := s.queries().RemainingCapacityForOffer(ctx, sqlcgen.RemainingCapacityForOfferParams{
+				ListingID:      c.ListingID,
+				ReadinessWeek:  pgdate(readinessWeek),
+				DeadlineWeek:   pgdate(deadlineWeek),
+				WeeklyCapacity: c.WeeklyCapacity,
+				HorizonUntil:   c.HorizonUntil,
+			})
+			if err != nil {
+				return incomingView{}, err
+			}
+			item.CapacityInRange = remaining
+			item.CanFulfill = int64(c.Quantity) <= remaining
+		}
+
+		items = append(items, item)
 	}
 
 	view := incomingView{Items: items, Pagination: pagination{HasNext: hasNext}}
