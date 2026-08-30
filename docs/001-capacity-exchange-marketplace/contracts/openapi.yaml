@@ -1811,6 +1811,7 @@ components:
             - READINESS_AFTER_DEADLINE
             - PAYMENT_STATEMENT_EXISTS
             - DISPUTE_ALREADY_OPEN
+            - ROLES_IN_USE
         detail:
           type: string
           description: Penjelasan bahasa Indonesia yang dapat dikutip pengguna.
