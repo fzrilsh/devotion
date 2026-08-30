@@ -237,9 +237,14 @@ yang berubah.
 
 ### E. Minor dan kosmetik
 
-- **T045**: sisi baca incoming-request tidak pernah expose quantity, deadline,
+- **T045**: ~~sisi baca incoming-request tidak pernah expose quantity, deadline,
   kapasitas-dalam-rentang, maupun can-fulfill (`internal/quota/detail.go:81-89`).
-  Butuh perubahan backend plus kontrak, bukan FE saja.
+  Butuh perubahan backend plus kontrak, bukan FE saja.~~ **Sudah diperbaiki**:
+  `ListIncomingCandidates` diperluas membawa quantity dan deadline request plus
+  bentuk kapasitas listing, dan `listIncoming` menghitung `capacity_in_range`
+  serta `can_fulfill` per baris lewat `RemainingCapacityForOffer`. Kontrak
+  menambah skema `IncomingCandidate` terpisah dari `RequestCandidate` (FR-035,
+  FR-090).
 - **`WorkOrderList` items** ~~menserialisasi `product_item_id: ""` (bukan UUID
   valid) dan `readiness_lead_days: 0` karena `workOrderView` tanpa `omitempty`
   (`internal/order/workorder.go:453-478`)~~. **Sudah diperbaiki**: kedua field
