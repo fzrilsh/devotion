@@ -28,13 +28,18 @@ perubahannya.
   yang dipakai lapisan baca pencarian, sehingga pengingat tak pernah menyala pada
   kalender yang masih dianggap segar. Penanda `stale_notified_at` dikawal supaya
   satu episode basi mengingatkan sekali, dan suntingan pemilik me-`re-arm`-nya.
-  Kedaluwarsa request kuota (FR-037) memindahkan kandidat yang lewat batas balas
-  72 jam dari `awaiting_reply` ke `expired` dan memberi tahu pembeli sekali; nilai
-  enum `event_type` baru `request_expired` ditambahkan (migrasi 000021) dan
-  bersifat transaksional, di-enqueue di dalam transaksi kedaluwarsa. Pengawal
-  `status='awaiting_reply'` memastikan kandidat yang sudah dibalas tak pernah
-  kedaluwarsa dan pembeli tak diberi tahu dua kali. Menutup temuan audit FR-021,
-  FR-037, dan persist `candidate_status` `expired`.
+  Kedaluwarsa request kuota (FR-037) memindahkan setiap kandidat yang lewat batas
+  balas 72 jam dari `awaiting_reply` ke `expired`; nilai enum `event_type` baru
+  `request_expired` ditambahkan (migrasi 000021) dan bersifat transaksional,
+  di-enqueue di dalam transaksi kedaluwarsa. Pengawal `status='awaiting_reply'`
+  memastikan kandidat yang sudah dibalas tak pernah kedaluwarsa dan re-run maupun
+  dua instance yang tumpang tindih tak memberi tahu dua kali. Pemberitahuan "tanpa
+  penawaran" bersifat per-request, bukan per-kandidat (AS-7): satu request yang
+  dikirim ke banyak kandidat dan semuanya diam memberi tahu pembeli sekali dengan
+  tautan ke request itu, dan bila ada kandidat yang sudah membalas dengan penawaran
+  (`offered`/`agreed`) notifikasi ditahan agar pembeli tak diberi tahu keliru bahwa
+  requestnya lewat "tanpa penawaran". Menutup temuan audit FR-021, FR-037, dan
+  persist `candidate_status` `expired`.
 - Endpoint `GET /api/work-orders/{workOrderId}/contacts` membuka pertukaran
   kontak antar kedua pihak setelah pesanan terbentuk (FR-092, FR-040). Setiap
   pihak melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk

@@ -711,6 +711,24 @@ func (q *Queries) RemainingCapacityForOffer(ctx context.Context, arg RemainingCa
 	return remaining_capacity, err
 }
 
+const requestHasStandingOffer = `-- name: RequestHasStandingOffer :one
+SELECT EXISTS (
+    SELECT 1 FROM request_candidate
+    WHERE request_id = $1 AND status IN ('offered', 'agreed')
+)
+`
+
+// RequestHasStandingOffer reports whether a request still has a candidate that
+// replied with an offer or was agreed, so the expiry job tells the buyer the
+// request lapsed "tanpa penawaran" only when none did (AS-7, FR-037). A rejected
+// or not-continued candidate is not a standing offer, matching the notice body.
+func (q *Queries) RequestHasStandingOffer(ctx context.Context, requestID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, requestHasStandingOffer, requestID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const setCandidateStatus = `-- name: SetCandidateStatus :exec
 UPDATE request_candidate
 SET status = $2, updated_at = $3

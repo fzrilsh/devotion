@@ -6,17 +6,21 @@ import (
 	"time"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
+	"github.com/fzrilsh/devotion/backend/internal/platform"
 )
 
 // setDeadline overwrites a work order's delivery deadline to a fixed date so a
 // test controls where the deadline falls relative to the FR-051 warning band,
-// independent of the week the accept path derived. It also clears
-// deadline_warn_sent_at so the order starts un-warned.
+// independent of the week the accept path derived. It moves readiness_week_start
+// to that deadline's Monday so a past deadline never trips the
+// readiness_not_past_deadline check, and clears deadline_warn_sent_at so the
+// order starts un-warned.
 func setDeadline(t *testing.T, h *woHarness, at time.Time) {
 	t.Helper()
+	readiness := platform.WeekStart(at)
 	if _, err := h.pool.Exec(context.Background(),
-		`UPDATE work_order SET deadline = $2, deadline_warn_sent_at = NULL WHERE id = $1`,
-		h.workOrderID, at); err != nil {
+		`UPDATE work_order SET deadline = $2, readiness_week_start = $3, deadline_warn_sent_at = NULL WHERE id = $1`,
+		h.workOrderID, at, readiness); err != nil {
 		t.Fatalf("set deadline: %v", err)
 	}
 }

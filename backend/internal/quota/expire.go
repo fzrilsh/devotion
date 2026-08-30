@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/fzrilsh/devotion/backend/internal/db"
@@ -29,34 +30,64 @@ func (s *Service) RequestExpireJob() scheduler.Job {
 }
 
 // runRequestExpire does one pass: read the candidates still awaiting a reply
-// whose reply window has lapsed, then expire each in its own transaction so one
-// candidate's failure neither rolls back the others nor aborts the pass. now
-// comes from the injected Clock (Rule 5); the cutoff is that instant, matching
-// IsRequestExpired's inclusive boundary. ExpireCandidate reports the rows it
-// changed, so the buyer is notified only for a candidate this pass actually
-// expired: a candidate the subcontractor answered or a race already expired
-// between the scan and the update is a no-op and sends no notice.
+// whose reply window has lapsed, grouped by request, then handle each request in
+// its own transaction so one request's failure neither rolls back the others nor
+// aborts the pass. now comes from the injected Clock (Rule 5); the cutoff is that
+// instant, matching IsRequestExpired's inclusive boundary. Every lapsed candidate
+// of the request is expired, but the buyer is told the request lapsed "tanpa
+// penawaran" only once per request and only when no candidate made a standing
+// offer (AS-7, FR-037): a request with one offer and one silent candidate expires
+// the silent one without a false "no offers" notice, and a request all three
+// ignored notifies the buyer a single time, not once per candidate.
 func (s *Service) runRequestExpire(ctx context.Context) error {
 	now := s.clock.Now()
 	rows, err := s.queries().ListCandidatesToExpire(ctx, tstz(now))
 	if err != nil {
 		return err
 	}
-	for _, row := range rows {
+	// ListCandidatesToExpire is ordered by request id, so a run of rows sharing
+	// a request id is contiguous; collapse each run to one request-level unit.
+	for i := 0; i < len(rows); {
+		requestID := rows[i].RequestID
+		buyerAccount := rows[i].BuyerAccount
+		j := i
+		var candidateIDs []pgtype.UUID
+		for j < len(rows) && rows[j].RequestID == requestID {
+			candidateIDs = append(candidateIDs, rows[j].CandidateID)
+			j++
+		}
+		i = j
+
 		if err := db.WithTx(ctx, s.pool, func(tx pgx.Tx) error {
 			q := sqlcgen.New(tx)
-			affected, err := q.ExpireCandidate(ctx, sqlcgen.ExpireCandidateParams{
-				ID:        row.CandidateID,
-				UpdatedAt: tstz(now),
-			})
+			expired := 0
+			for _, candidateID := range candidateIDs {
+				affected, err := q.ExpireCandidate(ctx, sqlcgen.ExpireCandidateParams{
+					ID:        candidateID,
+					UpdatedAt: tstz(now),
+				})
+				if err != nil {
+					return err
+				}
+				expired += int(affected)
+			}
+			// Nothing this pass actually expired (a race or an already-answered
+			// candidate): no notice. This also makes a repeat pass a no-op, so the
+			// buyer hears about a lapsed request once, not once per tick.
+			if expired == 0 {
+				return nil
+			}
+			// A candidate that replied keeps the request alive; the "tanpa
+			// penawaran" notice would be false, so it is suppressed (AS-7).
+			hasOffer, err := q.RequestHasStandingOffer(ctx, requestID)
 			if err != nil {
 				return err
 			}
-			if affected == 0 {
+			if hasOffer {
 				return nil
 			}
-			link := "/quota-requests/" + uuidString(row.RequestID)
-			return s.notifier.Enqueue(ctx, tx, row.BuyerAccount,
+			link := "/quota-requests/" + uuidString(requestID)
+			return s.notifier.Enqueue(ctx, tx, buyerAccount,
 				sqlcgen.EventTypeRequestExpired,
 				"Permintaan kuota kedaluwarsa",
 				"Batas waktu balasan permintaan kuota Anda telah lewat tanpa penawaran. Anda dapat mengirim permintaan baru ke listing lain.",

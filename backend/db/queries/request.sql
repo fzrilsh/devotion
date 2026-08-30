@@ -183,6 +183,16 @@ UPDATE request_candidate
 SET status = 'expired', updated_at = $2
 WHERE id = $1 AND status = 'awaiting_reply';
 
+-- RequestHasStandingOffer reports whether a request still has a candidate that
+-- replied with an offer or was agreed, so the expiry job tells the buyer the
+-- request lapsed "tanpa penawaran" only when none did (AS-7, FR-037). A rejected
+-- or not-continued candidate is not a standing offer, matching the notice body.
+-- name: RequestHasStandingOffer :one
+SELECT EXISTS (
+    SELECT 1 FROM request_candidate
+    WHERE request_id = $1 AND status IN ('offered', 'agreed')
+);
+
 -- GetRequestForBuyer loads one request owned by a buyer account, for the detail
 -- view (FR-032). The buyer account guard makes a request that is not the
 -- caller's a 404 rather than leaking its existence.
