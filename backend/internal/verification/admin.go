@@ -186,7 +186,16 @@ func (s *Service) decide(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		return nil
+
+		// Tell the applicant their request was decided (FR-007, FR-051). The
+		// notice rides the event's own transaction, so an approval and its notice,
+		// or a rejection and its notice, land together or not at all. The body
+		// distinguishes the two outcomes; a rejection quotes the reason the admin
+		// gave so the applicant reads why without opening the request.
+		title, bodyText := decisionNotice(status, reason)
+		link := "/verification"
+		return s.notifier.Enqueue(r.Context(), tx, decided.ApplicantAccount,
+			sqlcgen.EventTypeVerificationDecision, title, bodyText, &link)
 	})
 	if err != nil {
 		switch {
@@ -226,6 +235,20 @@ func parseVerificationStatus(v string) (sqlcgen.VerificationStatus, bool) {
 	default:
 		return "", false
 	}
+}
+
+// decisionNotice builds the applicant's notification title and body for a decided
+// request (FR-007, FR-051). An approval invites them to complete their listing; a
+// rejection quotes the admin's reason so they read why without reopening the
+// request. status is always approved or rejected here (parseDecision guarantees
+// it), and reason is non-empty on a rejection (the handler required it).
+func decisionNotice(status sqlcgen.VerificationStatus, reason string) (title, body string) {
+	if status == sqlcgen.VerificationStatusApproved {
+		return "Verifikasi disetujui",
+			"Pengajuan verifikasi identitas Anda disetujui. Lencana terverifikasi kini tampil pada profil Anda."
+	}
+	return "Verifikasi ditolak",
+		"Pengajuan verifikasi identitas Anda ditolak. Alasan: " + reason + " Anda dapat mengajukan ulang setelah memperbaikinya."
 }
 
 // parseDecision maps the decision body value to a terminal status. Only approved

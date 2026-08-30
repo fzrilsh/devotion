@@ -89,7 +89,8 @@ SET status = sqlc.arg(status)::verification_status,
     decided_at = sqlc.arg(decided_at)::timestamptz
 WHERE id = sqlc.arg(id)::uuid AND status = 'pending'
 RETURNING *,
-    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name;
+    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name,
+    (SELECT account_id FROM business_profile WHERE id = profile_id) AS applicant_account;
 
 -- MarkProfileVerified flips the verified badge on approval (FR-008). It is called
 -- inside the same transaction as DecideVerificationRequest so an approved

@@ -7,6 +7,18 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Ditambahkan
+- Dua kejadian notifikasi FR-051 yang selama ini terdefinisi di enum `event_type`
+  tapi tak pernah di-enqueue kini tersambung. `verification_decision` dikirim ke
+  akun pemohon di dalam transaksi keputusan admin, baik saat disetujui maupun
+  ditolak, dan pada penolakan mengutip alasan yang ditulis admin. Query keputusan
+  mengembalikan `applicant_account` (subquery ke `business_profile`) sehingga
+  profil dipetakan ke akun tanpa baca tambahan; kejadian ini transaksional,
+  ikut rollback bila keputusan gagal. `rating_request` dikirim ke kedua pihak saat
+  pesanan dikonfirmasi, baik oleh pembeli secara manual maupun oleh penutupan
+  otomatis tujuh hari (US5 AS-1), mengundang keduanya saling menilai. Kejadian ini
+  non-transaksional (FR-091), jadi tiap pihak tetap menghormati preferensi
+  kanalnya, dan menumpang transaksi konfirmasi sehingga tak pernah terkirim untuk
+  penutupan yang di-rollback.
 - Pekerjaan penjadwal peringatan tenggat pengiriman mendekat (FR-051) melengkapi
   sisi notifikasi FR-051 di samping `deadline_passed`. Berbeda dari auto-confirm
   dan pesanan telat, ia tak punya kembaran hitung-saat-baca: tenggat yang mendekat

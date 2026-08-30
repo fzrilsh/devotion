@@ -71,7 +71,8 @@ SET status = $1::verification_status,
     decided_at = $4::timestamptz
 WHERE id = $5::uuid AND status = 'pending'
 RETURNING id, profile_id, identity_number, identity_file_id, location_file_id, status, admin_note, decided_by, decided_at, applicant_source_address, created_at,
-    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name
+    (SELECT business_name FROM business_profile WHERE id = profile_id) AS business_name,
+    (SELECT account_id FROM business_profile WHERE id = profile_id) AS applicant_account
 `
 
 type DecideVerificationRequestParams struct {
@@ -95,6 +96,7 @@ type DecideVerificationRequestRow struct {
 	ApplicantSourceAddress *netip.Addr
 	CreatedAt              pgtype.Timestamptz
 	BusinessName           string
+	ApplicantAccount       pgtype.UUID
 }
 
 // DecideVerificationRequest records an admin's approval or rejection: it stamps
@@ -125,6 +127,7 @@ func (q *Queries) DecideVerificationRequest(ctx context.Context, arg DecideVerif
 		&i.ApplicantSourceAddress,
 		&i.CreatedAt,
 		&i.BusinessName,
+		&i.ApplicantAccount,
 	)
 	return i, err
 }

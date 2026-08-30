@@ -30,6 +30,8 @@ func confirmReq(handler http.Handler, workOrderID string) *httptest.ResponseReco
 // the manual path is what closed it, not the ticker.
 func TestConfirm_BuyerConfirmsShipped_FR047_FR068(t *testing.T) {
 	h := seedAcceptedWorkOrder(t, "wo_confirm_ok")
+	notif := &recordingNotifier{}
+	h.svc.notifier = notif
 	shipWorkOrder(t, h)
 
 	// One day after shipment: far inside the 7-day window, so only the manual
@@ -74,6 +76,15 @@ func TestConfirm_BuyerConfirmsShipped_FR047_FR068(t *testing.T) {
 	}
 	if changedBy != h.buyerAcc {
 		t.Fatal("changed_by bukan buyer yang mengonfirmasi (FR-039)")
+	}
+
+	// Both parties are invited to rate each other once the buyer confirms
+	// (FR-051 "permintaan rating", US5 AS-1).
+	if got := notif.countFor(h.buyerAcc, sqlcgen.EventTypeRatingRequest); got != 1 {
+		t.Fatalf("pemberi order diminta ulasan %d kali, mau 1 (FR-051)", got)
+	}
+	if got := notif.countFor(h.subAcc, sqlcgen.EventTypeRatingRequest); got != 1 {
+		t.Fatalf("subkontraktor diminta ulasan %d kali, mau 1 (FR-051)", got)
 	}
 }
 
