@@ -112,28 +112,6 @@ Yang di bawah ini tidak terlihat di alur utama, tapi ikut menentukan apakah apli
 - **Galat yang konsisten** dalam format `application/problem+json`, dengan 33 kode mesin yang stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
 - **Swagger UI** di `/docs` saat mode development, membaca kontrak OpenAPI yang sama dengan yang disematkan ke binary.
 
-### Status implementasi
-
-Tabel ini disusun dari pembacaan kode di `origin/staging`, bukan dari catatan tugas. Rute yang disebut selesai memang terdaftar di router, dan status uji berasal dari `go vet` serta `go test` yang benar-benar dijalankan.
-
-| Area | Status |
-|---|---|
-| Akun, peran, profil usaha, sesi, verifikasi email dan HP, pemulihan akun | Selesai di backend dan frontend. |
-| Verifikasi identitas usaha, unggahan berkas, keputusan admin | Selesai di backend dan frontend. |
-| Master data, wilayah, usulan item, pengelolaan daftar baku | Selesai di backend dan frontend. |
-| Listing kapasitas dan kalender mingguan | Selesai di backend dan frontend. |
-| Pencarian, skor kriteria keras, paginasi kursor | Selesai di backend dan frontend. |
-| Request kuota multi-kandidat, penawaran, counter-offer, penolakan | Selesai di backend dan frontend. |
-| Work order, alokasi kapasitas, mesin keadaan, pembatalan, pembayaran, sengketa | Selesai di backend dan frontend. |
-| Konfirmasi otomatis tujuh hari dan pengingatnya | Perhitungannya ada di backend, dipakai dua lapisan sekaligus, saat data dibaca dan lewat penjadwal dalam proses. Frontend sudah menampilkan hitung mundurnya. Satu yang belum: rute `POST /api/work-orders/{workOrderId}/confirm` sudah ada di kontrak dan sudah dipanggil frontend, tapi belum terdaftar di router, jadi konfirmasi manual masih membalas 404. |
-| Ulasan, reputasi turunan, tingkat penyelesaian, moderasi | Selesai di backend dan frontend. |
-| Notifikasi, preferensi kanal, rate limiting, health check, panel WhatsApp | Selesai di backend dan frontend. |
-| Panel admin: verifikasi, usulan, daftar baku, pesanan telat, sengketa, moderasi ulasan | Selesai di backend dan frontend. |
-| Pengujian otomatis frontend | Belum ada. `frontend/package.json` tidak punya script `test`, padahal CI memanggil `npm test` sebelum membangun image, jadi job image belum pernah terbit. |
-| Uji integrasi backend terhadap database | Tersedia, tapi memilih dilewati kalau `DATABASE_URL_TEST` tidak menunjuk database yang bisa dijangkau. |
-
-> Tiga hal yang harus ditutup sebelum submission. Pertama, daftarkan rute `POST /api/work-orders/{workOrderId}/confirm` di backend. Kedua, tambahkan script `test` di `frontend/package.json`, karena CI memanggilnya sebelum membangun image. Ketiga, buang opsi `erasableSyntaxOnly` dari `tsconfig.app.json` dan `tsconfig.node.json`; opsi itu baru dikenal TypeScript 5.8 sedangkan yang terpasang 5.7.2, dan akibatnya `npm run build` berhenti sebelum Vite jalan.
-
 ---
 
 ## Demo dan screenshot
@@ -298,7 +276,9 @@ flowchart TB
 
 ### Database schema
 
-**26 tabel domain** dari **19 migrasi**, ditambah tabel milik `whatsmeow` yang dibuat library itu sendiri. ERD dipecah per konteks agar terbaca. Atribut dibatasi pada primary key, foreign key, dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
+**26 tabel domain**, plus `schema_migrations` dan tabel milik `whatsmeow`. ERD dipecah per konteks. Atribut dibatasi pada kunci dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
+
+Entitas tanpa daftar atribut sudah dirinci di diagram lain. Kolom aktor admin (`decided_by`, `handled_by`, `hidden_by`, `changed_by`) menunjuk `user_account.id` dan kosong selama keputusan belum diambil; panahnya tidak digambar.
 
 #### Identitas, wilayah, dan verifikasi
 
@@ -311,7 +291,7 @@ erDiagram
     user_account ||--o{ verification_code : "menerima"
     business_profile ||--o{ uploaded_file : "mengunggah"
     business_profile ||--o{ verification_request : "mengajukan"
-    uploaded_file ||--o| verification_request : "melampirkan"
+    uploaded_file ||--o{ verification_request : "melampirkan"
 
     province {
         text code PK "regex 2 digit"
@@ -332,6 +312,8 @@ erDiagram
         boolean role_subcontractor
         boolean role_buyer
         boolean role_admin "eksklusif dari peran usaha"
+        boolean notif_nontx_email "preferensi kanal non transaksional"
+        boolean notif_nontx_whatsapp "preferensi kanal non transaksional"
     }
     business_profile {
         uuid id PK
@@ -340,6 +322,7 @@ erDiagram
         text city_code FK
         numeric latitude "dibatasi wilayah Indonesia"
         numeric longitude "wajib berpasangan dengan latitude"
+        text description
         boolean verified
     }
     session {
@@ -348,6 +331,7 @@ erDiagram
         bytea token_hash UK "hash, bukan token mentah"
         inet source_address
         timestamptz expires_at
+        timestamptz accessed_at "dasar perpanjangan sesi"
     }
     verification_code {
         uuid id PK
@@ -361,6 +345,7 @@ erDiagram
         uuid id PK
         uuid owner_profile_id FK
         file_type type "identity_document, location_photo"
+        text original_name
         text mime_type "jpeg, png, pdf saja"
         integer size_bytes "maksimal 5 MB"
         text storage_path UK "nama dibuat sistem"
@@ -368,11 +353,14 @@ erDiagram
     verification_request {
         uuid id PK
         uuid profile_id FK "satu pengajuan pending per profil"
+        text identity_number
         uuid identity_file_id FK
         uuid location_file_id FK
         verification_status status
         text admin_note "wajib bila ditolak"
-        uuid decided_by FK
+        uuid decided_by FK "user_account, wajib bila sudah diputus"
+        timestamptz decided_at
+        inet applicant_source_address
     }
 ```
 
@@ -387,7 +375,7 @@ erDiagram
     capacity_listing ||--o{ listing_machine : "mengoperasikan"
     catalog_item ||--o{ listing_product : "dirujuk"
     catalog_item ||--o{ listing_machine : "dirujuk"
-    catalog_item ||--o| item_proposal : "dihasilkan"
+    catalog_item ||--o{ item_proposal : "dihasilkan"
 
     catalog_item {
         uuid id PK
@@ -402,8 +390,10 @@ erDiagram
         item_type type
         text proposed_name
         proposal_status status
+        text admin_note
         uuid item_id FK "terisi bila disetujui"
-        uuid decided_by FK
+        uuid decided_by FK "user_account"
+        timestamptz decided_at
     }
     capacity_listing {
         uuid id PK
@@ -438,6 +428,11 @@ erDiagram
 ```mermaid
 erDiagram
     business_profile ||--o{ quota_request : "mengirim"
+    business_profile ||--o{ request_candidate : "dijangkau sebagai subkontraktor"
+    business_profile ||--o{ work_order : "menjadi pembeli atau subkontraktor"
+    business_profile ||--o{ payment_record : "menyatakan pembayaran"
+    business_profile ||--o{ review : "menulis dan menerima"
+    business_profile ||--o{ dispute : "melaporkan"
     catalog_item ||--o{ quota_request : "menentukan produk"
     quota_request ||--o{ request_candidate : "menjangkau"
     capacity_listing ||--o{ request_candidate : "dinilai"
@@ -458,6 +453,7 @@ erDiagram
         integer quantity "harus positif"
         text material
         date deadline
+        text note
         timestamptz reply_due_at "72 jam sejak dibuat"
     }
     request_candidate {
@@ -475,6 +471,7 @@ erDiagram
         offer_party proposed_by "subcontractor atau buyer"
         bigint total_price "rupiah bulat, harus positif"
         integer readiness_lead_days
+        text note
     }
     work_order {
         uuid id PK
@@ -485,13 +482,17 @@ erDiagram
         integer quantity
         bigint total_price "rupiah bulat"
         date deadline
-        date readiness_week_start "wajib hari Senin"
+        date readiness_week_start "wajib hari Senin, tidak melewati deadline"
         work_order_status status "7 status"
         timestamptz shipped_at
         timestamptz auto_confirm_base_at "dasar hitung 7 hari"
         timestamptz confirmed_at
         boolean auto_confirmed
+        timestamptz confirm_warn_sent_at "penanda pengingat sekali kirim"
+        timestamptz late_notified_at "penanda pemberitahuan lewat tenggat"
         uuid cancelled_by_id FK
+        text cancellation_reason
+        timestamptz cancelled_at
     }
     capacity_allocation {
         uuid id PK
@@ -505,8 +506,9 @@ erDiagram
         uuid work_order_id FK
         work_order_status old_status
         work_order_status new_status
-        uuid changed_by FK "wajib bila bukan sistem"
+        uuid changed_by FK "user_account, wajib bila bukan sistem"
         boolean by_system
+        text note
     }
     payment_record {
         uuid id PK
@@ -514,16 +516,20 @@ erDiagram
         uuid profile_id FK
         payment_direction direction "sent atau received"
         date date "tanpa kolom jumlah uang"
+        text note
     }
     dispute {
         uuid id PK
         uuid work_order_id FK "satu sengketa terbuka per pesanan"
         uuid reporter_id FK
+        text report_body
         dispute_status status
         dispute_result result "cancelled, continued, confirmed"
         boolean allocation_reversed
         uuid liable_party_id FK
-        uuid handled_by FK
+        text admin_note
+        uuid handled_by FK "user_account"
+        timestamptz resolved_at
     }
     review {
         uuid id PK
@@ -531,10 +537,15 @@ erDiagram
         uuid reviewer_id FK "tidak boleh sama dengan reviewee"
         uuid reviewee_id FK
         smallint rating "1 sampai 5"
+        text text
         boolean hidden
-        uuid hidden_by FK
+        uuid hidden_by FK "user_account"
+        timestamptz hidden_at
+        text hidden_reason
     }
 ```
+
+Tiga aturan di sini harus membaca tabel lain, jadi ditegakkan trigger, bukan `CHECK`: `trg_reject_self_request` menolak kandidat yang subkontraktornya sama dengan pembeli (FR-083), `trg_reject_allocation_before_readiness` menolak alokasi sebelum `readiness_week_start` (FR-087), `trg_reject_wrong_item_type` mengikat `listing_product` ke item `product` dan `listing_machine` ke `machine`.
 
 #### Notifikasi dan pembatasan laju
 
@@ -560,6 +571,8 @@ erDiagram
         delivery_status status "pending, sent, failed_permanent"
         smallint attempts "maksimal 3"
         text last_error
+        timestamptz attempted_at "urutan antrean pengiriman"
+        timestamptz sent_at
     }
     rate_limit {
         uuid id PK
@@ -570,16 +583,18 @@ erDiagram
     }
 ```
 
+`rate_limit` tanpa kunci asing. `key` menyimpan pengenal sasaran sebagai teks (id akun, nomor, atau alamat asal) sesuai `target`, sehingga pembatasan tetap berlaku bagi pihak yang belum punya akun.
+
 #### Keputusan skema
 
 | Keputusan | Penerapan | Alasan |
 |---|---|---|
-| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` bertipe `bigint` dengan `CHECK (total_price > 0)`. | Rupiah tidak dipecah di praktik B2B ini, dan tipe pecahan menimbulkan galat pembulatan yang sulit dilacak. |
-| **Minggu selalu Senin** | `week_start`, `horizon_until`, `readiness_week_start` bertipe `date` dengan `CHECK (EXTRACT(ISODOW ...) = 1)`. | Mencegah periode jatuh di tengah minggu, yang membuat kapasitas berkurang dari periode salah. |
-| **Platform tidak memegang dana** | `payment_record` tanpa kolom jumlah uang, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa menjadi perantara dana. |
-| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`; `used_capacity <= total_capacity`; penulisan satu transaksi dengan `SELECT ... FOR UPDATE` terurut menaik menurut `week_start`. | Batas ditegakkan database, dan urutan penguncian seragam mencegah deadlock. |
-| **Jejak keputusan lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan yang mewajibkan kolom pendukung terisi begitu status keluar dari pending. | Status terminal tidak dapat tersimpan tanpa catatan admin, waktu, dan pelaku. |
-| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` bertipe `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti pengambilalihan sesi. |
+| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` `bigint`, `CHECK (total_price > 0)`. | Rupiah tidak dipecah di B2B ini, dan tipe pecahan menimbulkan galat pembulatan. |
+| **Minggu selalu Senin** | `week_start`, `horizon_until`, `readiness_week_start` `date` dengan `CHECK (EXTRACT(ISODOW ...) = 1)`. | Periode tidak jatuh di tengah minggu, jadi kapasitas tidak berkurang dari periode salah. |
+| **Platform tidak memegang dana** | `payment_record` tanpa kolom jumlah, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa jadi perantara dana. |
+| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`, `used_capacity <= total_capacity`, satu transaksi dengan `SELECT ... FOR UPDATE` terurut `week_start`. | Batas ditegakkan database, dan urutan kunci seragam mencegah deadlock. |
+| **Jejak keputusan lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan: kolom pendukung wajib terisi begitu status keluar dari pending. | Status terminal tidak tersimpan tanpa catatan admin, waktu, dan pelaku. |
+| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti pengambilalihan sesi. |
 
 Definisi lengkap beserta indeks dan constraint ada di `docs/001-capacity-exchange-marketplace/data-model.md` dan `backend/db/migrations/`.
 
@@ -860,36 +875,53 @@ Kredensial di atas hanya contoh. Pakai akun lokal sendiri saat menguji.
 
 Kontrak OpenAPI 3.1 di [contracts/openapi.yaml](docs/001-capacity-exchange-marketplace/contracts/openapi.yaml), peta endpoint terhadap requirement di [contracts/README.md](docs/001-capacity-exchange-marketplace/contracts/README.md). Salinan yang di-embed disinkronkan lewat `backend/apidocs-sync.sh`, dan CI menggagalkan build bila salinannya basi.
 
+### API eksternal
+
+Satu API pihak ketiga: [wilayah.id](https://wilayah.id/), sumber wilayah administratif Indonesia. Tanpa kunci API. Seluruh pemanggilannya di `backend/internal/masterdata/regions.go`, satu-satunya `http.Client` keluar di backend.
+
+```http
+GET https://wilayah.id/api/provinces.json          → 38 provinsi
+GET https://wilayah.id/api/regencies/{kode}.json   → kabupaten/kota per provinsi
+```
+
+Respons dibungkus objek `data` berisi `code` dan `name`. Kecamatan dan desa tidak diambil, tidak ada requirement yang memakainya.
+
+| Hal | Keputusan |
+|---|---|
+| Kapan dipanggil | Hanya `seed:regions --refresh`, timeout 30 detik, satu galat membatalkan semuanya |
+| Saat melayani pengguna | Tidak pernah, wilayah dibaca dari tabel `province` dan `city` |
+| Sumber bawaan | `docs/master-data/regions.json`, 38 provinsi dan 514 kabupaten/kota |
+| Idempotensi | Upsert pada kode wilayah, nama diperbarui, baris tidak pernah dihapus |
+| Normalisasi | `NormalizeCityCode` membuang titik, `32.73` menjadi `3273`, tanpa itu `city_code_format` dan `city_belongs_to_province` menolak |
+
+> Bila wilayah.id mati, aplikasi tetap jalan penuh. `seed:regions` tanpa `--refresh` membaca salinan JSON di repository.
+
+Bentuk respons dan kueri verifikasi di [docs/master-data/README.md](docs/master-data/README.md), alasannya di `research.md` R-02. Cloudflare, Mailjet, Sentry, dan WhatsApp bukan API data, dicatat di `docs/layanan-luar.md`.
+
 ---
 
 ## Testing
 
 ### Data dummy untuk pengujian
 
-Isi database dengan data uji lewat gist berikut, terpisah dari repository supaya dump besar tidak ikut ke riwayat kode:
-
-**[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**
-
-Seluruh isinya **data dummy**, dibuat khusus untuk menguji website Devotion. Nama usaha, email, nomor telepon, dan nomor identitas semuanya fiktif, tidak ada data pribadi orang sungguhan. Isinya 60 usaha konveksi, 47 listing kapasitas, dan 34 pesanan yang tersebar di tujuh status, plus antrean admin yang tidak kosong, sehingga setiap layar punya sesuatu untuk ditampilkan.
+**[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**, disimpan di luar repository supaya dump besar tidak ikut ke riwayat kode. Isinya 60 usaha konveksi, 47 listing, dan 34 pesanan di tujuh status, plus antrean admin yang tidak kosong. Semua fiktif, tidak ada data pribadi orang sungguhan.
 
 | Berkas | Isi |
 |---|---|
 | `dummy-data.sql` | seluruh data, satu transaksi |
-| `creedentials.txt` | daftar 61 akun uji beserta sandinya |
+| `creedentials.txt` | 61 akun uji beserta sandinya |
 | `copy-files.sh` | penyalin 122 berkas unggahan tiruan, Linux dan macOS |
 | `copy-files.ps1` | penyalin yang sama untuk Windows |
 
-Tiga hal harus beres sebelum impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` sengaja tidak ikut di dump, karena keduanya data acuan yang id-nya dibuat per database, sedangkan profil dan listing menunjuk keduanya lewat kunci asing. Bila belum ada, impor berhenti sendiri dengan pesan yang menyebut seed mana yang kurang.
+Prasyarat impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` tidak ikut di dump karena id-nya dibuat per database sedangkan profil dan listing menunjuknya lewat kunci asing. Bila belum ada, impor berhenti dengan pesan yang menyebut seed mana yang kurang.
 
 ```bash
 docker compose exec -T postgres psql -U devotion -d devotion < dummy-data.sql
 ```
 
-Keluaran terakhir harus `COMMIT`. Satu galat saja menggagalkan seluruh transaksi dan database tetap seperti sebelumnya, jadi tidak ada risiko data separuh jadi. Impor kedua di atas database yang sama akan gagal di pelanggaran UNIQUE, bukan menghasilkan data ganda.
+Keluaran terakhir harus `COMMIT`. Satu galat menggagalkan seluruh transaksi, jadi tidak ada risiko data separuh jadi, dan impor kedua gagal di pelanggaran UNIQUE alih-alih menghasilkan data ganda. Waktu di dalam dump dihitung relatif terhadap saat impor, jadi kalender kapasitas selalu terlihat baru. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`, tanpa itu halaman verifikasi admin menampilkan gambar rusak.
 
-Semua waktu di dalam dump dihitung relatif terhadap saat impor, bukan tanggal mati, jadi kalender kapasitas selalu terlihat baru kapan pun diimpor. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`; tanpa itu halaman verifikasi admin menampilkan gambar rusak.
-
-> Data ini hanya untuk pengembangan dan demo. Jangan diimpor ke database yang sudah memuat data sungguhan.
+> Hanya untuk pengembangan dan demo. Jangan diimpor ke database yang memuat data sungguhan.
 
 ### Menjalankan pengujian
 
@@ -907,7 +939,7 @@ npm run lint
 npm run build
 ```
 
-`DATABASE_URL_TEST` harus disebut eksplisit. Nilai bawaan menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan uji yang tidak menjangkau database memilih `t.Skip` daripada gagal, jadi tanpa variabel itu seluruh uji database dilewati diam-diam dan hasilnya tetap terlihat hijau.
+`DATABASE_URL_TEST` wajib disebut eksplisit: bawaannya menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan uji yang tidak menjangkau database memilih `t.Skip` daripada gagal. Tanpa variabel itu seluruh uji database dilewati diam-diam dan hasilnya tetap hijau.
 
 Uji integrasi memakai skema terpisah pada layanan Postgres yang sama, bukan container tambahan. Uji bertenggat memakai `Clock` yang dapat digantikan, sehingga konfirmasi otomatis 7 hari diuji tanpa menunggu 7 hari.
 
@@ -928,24 +960,11 @@ npm test               script test belum ada di package.json
 
 ### Cakupan
 
-Coverage tidak diukur sebagai persentase. Yang dijaga adalah keterlacakan: **64 berkas uji Go**, **353 kasus uji**, dan setiap uji menyebut FR yang diverifikasinya di nama fungsinya, misalnya `TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`. Dengan cara itu **57 requirement** dapat ditelusuri dari nama uji ke spec.
+Bukan persentase, tapi keterlacakan: **64 berkas uji Go**, **353 kasus uji**, setiap uji menyebut FR yang diverifikasinya di nama fungsinya (`TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`), sehingga **57 requirement** dapat ditelusuri dari nama uji ke spec.
 
-Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus:
+Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus: urutan hasil pencarian dapat diulang termasuk antar halaman; skor bebas dari pengaruh reputasi, verifikasi, kebaruan kalender, dan jarak; kapasitas terjumlah lintas periode sampai tenggat; dua kesepakatan berbarengan atas periode yang sama hanya satu berhasil; pembatalan pra-produksi membalik seluruh baris alokasi; request kuota ke listing sendiri ditolak; konfirmasi otomatis 7 hari dan penghentiannya oleh sengketa; tingkat penyelesaian membebani hanya pihak yang membatalkan; dokumen identitas tertutup selain bagi pemilik dan admin; validasi berkas dari magic bytes beserta batas ukuran, kuota storage, dan pembuangan metadata gambar; idempotensi horizon kalender; migrasi dan constraint PostgreSQL.
 
-- Urutan hasil pencarian dapat diulang, termasuk antar halaman.
-- Skor tidak terpengaruh reputasi, verifikasi, kebaruan kalender, maupun jarak.
-- Kapasitas terjumlah lintas periode sampai tenggat.
-- Dua kesepakatan berbarengan atas periode yang sama: hanya satu berhasil.
-- Pembatalan pra-produksi membalik seluruh baris alokasi.
-- Request kuota ke listing milik sendiri ditolak.
-- Konfirmasi otomatis 7 hari, dan penghentiannya oleh sengketa.
-- Tingkat penyelesaian membebani hanya pihak yang membatalkan.
-- Dokumen identitas tidak dapat diakses selain pemilik dan admin.
-- Validasi berkas dari magic bytes, batas ukuran, kuota storage, pembuangan metadata gambar.
-- Idempotensi horizon kalender.
-- Migrasi dan constraint PostgreSQL.
-
-Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/skenario-uji-manual.md`, sehingga label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
+Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/skenario-uji-manual.md`, karena itu label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
 
 ---
 
