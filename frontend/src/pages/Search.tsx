@@ -6,24 +6,71 @@ import { useSearch } from "@hooks/useQuota";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
 import { useState } from "react";
-import { LuCheck, LuCircleAlert, LuMapPin, LuSearch, LuShieldCheck, LuStar, LuX } from "react-icons/lu";
+import { LuCheck, LuCircleAlert, LuMapPin, LuMaximize2, LuSearch, LuShieldCheck, LuStar, LuX } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 
-const regionOptions = [
-    { value: "city" as const, label: "Kota saya" },
-    { value: "province" as const, label: "Provinsi saya" },
-    { value: "national" as const, label: "Nasional" },
-];
+type RegionLevel = "city" | "province" | "national";
+
+// Region levels the searcher can actually reach, narrowest first (FR-063). A profile
+// without a city code has no city level to start from, so that step is skipped.
+function availableRegionLevels(hasCity: boolean, hasProvince: boolean): RegionLevel[] {
+    const levels: RegionLevel[] = [];
+
+    if (hasCity) levels.push("city");
+    if (hasProvince) levels.push("province");
+    levels.push("national");
+
+    return levels;
+}
 
 function formatNumber(value: number): string {
     return value.toLocaleString("id-ID");
 }
 
+function regionLevelLabel(level: RegionLevel, cityName: string, provinceName: string): string {
+    if (level === "city") return cityName ? `Kota/kabupaten ${cityName}` : "Kota/kabupaten Anda";
+    if (level === "province") return provinceName ? `Provinsi ${provinceName}` : "Provinsi Anda";
+
+    return "Seluruh Indonesia";
+}
+
+function formatDate(value: string): string {
+    const parsed = new Date(`${value}T00:00:00+07:00`);
+
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// Fallback when the response carries no relaxation object: name the narrowest
+// hard filter the searcher actually set, plus one concrete way to loosen it (FR-028).
+function fallbackRelaxation(params: SearchParams, machineName?: string): { most_restrictive: string; suggestion: string } {
+    if (params.machine_item_id) {
+        return {
+            most_restrictive: machineName ? `Jenis mesin: ${machineName}` : "Filter jenis mesin",
+            suggestion: "Kosongkan filter jenis mesin agar subkontraktor dengan mesin lain ikut dipertimbangkan.",
+        };
+    }
+
+    if (params.max_lead_days != null) {
+        return {
+            most_restrictive: `Jeda kesiapan maksimal ${params.max_lead_days} hari`,
+            suggestion: "Naikkan batas jeda kesiapan, atau kosongkan agar kesiapan mulai tidak dibatasi.",
+        };
+    }
+
+    return {
+        most_restrictive: `Jumlah ${formatNumber(params.quantity)} unit sampai ${formatDate(params.deadline)}`,
+        suggestion: "Geser deadline lebih jauh supaya kapasitas beberapa minggu bisa dijumlahkan, atau pecah kebutuhan ke beberapa subkontraktor.",
+    };
+}
+
 function CandidateCard({ candidate, selected, onToggle }: { candidate: SearchCandidate; selected: boolean; onToggle: () => void }) {
+    const totalCriteria = candidate.criteria.length;
     const unmet = candidate.criteria.filter((criterion) => !criterion.met);
+    const allMet = totalCriteria > 0 && unmet.length === 0;
+    const noneMet = totalCriteria > 0 && unmet.length === totalCriteria;
     const reputation = candidate.reputation;
 
     return (
@@ -54,7 +101,9 @@ function CandidateCard({ candidate, selected, onToggle }: { candidate: SearchCan
                     </p>
                 </div>
 
-                <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-sm font-extrabold", candidate.score === 4 ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-500")}>{candidate.score}/4</span>
+                <span className={cn("grid size-9 shrink-0 place-items-center rounded-full text-[11px] font-extrabold tabular-nums", allMet ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-500")}>
+                    {totalCriteria > 0 ? `${candidate.score}/${totalCriteria}` : candidate.score}
+                </span>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -96,7 +145,7 @@ function CandidateCard({ candidate, selected, onToggle }: { candidate: SearchCan
                 <button
                     type="button"
                     onClick={onToggle}
-                    disabled={unmet.length === 4}
+                    disabled={noneMet}
                     className={cn(
                         "shrink-0 cursor-pointer rounded-xl px-4 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-40",
                         selected ? "bg-deep-navy-500 text-white hover:bg-deep-navy-600" : "bg-industrial-blue-500 text-white hover:bg-industrial-blue-600",
@@ -120,7 +169,6 @@ export default function Search() {
     const [quantity, setQuantity] = useState("");
     const [deadline, setDeadline] = useState("");
     const [maxLeadDays, setMaxLeadDays] = useState("");
-    const [regionLevel, setRegionLevel] = useState<"city" | "province" | "national">("city");
     const [formError, setFormError] = useState("");
 
     const [submitted, setSubmitted] = useState<SearchParams | null>(null);
@@ -129,11 +177,60 @@ export default function Search() {
     const { getCityName, getProvinceName } = useWilayah(profile?.province_code || undefined);
 
     const searchQuery = useSearch(submitted);
+    const firstPage = searchQuery.data?.pages[0];
     const candidates = searchQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const selectedList = Object.values(selected);
 
     const products = (productsQuery.data ?? []).filter((item) => item.active);
     const machines = (machinesQuery.data ?? []).filter((item) => item.active);
+
+    const cityName = profile?.city_code ? getCityName(profile.city_code) : "";
+    const provinceName = profile?.province_code ? getProvinceName(profile.province_code) : "";
+
+    const regionLevels = availableRegionLevels(Boolean(profile?.city_code), Boolean(profile?.province_code));
+    const startLevel = regionLevels[0];
+
+    // The level the response says it used, not the one we asked for (FR-063).
+    const activeLevel: RegionLevel | null = firstPage?.region_level ?? submitted?.region_level ?? null;
+    const activeIndex = activeLevel ? regionLevels.indexOf(activeLevel) : -1;
+    const expandLevel = activeIndex >= 0 && activeIndex < regionLevels.length - 1 ? regionLevels[activeIndex + 1] : null;
+
+    function withRegionLevel(params: SearchParams, level: RegionLevel): SearchParams {
+        const next: SearchParams = { ...params, region_level: level };
+
+        delete next.city_code;
+        delete next.province_code;
+
+        if (level === "city" && profile?.city_code) next.city_code = profile.city_code;
+        if (level === "province" && profile?.province_code) next.province_code = profile.province_code;
+
+        return next;
+    }
+
+    // Naikkan cakupan tepat satu tingkat, filter lain dibiarkan apa adanya (FR-063).
+    function handleExpandRegion() {
+        if (!submitted || !expandLevel) return;
+
+        // Kandidat cakupan lebih sempit tetap ada di cakupan yang lebih luas, jadi pilihan tidak direset.
+        setSubmitted(withRegionLevel(submitted, expandLevel));
+    }
+
+    const machineName = machines.find((item) => item.item_id === submitted?.machine_item_id)?.name;
+
+    // Saran pelonggaran hanya relevan saat sudah tidak ada tingkat wilayah untuk diperluas (FR-028).
+    const relaxation = submitted && candidates.length === 0 && !expandLevel ? (firstPage?.relaxation ?? fallbackRelaxation(submitted, machineName)) : null;
+
+    const expandAction = expandLevel ? (
+        <button
+            type="button"
+            onClick={handleExpandRegion}
+            disabled={searchQuery.isFetching}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-industrial-blue-500/40 bg-industrial-blue-500/5 px-4 py-2.5 text-sm font-semibold text-industrial-blue-600 transition hover:bg-industrial-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+            <LuMaximize2 className="size-4" aria-hidden />
+            Perluas ke {regionLevelLabel(expandLevel, cityName, provinceName).toLowerCase()}
+        </button>
+    ) : null;
 
     function handleSearch(event: React.FormEvent) {
         event.preventDefault();
@@ -160,7 +257,7 @@ export default function Search() {
             product_item_id: productItemId,
             quantity: parsedQuantity,
             deadline,
-            region_level: regionLevel,
+            region_level: startLevel,
         };
 
         if (machineItemId) params.machine_item_id = machineItemId;
@@ -168,11 +265,8 @@ export default function Search() {
         const parsedLead = Number(maxLeadDays);
         if (maxLeadDays && Number.isInteger(parsedLead) && parsedLead >= 0) params.max_lead_days = parsedLead;
 
-        if (regionLevel === "city" && profile?.city_code) params.city_code = profile.city_code;
-        if (regionLevel === "province" && profile?.province_code) params.province_code = profile.province_code;
-
         setSelected({});
-        setSubmitted(params);
+        setSubmitted(withRegionLevel(params, startLevel));
     }
 
     function toggleCandidate(candidate: SearchCandidate) {
@@ -264,21 +358,11 @@ export default function Search() {
 
                     <div>
                         <span className={labelClassName}>Cakupan Wilayah</span>
-                        <div className="flex gap-2">
-                            {regionOptions.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => setRegionLevel(option.value)}
-                                    className={cn("flex-1 cursor-pointer rounded-xl border px-3 py-2.5 text-xs font-semibold transition", regionLevel === option.value ? "border-industrial-blue-500 bg-industrial-blue-500 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-industrial-blue-500/50")}
-                                >
-                                    {option.label}
-                                </button>
-                            ))}
+                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <LuMapPin className="size-4 shrink-0 text-slate-400" aria-hidden />
+                            <p className="text-sm font-semibold text-slate-700">{regionLevelLabel(startLevel, cityName, provinceName)}</p>
                         </div>
-                        <p className="mt-1.5 text-xs text-slate-400">
-                            {regionLevel === "city" ? `Sekitar ${profile?.city_code ? getCityName(profile.city_code) : "kota Anda"}.` : regionLevel === "province" ? `Seluruh ${profile?.province_code ? getProvinceName(profile.province_code) : "provinsi Anda"}.` : "Seluruh Indonesia."}
-                        </p>
+                        <p className="mt-1.5 text-xs text-slate-400">Pencarian dimulai dari cakupan terdekat. Bila hasilnya sedikit, Anda bisa memperluas satu tingkat pada hasil.</p>
                     </div>
                 </div>
 
@@ -302,14 +386,32 @@ export default function Search() {
                         <p className="text-sm font-semibold text-red-700">Hasil pencarian tidak dapat dimuat. Periksa kembali kriteria Anda.</p>
                     </div>
                 ) : candidates.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                        <p className="text-sm text-slate-500">Tidak ada subkontraktor yang cocok pada cakupan ini. Coba perluas wilayah atau longgarkan kriteria.</p>
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8">
+                        <p className="text-sm font-semibold text-slate-700">Tidak ada subkontraktor yang cocok pada cakupan {activeLevel ? regionLevelLabel(activeLevel, cityName, provinceName).toLowerCase() : "ini"}.</p>
+
+                        {expandLevel ? (
+                            <>
+                                <p className="mt-1 text-sm text-slate-500">Perluas pencarian satu tingkat tanpa mengubah filter lain.</p>
+                                <div className="mt-4">{expandAction}</div>
+                            </>
+                        ) : relaxation ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left">
+                                <p className="text-xs font-bold uppercase tracking-wide text-amber-600">Filter paling membatasi</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800">{relaxation.most_restrictive}</p>
+                                <p className="mt-2 text-sm text-slate-600">{relaxation.suggestion}</p>
+                            </div>
+                        ) : null}
                     </div>
                 ) : (
                     <>
-                        <p className="text-sm text-slate-500">
-                            {candidates.length} kandidat ditemukan, diurutkan dari skor kecocokan tertinggi.
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm text-slate-500">
+                                {candidates.length} kandidat ditemukan pada cakupan{" "}
+                                <span className="font-semibold text-slate-700">{activeLevel ? regionLevelLabel(activeLevel, cityName, provinceName) : "-"}</span>, diurutkan dari skor kecocokan tertinggi.
+                            </p>
+
+                            {expandLevel ? expandAction : null}
+                        </div>
 
                         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                             {candidates.map((candidate) => (

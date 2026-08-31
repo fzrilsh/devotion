@@ -5,22 +5,8 @@ import { useHealth } from "@hooks/useSystem";
 import { cn } from "@lib/utils";
 import { LuActivity, LuArrowRight, LuCalendarX, LuClipboardList, LuClock, LuInbox, LuMessageSquare, LuMessagesSquare, LuShieldAlert, LuShieldCheck, LuTriangleAlert } from "react-icons/lu";
 import { Link } from "react-router-dom";
-
-function formatDate(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    const normalized = isoDate.trim().replace(" ", "T");
-    const date = new Date(normalized);
-
-    if (Number.isNaN(date.getTime())) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Jakarta",
-    }).format(date);
-}
+import { disputeStatusMeta } from "./meta";
+import { formatDateId as formatDate } from "@lib/datetime";
 
 function QueueCard({ title, description, count, tone, icon: Icon, to }: { title: string; description: string; count: number; tone: "blue" | "amber" | "red" | "violet"; icon: React.ElementType; to: string }) {
     const tones = {
@@ -85,12 +71,6 @@ function QueueSection({ title, to, icon: Icon, isLoading, isError, isEmpty, empt
         </section>
     );
 }
-
-const disputeStatusMeta: Record<Dispute["status"], { label: string; className: string }> = {
-    reported: { label: "Dilaporkan", className: "bg-red-500/10 text-red-600" },
-    in_mediation: { label: "Mediasi", className: "bg-amber-500/10 text-amber-600" },
-    resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
-};
 
 // Peringatan ringkas saja; rinciannya di halaman Status Sistem. Health yang gagal
 // dibaca sebagai tidak sehat, karena 503 memang jawaban untuk basis data gagal

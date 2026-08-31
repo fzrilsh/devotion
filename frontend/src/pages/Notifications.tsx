@@ -2,6 +2,7 @@ import type { Notification } from "@api/notifications";
 import Loading from "@components/common/Loading";
 import { useMarkNotificationRead, useNotifications } from "@hooks/useNotifications";
 import { useAuth } from "@hooks/useAuth";
+import { formatDateLongId, parseApiDate } from "@lib/datetime";
 import { getNotificationLink } from "@lib/notificationLinks";
 import { cn } from "@lib/utils";
 import { useState } from "react";
@@ -28,7 +29,9 @@ const eventMeta: Record<Notification["event"], { label: string; icon: React.Elem
 };
 
 function formatRelativeTime(isoDate: string): string {
-    const date = new Date(isoDate);
+    const date = parseApiDate(isoDate);
+    if (!date) return "-";
+
     const diffMs = Date.now() - date.getTime();
     const diffMinutes = Math.floor(diffMs / 60000);
 
@@ -41,7 +44,7 @@ function formatRelativeTime(isoDate: string): string {
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `${diffDays} hari lalu`;
 
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(date);
+    return formatDateLongId(isoDate);
 }
 
 function NotificationItem({ notification, isBuyer }: { notification: Notification; isBuyer: boolean }) {

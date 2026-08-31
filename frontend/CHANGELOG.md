@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added unit tests for the two new shared modules: `lib/datetime.test.ts` covers RFC 3339 and space-separated parsing, the "-" fallback for unparseable input, WIB rendering, and integer rupiah; `lib/statusFilters.test.ts` covers chip derivation and ordering, growth when a status is added to the label map, and rejection of `Object.prototype` keys by `isStatusFilter`.
+
 - Added reusable form components under `components/form`: `FormField` (text input and select), `PasswordField` (show/hide toggle), and `RoleOption` (radio-style role card).
 - Added `DashboardLayout`, a generic sidebar layout for authenticated dashboards (fixed sidebar on desktop, drawer on mobile, sticky header with an account menu and logout), and `AdminLayout` with the admin navigation items.
 - Added `AppLayout`, a sidebar layout for non-admin authenticated users with navigation items that follow the account roles (buyer, subcontractor, or both). All protected non-admin routes are now nested under it.
@@ -49,6 +51,15 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Status filter chips are derived from the status label maps instead of being written out again as literals. `lib/statusFilters.ts` builds them from a `Record<Enum, …>`, so a new enum value in `openapi.yaml` fails typecheck at the label map and the chip appears without editing the page. Applied to the work orders list, incoming requests, admin disputes, admin verification queue, and admin item proposals. Two consequences worth knowing: the incoming requests filter now also offers "Tidak Dilanjutkan", which the hand-written list had left out, and the "offered" chip there now reads "Ada Penawaran" like everywhere else instead of "Sudah Dibalas". `parseStatusParam` on the work orders list validates against the same map through `isStatusFilter`.
+- Dispute mediation results in the admin page come from a `Record<DisputeResult, …>` rather than an array of literals, and the resolved-dispute line looks the label up directly instead of scanning the array.
+- `disputeStatusMeta` lives in `pages/Admin/meta.ts` and is shared by the disputes page and the admin dashboard. The two copies disagreed: `in_mediation` read "Dalam Mediasi" on one page and "Mediasi" on the other, so one dispute was labelled two ways depending on where it was opened. The shared copy keeps "Dalam Mediasi".
+- Date and rupiah formatting moved to `lib/datetime.ts`. Twelve pages each had their own `formatDateTimeId`/`formatDateId`, and only `WorkOrders/meta.ts` and the admin dashboard normalized the space-separated timestamp form (`2026-08-31 10:00:00`) that ECMAScript does not require engines to accept. Every page now goes through `parseApiDate`, so a space-separated value renders the same in Safari as in Chrome instead of showing "Invalid Date" on some pages and a date on others. `WorkOrders/meta.ts` and `Requests/meta.ts` re-export from it, so page imports are unchanged. Formatters return "-" for unparseable input rather than "Invalid Date". Notification relative time also parses through it.
+- `useIncomingCandidate` follows `has_next` to the end of the incoming list instead of giving up after 5 pages, so a candidate that has been pushed far down the list can still be opened from its notification. A 200-page ceiling and a seen-cursor check remain as guards against a cursor that stops advancing, not as a reachability limit. A `GET /candidates/{candidateId}` endpoint would remove the scan entirely; the contract has no such endpoint yet.
+
+- Region scope on the Search page is now a guided one-step expansion instead of three free-standing toggles (FR-063). The search starts at the narrowest scope the account has (city, else province, else national), the results header names the scope the response actually used, and a single "Perluas ke ..." action raises it exactly one level without touching any other filter. The action disappears at national level. An account without a city or province code no longer sees a scope it cannot search.
+- The empty search result now names the most restrictive filter and one concrete way to loosen it (FR-028), reading `SearchResult.relaxation` when the backend sends it and deriving a suggestion from the submitted filters otherwise. The generic "coba perluas wilayah atau longgarkan kriteria" line is gone.
+
 - `WhatsAppStatus` now carries a `status` enum (`connected`, `pairing`, `disconnected`) instead of a boolean `connected`, in `openapi.yaml` and the regenerated types, and the admin WhatsApp page renders all three states with their own wording. A boolean cannot tell pairing apart from disconnected, so a session that was already showing a scannable QR was described as disconnected and the page told the admin to reconnect for no reason.
 
 - Redesigned the Register page for clarity and accessibility: simplified flat branding panel, role selection via a proper radiogroup, plain password fields with a visible minimum-length rule, an explicit terms agreement checkbox, friendlier Indonesian validation messages, and a clearer primary CTA with a spinner loading state.
@@ -59,6 +70,8 @@ All notable changes to this project will be documented in this file.
 - Redesigned the public footer: a four-column layout (brand with the capacity-exchange description and the no-funds-held note, in-page navigation, platform links, company links) with a bottom bar for copyright and legal links.
 
 ### Fixed
+
+- Search candidate cards derive the criteria denominator from `candidate.criteria.length` instead of a hardcoded 4. The score badge read `{score}/4` and the "Pilih" button was disabled on `unmet.length === 4`, so any change to the number of hard criteria on the backend would have shown a wrong denominator and silently stopped disabling candidates that meet nothing.
 
 - Completion rate is no longer multiplied by 100 on the search results and My Profile pages. `Reputation.completion_rate` is already a percentage (0-100) per `openapi.yaml`, so a value of 92 was rendering as "9200%". The public profile page was already correct. The `enough_data` gate (FR-073) was correct in all three places and is unchanged.
 - Recording a payment, filing a dispute, or submitting a review now refreshes the work order detail immediately. The shared invalidator only invalidated the list key, and those three mutations pass no updated order, so the detail cache stayed stale for the 30-second `staleTime`: the new payment row was missing, and the order kept showing its old status with the dispute button still enabled after moving to `in_mediation`. `POST /work-orders/{id}/payments` and `POST /work-orders/{id}/disputes` return the full `WorkOrderDetail` per `openapi.yaml`, so both mutations now write it straight into the detail cache the way status change, confirm, and cancel already did; `recordPayment` and `reportDispute` were typed as `PaymentRecord` and `Dispute`, which no longer matched the contract.
@@ -80,6 +93,8 @@ All notable changes to this project will be documented in this file.
 - Registration now continues to the Verify Email page with the registered email instead of dropping the user back at login, and a successful email verification continues to Verify Phone.
 
 ### Removed
+
+- Removed `getProducts` and `getMachines` from `api/master.ts`. They were never imported: the listing hooks use `getMasterProducts`/`getMasterMachines` from `api/listing.ts`, which call the same two endpoints. The now-unused `CatalogItem` re-export went with them.
 
 - Removed the unused duplicate `pages/Search/SearchPage.tsx`; the search page lives at `pages/Search.tsx`.
 - Relaxed the phone number schema to accept `08`, `62`, and `+62` formats, and made the password confirmation error message clearer.

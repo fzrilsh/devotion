@@ -1,18 +1,9 @@
 import { apiClient } from "./client";
 import type { components } from "./types";
 
-export type CatalogItem = components["schemas"]["CatalogItem"];
 export type Province = components["schemas"]["Province"];
 export type City = components["schemas"]["City"];
 export type ItemProposal = components["schemas"]["ItemProposal"];
-
-export async function getProducts(): Promise<CatalogItem[]> {
-    return apiClient<CatalogItem[]>("/master/products");
-}
-
-export async function getMachines(): Promise<CatalogItem[]> {
-    return apiClient<CatalogItem[]>("/master/machines");
-}
 
 export async function getProvinces(): Promise<Province[]> {
     return apiClient<Province[]>("/regions/provinces");

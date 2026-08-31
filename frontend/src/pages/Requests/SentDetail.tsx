@@ -6,19 +6,10 @@ import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuClock, LuHandshake, LuHourglass, LuSend } from "react-icons/lu";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { formatDayTimeId as formatDateTimeId, formatRupiah } from "@lib/datetime";
 import { candidateStatusMeta, formatDateShort } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
-
-function formatRupiah(amount: number): string {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
-}
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {

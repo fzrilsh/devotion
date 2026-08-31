@@ -1,20 +1,14 @@
 import type { CandidateStatus } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useIncomingCandidates } from "@hooks/useQuota";
+import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuInbox, LuSend } from "react-icons/lu";
 import { Link } from "react-router-dom";
 import { candidateStatusMeta, formatRupiah } from "./meta";
 
-const filterOptions: { value: CandidateStatus | "all"; label: string }[] = [
-    { value: "all", label: "Semua" },
-    { value: "awaiting_reply", label: "Menunggu Balasan" },
-    { value: "offered", label: "Sudah Dibalas" },
-    { value: "agreed", label: "Sepakat" },
-    { value: "rejected", label: "Ditolak" },
-    { value: "expired", label: "Kedaluwarsa" },
-];
+const filterOptions = statusFilters(candidateStatusMeta);
 
 export default function Incoming() {
     const [status, setStatus] = useState<CandidateStatus | "all">("all");

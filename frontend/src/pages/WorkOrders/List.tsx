@@ -2,22 +2,14 @@ import type { WorkOrderStatus } from "@api/workOrders";
 import Loading from "@components/common/Loading";
 import { useAuth } from "@hooks/useAuth";
 import { useWorkOrders } from "@hooks/useWorkOrders";
+import { isStatusFilter, statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuClipboardList, LuInbox } from "react-icons/lu";
 import { Link, useSearchParams } from "react-router-dom";
 import { formatDateId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
-const statusFilters: { value: WorkOrderStatus | "all"; label: string }[] = [
-    { value: "all", label: "Semua" },
-    { value: "accepted", label: "Diterima" },
-    { value: "production", label: "Produksi" },
-    { value: "completed", label: "Selesai" },
-    { value: "shipped", label: "Dikirim" },
-    { value: "confirmed", label: "Terkonfirmasi" },
-    { value: "cancelled", label: "Dibatalkan" },
-    { value: "in_mediation", label: "Mediasi" },
-];
+const filterOptions = statusFilters(workOrderStatusMeta);
 
 const roleFilters = [
     { value: undefined, label: "Semua Posisi" },
@@ -26,7 +18,7 @@ const roleFilters = [
 ];
 
 function parseStatusParam(value: string | null): WorkOrderStatus | "all" {
-    return statusFilters.some((filter) => filter.value === value) ? (value as WorkOrderStatus | "all") : "all";
+    return isStatusFilter(workOrderStatusMeta, value) ? value : "all";
 }
 
 export default function List() {
@@ -56,7 +48,7 @@ export default function List() {
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap gap-2">
-                    {statusFilters.map((filter) => (
+                    {filterOptions.map((filter) => (
                         <button
                             key={filter.value}
                             type="button"

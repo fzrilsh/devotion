@@ -7,17 +7,12 @@ import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuHourglass, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { candidateStatusMeta, formatDateShort, formatRupiah } from "./meta";
+import { formatDayTimeId as formatDateTimeId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 
 type DetailLocationState = { candidateId?: string };
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 type CapacityInfo = { quantityRequested: number; remainingCapacity: number; untilWeek?: string };
 

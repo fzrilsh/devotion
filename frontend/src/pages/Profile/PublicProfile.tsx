@@ -8,12 +8,7 @@ import { useMyProfile, useProfileReviews, usePublicProfile } from "@hooks/usePro
 import { formatDistanceKm, haversineKm, toCoordinate } from "@lib/geo";
 import { LuBadgeCheck, LuInbox, LuLoaderCircle, LuMapPin, LuRuler, LuShieldCheck, LuStar, LuWrench } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
-
-function formatDateId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
+import { formatDateLongId as formatDateId } from "@lib/datetime";
 
 function RatingStars({ rating }: { rating: number }) {
     return (

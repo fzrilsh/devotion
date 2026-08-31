@@ -4,37 +4,27 @@ import Loading from "@components/common/Loading";
 import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useDisputes, useMediateDispute, useResolveDispute } from "@hooks/useAdmin";
 import { useWorkOrder } from "@hooks/useWorkOrders";
+import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuGavel, LuHandshake, LuInbox, LuMessagesSquare } from "react-icons/lu";
 import { Link } from "react-router-dom";
+import { disputeStatusMeta } from "./meta";
+import { formatDateTimeId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
-const disputeStatusMeta: Record<DisputeStatus, { label: string; className: string }> = {
-    reported: { label: "Dilaporkan", className: "bg-red-500/10 text-red-600" },
-    in_mediation: { label: "Dalam Mediasi", className: "bg-amber-500/10 text-amber-600" },
-    resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
+// Record, bukan array literal, supaya hasil mediasi baru pada kontrak menggagalkan
+// typecheck di sini. Urutan kunci menentukan urutan pilihan pada formulir.
+const resultMeta: Record<DisputeResult, { label: string; hint: string }> = {
+    continued: { label: "Pesanan Dilanjutkan", hint: "Kedua pihak sepakat melanjutkan produksi." },
+    confirmed: { label: "Pesanan Dinyatakan Selesai", hint: "Barang dianggap diterima; pesanan ditutup." },
+    cancelled: { label: "Pesanan Dibatalkan", hint: "Alokasi kapasitas dibalik dan pihak penanggung ditetapkan." },
 };
 
-const resultOptions: { value: DisputeResult; label: string; hint: string }[] = [
-    { value: "continued", label: "Pesanan Dilanjutkan", hint: "Kedua pihak sepakat melanjutkan produksi." },
-    { value: "confirmed", label: "Pesanan Dinyatakan Selesai", hint: "Barang dianggap diterima; pesanan ditutup." },
-    { value: "cancelled", label: "Pesanan Dibatalkan", hint: "Alokasi kapasitas dibalik dan pihak penanggung ditetapkan." },
-];
+const resultOptions = (Object.entries(resultMeta) as [DisputeResult, { label: string; hint: string }][]).map(([value, meta]) => ({ value, ...meta }));
 
-const filterOptions: { value: DisputeStatus | "all"; label: string }[] = [
-    { value: "all", label: "Semua" },
-    { value: "reported", label: "Dilaporkan" },
-    { value: "in_mediation", label: "Dalam Mediasi" },
-    { value: "resolved", label: "Selesai" },
-];
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
+const filterOptions = statusFilters(disputeStatusMeta);
 
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {
@@ -116,7 +106,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
             {dispute.status === "resolved" ? (
                 <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                     Diputuskan {formatDateTimeId(dispute.resolved_at)}
-                    {dispute.result ? ` · Hasil: ${resultOptions.find((option) => option.value === dispute.result)?.label ?? dispute.result}` : ""}
+                    {dispute.result ? ` · Hasil: ${resultMeta[dispute.result]?.label ?? dispute.result}` : ""}
                     {dispute.allocation_reversed ? " · Alokasi dibalik" : ""}
                 </div>
             ) : null}

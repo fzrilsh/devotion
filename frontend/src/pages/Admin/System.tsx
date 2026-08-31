@@ -5,6 +5,7 @@ import { useHealth } from "@hooks/useSystem";
 import { cn } from "@lib/utils";
 import { LuActivity, LuDatabase, LuHardDrive, LuMessageCircle, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
 import { Link } from "react-router-dom";
+import { formatDateTimeId } from "@lib/datetime";
 
 const overallMeta: Record<Health["status"], { label: string; note: string; card: string; badge: string }> = {
     ok: { label: "Sehat", note: "Seluruh ketergantungan berjalan normal.", card: "border-emerald-200 bg-emerald-50", badge: "bg-emerald-500/15 text-emerald-700" },
@@ -32,12 +33,6 @@ const toneClass = {
     warn: { card: "border-amber-200 bg-amber-50/60", icon: "bg-amber-500/10 text-amber-600", badge: "bg-amber-500/10 text-amber-700" },
     bad: { card: "border-red-200 bg-red-50/60", icon: "bg-red-500/10 text-red-600", badge: "bg-red-500/10 text-red-700" },
 };
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 function DependencyCard({ title, icon: Icon, label, detail, tone, children }: { title: string; icon: React.ElementType; label: string; detail: string; tone: "ok" | "warn" | "bad"; children?: React.ReactNode }) {
     const classes = toneClass[tone];

@@ -6,6 +6,7 @@ import { useMyVerificationRequests, useSubmitVerification, useUploadFile } from 
 import { cn } from "@lib/utils";
 import { useRef, useState } from "react";
 import { LuCircleCheck, LuCloudUpload, LuFileCheck, LuHourglass, LuShieldCheck, LuTriangleAlert, LuX } from "react-icons/lu";
+import { formatDateTimeLongId as formatDateTimeId } from "@lib/datetime";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = "image/jpeg,image/png,application/pdf";
@@ -18,12 +19,6 @@ const statusMeta: Record<VerificationStatus, { label: string; className: string 
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 function getProblemMessage(error: unknown, fallback: string): string {
     if (error instanceof ApiError) {
