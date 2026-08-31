@@ -75,6 +75,18 @@ type paymentView struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
+// paymentMismatch flags that the two parties' payment statements disagree
+// (FR-043). The server computes it from the presence and dates of the statement
+// rows, never from money (there is no amount to compare), so the client renders
+// the notice from this rather than re-deriving it from the payments array. Kind
+// is missing_counterpart when one side stated and the other has not, or
+// date_differs when both stated but on different dates; DayDifference carries the
+// absolute day gap and rides only on date_differs.
+type paymentMismatch struct {
+	Kind          string `json:"kind"`
+	DayDifference *int   `json:"day_difference,omitempty"`
+}
+
 // workOrderView is the WorkOrderDetail response. It carries the state machine to
 // the client via allowed_transitions and self_cancellable so the frontend renders
 // buttons from the array instead of duplicating the machine (FR-039). At
@@ -94,10 +106,13 @@ type workOrderView struct {
 	ReadinessDeadline      string           `json:"readiness_deadline"`
 	AllowedTransitions     []string         `json:"allowed_transitions"`
 	SelfCancellable        bool             `json:"self_cancellable"`
+	CanRecordPayment       bool             `json:"can_record_payment"`
+	CanReview              bool             `json:"can_review"`
 	AutoConfirmAt          *time.Time       `json:"auto_confirm_at"`
 	Allocations            []allocationView `json:"allocations"`
 	StatusHistory          []statusEntry    `json:"status_history"`
 	Payments               []paymentView    `json:"payments"`
+	PaymentMismatch        *paymentMismatch `json:"payment_mismatch"`
 }
 
 // accept forms the agreement for one accepted offer following research.md R-04.
@@ -410,12 +425,20 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
 			AllowedTransitions:     allowedTransitions(wo.Status),
 			SelfCancellable:        wo.Status == sqlcgen.WorkOrderStatusAccepted,
-			AutoConfirmAt:          nil,
-			Allocations:            allocations,
+			// The accepting caller is the buyer, a party, and a fresh order is
+			// 'accepted', a status that still takes payment statements, so the
+			// buyer may record one right away (FR-041). It is not yet confirmed
+			// received, so it is not reviewable, and with no statements there is
+			// no mismatch (FR-043, FR-047).
+			CanRecordPayment: true,
+			CanReview:        false,
+			AutoConfirmAt:    nil,
+			Allocations:      allocations,
 			StatusHistory: []statusEntry{
 				{Status: string(wo.Status), At: now, Note: &noteStr},
 			},
-			Payments: []paymentView{},
+			Payments:        []paymentView{},
+			PaymentMismatch: nil,
 		}
 		return nil
 	})

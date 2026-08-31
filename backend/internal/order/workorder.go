@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -78,7 +79,7 @@ func (s *Service) handleWorkOrderDetail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	view, err := s.buildDetailView(r.Context(), row)
+	view, err := s.buildDetailView(r.Context(), row, acc.ID)
 	if err != nil {
 		httpx.WriteInternal(w)
 		return
@@ -92,7 +93,13 @@ func (s *Service) handleWorkOrderDetail(w http.ResponseWriter, r *http.Request) 
 // client renders from the array instead of duplicating the machine (FR-039).
 // auto_confirm_at is present only once shipped, when the 7-day clock has a start
 // (FR-068).
-func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderForViewRow) (workOrderView, error) {
+//
+// callerAccount is the account reading the order. can_record_payment and
+// can_review depend on who is asking: only a party (buyer or subcontractor) may
+// record a statement or review, so an admin reading the order past the party
+// guard gets both false. payment_mismatch does not depend on the caller: it is
+// the same flag a party sees and admin reads when a dispute is reported (FR-043).
+func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderForViewRow, callerAccount pgtype.UUID) (workOrderView, error) {
 	history, err := s.queries().ListWorkOrderStatusHistory(ctx, row.ID)
 	if err != nil {
 		return workOrderView{}, err
@@ -161,6 +168,37 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		effStatus = sqlcgen.WorkOrderStatusConfirmed
 	}
 
+	// can_record_payment and can_review are caller-scoped: only a party may state a
+	// payment or review the order, so an admin reading the order past the party
+	// guard gets both false and the client offers neither button. A party may
+	// record a payment on any status except cancelled (a cancelled order settles no
+	// money through the platform, FR-041). It may review once the order reads as
+	// confirmed received and it has not already reviewed, the same two legs
+	// createReview enforces (FR-047); ReviewExistsForOrderReviewer is the
+	// not-yet-reviewed leg, keyed on the caller's own profile so the button never
+	// offers an action the one_review_per_order_per_reviewer constraint would reject.
+	isBuyer := row.BuyerAccount == callerAccount
+	isSub := row.SubcontractorAccount == callerAccount
+	isParty := isBuyer || isSub
+
+	canRecordPayment := isParty && effStatus != sqlcgen.WorkOrderStatusCancelled
+
+	canReview := false
+	if isParty && effStatus == sqlcgen.WorkOrderStatusConfirmed {
+		reviewerID := row.BuyerID
+		if isSub {
+			reviewerID = row.SubcontractorID
+		}
+		reviewed, err := s.queries().ReviewExistsForOrderReviewer(ctx, sqlcgen.ReviewExistsForOrderReviewerParams{
+			WorkOrderID: row.ID,
+			ReviewerID:  reviewerID,
+		})
+		if err != nil {
+			return workOrderView{}, err
+		}
+		canReview = !reviewed
+	}
+
 	view := workOrderView{
 		WorkOrderID:            uuidString(row.ID),
 		Status:                 string(effStatus),
@@ -174,9 +212,12 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		ReadinessDeadline:      platform.FormatDateID(row.ReadinessWeekStart.Time),
 		AllowedTransitions:     allowedTransitions(effStatus),
 		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
+		CanRecordPayment:       canRecordPayment,
+		CanReview:              canReview,
 		Allocations:            allocations,
 		StatusHistory:          statusHistory,
 		Payments:               payments,
+		PaymentMismatch:        computePaymentMismatch(pays, row.BuyerID, row.SubcontractorID),
 	}
 	// auto_confirm_at is shown while the order is still effectively shipped, so the
 	// buyer sees when it will close; once the window has passed the order already
@@ -186,6 +227,65 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		view.AutoConfirmAt = &at
 	}
 	return view, nil
+}
+
+// computePaymentMismatch derives the FR-043 mismatch flag from the two parties'
+// payment statement rows, never from money (payment_record carries no amount).
+// The platform does not verify that payment happened, so what it marks is a
+// contradiction between statements, not who is right. A statement is one party's
+// declaration in one direction; the buyer's natural direction is 'sent' and the
+// subcontractor's is 'received', so a matched pair is the buyer's sent statement
+// against the subcontractor's received statement.
+//
+// Two shapes count as a mismatch. missing_counterpart: one party has stated and
+// the other has not stated at all, so the pair is incomplete. date_differs: both
+// parties have stated but on different dates, with day_difference the absolute
+// day gap. When both have stated on the same date, or neither has stated at all,
+// there is no mismatch and the result is nil. The flag does not depend on who is
+// reading: it is the same for both parties and for admin on a dispute.
+func computePaymentMismatch(pays []sqlcgen.PaymentRecord, buyerID, subID pgtype.UUID) *paymentMismatch {
+	var buyerDate, subDate *time.Time
+	for _, p := range pays {
+		d := p.Date.Time
+		switch p.ProfileID {
+		case buyerID:
+			if buyerDate == nil || d.Before(*buyerDate) {
+				buyerDate = &d
+			}
+		case subID:
+			if subDate == nil || d.Before(*subDate) {
+				subDate = &d
+			}
+		}
+	}
+
+	switch {
+	case buyerDate == nil && subDate == nil:
+		return nil
+	case buyerDate == nil || subDate == nil:
+		return &paymentMismatch{Kind: "missing_counterpart"}
+	default:
+		days := daysBetween(*buyerDate, *subDate)
+		if days == 0 {
+			return nil
+		}
+		return &paymentMismatch{Kind: "date_differs", DayDifference: &days}
+	}
+}
+
+// daysBetween is the absolute whole-day gap between two statement dates. The dates
+// are stored as WIB calendar days (payment_record.date is a date column), so the
+// difference is taken on the calendar dates, not on wall-clock durations.
+func daysBetween(a, b time.Time) int {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	da := time.Date(ay, am, ad, 0, 0, 0, 0, time.UTC)
+	dbb := time.Date(by, bm, bd, 0, 0, 0, 0, time.UTC)
+	diff := int(da.Sub(dbb).Hours() / 24)
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff
 }
 
 // allocationRemaining is capacity - allocated, floored at zero and forced to zero
@@ -346,7 +446,7 @@ func (s *Service) changeStatus(ctx context.Context, accountID, workOrderID pgtyp
 	if err != nil {
 		return workOrderView{}, err
 	}
-	return s.buildDetailView(ctx, row)
+	return s.buildDetailView(ctx, row, accountID)
 }
 
 // transitionAllowed reports whether target is in the current status's allowed set.
@@ -469,9 +569,17 @@ func (s *Service) listItemView(wo sqlcgen.ListWorkOrdersForPartyRow) workOrderVi
 		ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
 		AllowedTransitions:     allowedTransitions(effStatus),
 		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
-		Allocations:            []allocationView{},
-		StatusHistory:          []statusEntry{},
-		Payments:               []paymentView{},
+		// The list row carries the summary shape only. can_record_payment,
+		// can_review, and payment_mismatch are computed on the detail read, which
+		// loads the payment rows and the caller's review state; the list frontend
+		// renders neither button nor the mismatch notice, so they stay false/nil
+		// here rather than paying for a per-row payment and review lookup.
+		CanRecordPayment: false,
+		CanReview:        false,
+		Allocations:      []allocationView{},
+		StatusHistory:    []statusEntry{},
+		Payments:         []paymentView{},
+		PaymentMismatch:  nil,
 	}
 	if effStatus == sqlcgen.WorkOrderStatusShipped && wo.ShippedAt.Valid {
 		at := AutoConfirmAt(AutoConfirmBase(wo.AutoConfirmBaseAt, wo.ShippedAt))

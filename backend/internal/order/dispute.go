@@ -147,7 +147,7 @@ func (s *Service) createDispute(ctx context.Context, accountID, workOrderID pgty
 	if err != nil {
 		return workOrderView{}, err
 	}
-	return s.buildDetailView(ctx, row)
+	return s.buildDetailView(ctx, row, accountID)
 }
 
 // isDisputeAlreadyOpen reports whether err is the unique-violation on the

@@ -182,7 +182,7 @@ func (s *Service) createPayment(ctx context.Context, accountID, workOrderID pgty
 	if err != nil {
 		return workOrderView{}, err
 	}
-	return s.buildDetailView(ctx, row)
+	return s.buildDetailView(ctx, row, accountID)
 }
 
 // isPaymentStatementDuplicate reports whether err is the unique-violation on the

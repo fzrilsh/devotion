@@ -255,3 +255,27 @@ func (q *Queries) LockReviewForHide(ctx context.Context, id pgtype.UUID) (LockRe
 	err := row.Scan(&i.ID, &i.Hidden)
 	return i, err
 }
+
+const reviewExistsForOrderReviewer = `-- name: ReviewExistsForOrderReviewer :one
+SELECT EXISTS (
+    SELECT 1 FROM review
+    WHERE work_order_id = $1 AND reviewer_id = $2
+)
+`
+
+type ReviewExistsForOrderReviewerParams struct {
+	WorkOrderID pgtype.UUID
+	ReviewerID  pgtype.UUID
+}
+
+// Reports whether a given profile has already reviewed a given work order, the
+// not-yet-reviewed leg of WorkOrderDetail.can_review (FR-047). The detail view
+// offers the review button only while this is false, so the client never shows
+// an action the one_review_per_order_per_reviewer constraint would reject. Rides
+// that same unique key (work_order_id, reviewer_id).
+func (q *Queries) ReviewExistsForOrderReviewer(ctx context.Context, arg ReviewExistsForOrderReviewerParams) (bool, error) {
+	row := q.db.QueryRow(ctx, reviewExistsForOrderReviewer, arg.WorkOrderID, arg.ReviewerID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
