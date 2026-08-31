@@ -212,6 +212,17 @@ JOIN request_candidate c ON c.id = o.candidate_id
 WHERE c.request_id = $1
 ORDER BY o.candidate_id, o.sequence ASC;
 
+-- ListOffersByCandidates returns every offer for the given candidates so the
+-- incoming list attaches each candidate's chain in one query (FR-032, FR-033).
+-- The subcontractor needs the buyer's latest counter round to reply, which lives
+-- only in the offer chain, not on the candidate row.
+-- name: ListOffersByCandidates :many
+SELECT o.id, o.candidate_id, o.sequence, o.proposed_by, o.total_price,
+       o.readiness_lead_days, o.note, o.created_at
+FROM offer o
+WHERE o.candidate_id = ANY($1::uuid[])
+ORDER BY o.candidate_id, o.sequence ASC;
+
 -- ListIncomingCandidates returns one keyset page of candidates whose listing the
 -- subcontractor account owns, newest request first (FR-030). An optional status
 -- filter narrows to one candidate_status. The cursor tuple is (created_at, id)

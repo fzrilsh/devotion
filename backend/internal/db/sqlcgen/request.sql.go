@@ -547,6 +547,47 @@ func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCa
 	return items, nil
 }
 
+const listOffersByCandidates = `-- name: ListOffersByCandidates :many
+SELECT o.id, o.candidate_id, o.sequence, o.proposed_by, o.total_price,
+       o.readiness_lead_days, o.note, o.created_at
+FROM offer o
+WHERE o.candidate_id = ANY($1::uuid[])
+ORDER BY o.candidate_id, o.sequence ASC
+`
+
+// ListOffersByCandidates returns every offer for the given candidates so the
+// incoming list attaches each candidate's chain in one query (FR-032, FR-033).
+// The subcontractor needs the buyer's latest counter round to reply, which lives
+// only in the offer chain, not on the candidate row.
+func (q *Queries) ListOffersByCandidates(ctx context.Context, dollar_1 []pgtype.UUID) ([]Offer, error) {
+	rows, err := q.db.Query(ctx, listOffersByCandidates, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Offer{}
+	for rows.Next() {
+		var i Offer
+		if err := rows.Scan(
+			&i.ID,
+			&i.CandidateID,
+			&i.Sequence,
+			&i.ProposedBy,
+			&i.TotalPrice,
+			&i.ReadinessLeadDays,
+			&i.Note,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOffersByRequest = `-- name: ListOffersByRequest :many
 SELECT o.id, o.candidate_id, o.sequence, o.proposed_by, o.total_price,
        o.readiness_lead_days, o.note, o.created_at
