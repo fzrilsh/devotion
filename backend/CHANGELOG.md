@@ -78,6 +78,10 @@ perubahannya.
   audit blok E (`docs/utang-teknis.md`).
 
 ### Diperbaiki
+- Build image CI gagal di `go mod download` karena stage build Dockerfile masih
+  memakai `golang:1.24.1-alpine`, sedangkan `go.mod` menuntut `go >= 1.25.0`
+  dengan `GOTOOLCHAIN=local`. Base image build dinaikkan ke `golang:1.25-alpine`
+  agar sejalan dengan `GO_VERSION` di workflow CI.
 - Kontrak dan dokumen perencanaan diselaraskan dengan kode yang sudah terbit,
   hasil audit backend. `ROLES_IN_USE` ditambahkan ke enum `Problem.code` di
   `openapi.yaml` (kode ini sudah ditegakkan `PATCH /api/me/roles` dan ada di
