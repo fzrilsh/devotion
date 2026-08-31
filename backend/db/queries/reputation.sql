@@ -11,6 +11,17 @@ INSERT INTO review (
 ) VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
+-- name: ReviewExistsForOrderReviewer :one
+-- Reports whether a given profile has already reviewed a given work order, the
+-- not-yet-reviewed leg of WorkOrderDetail.can_review (FR-047). The detail view
+-- offers the review button only while this is false, so the client never shows
+-- an action the one_review_per_order_per_reviewer constraint would reject. Rides
+-- that same unique key (work_order_id, reviewer_id).
+SELECT EXISTS (
+    SELECT 1 FROM review
+    WHERE work_order_id = $1 AND reviewer_id = $2
+);
+
 -- name: GetReviewForResponse :one
 -- Reloads one review with the author's business name and the transaction date,
 -- so the 201 body carries the same shape the public list returns. Keyed on the

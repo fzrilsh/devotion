@@ -98,7 +98,7 @@ func TestAutoConfirm_SixDaysNotYetDue_FR068(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetWorkOrderForView: %v", err)
 	}
-	view, err := h.svc.buildDetailView(context.Background(), row)
+	view, err := h.svc.buildDetailView(context.Background(), row, h.buyerAcc)
 	if err != nil {
 		t.Fatalf("buildDetailView: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestAutoConfirm_BothLayersShareDomainFunction_FR068_FR070(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetWorkOrderForView: %v", err)
 	}
-	view, err := h.svc.buildDetailView(context.Background(), row)
+	view, err := h.svc.buildDetailView(context.Background(), row, h.buyerAcc)
 	if err != nil {
 		t.Fatalf("buildDetailView: %v", err)
 	}
@@ -290,7 +290,7 @@ func TestAutoConfirm_BothLayersShareDomainFunction_FR068_FR070(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetWorkOrderForView: %v", err)
 	}
-	view, err = h.svc.buildDetailView(context.Background(), row)
+	view, err = h.svc.buildDetailView(context.Background(), row, h.buyerAcc)
 	if err != nil {
 		t.Fatalf("buildDetailView: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestAutoConfirm_BothLayersAgreeOnDisputed_FR070(t *testing.T) {
 	if !row.HasOpenDispute {
 		t.Fatal("has_open_dispute false pada pesanan bersengketa; lapisan baca tak akan tahu (FR-070)")
 	}
-	view, err := h.svc.buildDetailView(context.Background(), row)
+	view, err := h.svc.buildDetailView(context.Background(), row, h.buyerAcc)
 	if err != nil {
 		t.Fatalf("buildDetailView: %v", err)
 	}

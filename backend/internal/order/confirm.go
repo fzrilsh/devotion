@@ -169,5 +169,5 @@ func (s *Service) confirm(ctx context.Context, accountID, workOrderID pgtype.UUI
 	if err != nil {
 		return workOrderView{}, err
 	}
-	return s.buildDetailView(ctx, row)
+	return s.buildDetailView(ctx, row, accountID)
 }
