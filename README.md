@@ -276,7 +276,9 @@ flowchart TB
 
 ### Database schema
 
-**26 tabel domain** dari **19 migrasi**, ditambah tabel milik `whatsmeow` yang dibuat library itu sendiri. ERD dipecah per konteks agar terbaca. Atribut dibatasi pada primary key, foreign key, dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
+**26 tabel domain**, plus `schema_migrations` dan tabel milik `whatsmeow`. ERD dipecah per konteks. Atribut dibatasi pada kunci dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
+
+Entitas tanpa daftar atribut sudah dirinci di diagram lain. Kolom aktor admin (`decided_by`, `handled_by`, `hidden_by`, `changed_by`) menunjuk `user_account.id` dan kosong selama keputusan belum diambil; panahnya tidak digambar.
 
 #### Identitas, wilayah, dan verifikasi
 
@@ -289,7 +291,7 @@ erDiagram
     user_account ||--o{ verification_code : "menerima"
     business_profile ||--o{ uploaded_file : "mengunggah"
     business_profile ||--o{ verification_request : "mengajukan"
-    uploaded_file ||--o| verification_request : "melampirkan"
+    uploaded_file ||--o{ verification_request : "melampirkan"
 
     province {
         text code PK "regex 2 digit"
@@ -310,6 +312,8 @@ erDiagram
         boolean role_subcontractor
         boolean role_buyer
         boolean role_admin "eksklusif dari peran usaha"
+        boolean notif_nontx_email "preferensi kanal non transaksional"
+        boolean notif_nontx_whatsapp "preferensi kanal non transaksional"
     }
     business_profile {
         uuid id PK
@@ -318,6 +322,7 @@ erDiagram
         text city_code FK
         numeric latitude "dibatasi wilayah Indonesia"
         numeric longitude "wajib berpasangan dengan latitude"
+        text description
         boolean verified
     }
     session {
@@ -326,6 +331,7 @@ erDiagram
         bytea token_hash UK "hash, bukan token mentah"
         inet source_address
         timestamptz expires_at
+        timestamptz accessed_at "dasar perpanjangan sesi"
     }
     verification_code {
         uuid id PK
@@ -339,6 +345,7 @@ erDiagram
         uuid id PK
         uuid owner_profile_id FK
         file_type type "identity_document, location_photo"
+        text original_name
         text mime_type "jpeg, png, pdf saja"
         integer size_bytes "maksimal 5 MB"
         text storage_path UK "nama dibuat sistem"
@@ -346,11 +353,14 @@ erDiagram
     verification_request {
         uuid id PK
         uuid profile_id FK "satu pengajuan pending per profil"
+        text identity_number
         uuid identity_file_id FK
         uuid location_file_id FK
         verification_status status
         text admin_note "wajib bila ditolak"
-        uuid decided_by FK
+        uuid decided_by FK "user_account, wajib bila sudah diputus"
+        timestamptz decided_at
+        inet applicant_source_address
     }
 ```
 
@@ -365,7 +375,7 @@ erDiagram
     capacity_listing ||--o{ listing_machine : "mengoperasikan"
     catalog_item ||--o{ listing_product : "dirujuk"
     catalog_item ||--o{ listing_machine : "dirujuk"
-    catalog_item ||--o| item_proposal : "dihasilkan"
+    catalog_item ||--o{ item_proposal : "dihasilkan"
 
     catalog_item {
         uuid id PK
@@ -380,8 +390,10 @@ erDiagram
         item_type type
         text proposed_name
         proposal_status status
+        text admin_note
         uuid item_id FK "terisi bila disetujui"
-        uuid decided_by FK
+        uuid decided_by FK "user_account"
+        timestamptz decided_at
     }
     capacity_listing {
         uuid id PK
@@ -416,6 +428,11 @@ erDiagram
 ```mermaid
 erDiagram
     business_profile ||--o{ quota_request : "mengirim"
+    business_profile ||--o{ request_candidate : "dijangkau sebagai subkontraktor"
+    business_profile ||--o{ work_order : "menjadi pembeli atau subkontraktor"
+    business_profile ||--o{ payment_record : "menyatakan pembayaran"
+    business_profile ||--o{ review : "menulis dan menerima"
+    business_profile ||--o{ dispute : "melaporkan"
     catalog_item ||--o{ quota_request : "menentukan produk"
     quota_request ||--o{ request_candidate : "menjangkau"
     capacity_listing ||--o{ request_candidate : "dinilai"
@@ -436,6 +453,7 @@ erDiagram
         integer quantity "harus positif"
         text material
         date deadline
+        text note
         timestamptz reply_due_at "72 jam sejak dibuat"
     }
     request_candidate {
@@ -453,6 +471,7 @@ erDiagram
         offer_party proposed_by "subcontractor atau buyer"
         bigint total_price "rupiah bulat, harus positif"
         integer readiness_lead_days
+        text note
     }
     work_order {
         uuid id PK
@@ -463,13 +482,17 @@ erDiagram
         integer quantity
         bigint total_price "rupiah bulat"
         date deadline
-        date readiness_week_start "wajib hari Senin"
+        date readiness_week_start "wajib hari Senin, tidak melewati deadline"
         work_order_status status "7 status"
         timestamptz shipped_at
         timestamptz auto_confirm_base_at "dasar hitung 7 hari"
         timestamptz confirmed_at
         boolean auto_confirmed
+        timestamptz confirm_warn_sent_at "penanda pengingat sekali kirim"
+        timestamptz late_notified_at "penanda pemberitahuan lewat tenggat"
         uuid cancelled_by_id FK
+        text cancellation_reason
+        timestamptz cancelled_at
     }
     capacity_allocation {
         uuid id PK
@@ -483,8 +506,9 @@ erDiagram
         uuid work_order_id FK
         work_order_status old_status
         work_order_status new_status
-        uuid changed_by FK "wajib bila bukan sistem"
+        uuid changed_by FK "user_account, wajib bila bukan sistem"
         boolean by_system
+        text note
     }
     payment_record {
         uuid id PK
@@ -492,16 +516,20 @@ erDiagram
         uuid profile_id FK
         payment_direction direction "sent atau received"
         date date "tanpa kolom jumlah uang"
+        text note
     }
     dispute {
         uuid id PK
         uuid work_order_id FK "satu sengketa terbuka per pesanan"
         uuid reporter_id FK
+        text report_body
         dispute_status status
         dispute_result result "cancelled, continued, confirmed"
         boolean allocation_reversed
         uuid liable_party_id FK
-        uuid handled_by FK
+        text admin_note
+        uuid handled_by FK "user_account"
+        timestamptz resolved_at
     }
     review {
         uuid id PK
@@ -509,10 +537,15 @@ erDiagram
         uuid reviewer_id FK "tidak boleh sama dengan reviewee"
         uuid reviewee_id FK
         smallint rating "1 sampai 5"
+        text text
         boolean hidden
-        uuid hidden_by FK
+        uuid hidden_by FK "user_account"
+        timestamptz hidden_at
+        text hidden_reason
     }
 ```
+
+Tiga aturan di sini harus membaca tabel lain, jadi ditegakkan trigger, bukan `CHECK`: `trg_reject_self_request` menolak kandidat yang subkontraktornya sama dengan pembeli (FR-083), `trg_reject_allocation_before_readiness` menolak alokasi sebelum `readiness_week_start` (FR-087), `trg_reject_wrong_item_type` mengikat `listing_product` ke item `product` dan `listing_machine` ke `machine`.
 
 #### Notifikasi dan pembatasan laju
 
@@ -538,6 +571,8 @@ erDiagram
         delivery_status status "pending, sent, failed_permanent"
         smallint attempts "maksimal 3"
         text last_error
+        timestamptz attempted_at "urutan antrean pengiriman"
+        timestamptz sent_at
     }
     rate_limit {
         uuid id PK
@@ -548,16 +583,18 @@ erDiagram
     }
 ```
 
+`rate_limit` tanpa kunci asing. `key` menyimpan pengenal sasaran sebagai teks (id akun, nomor, atau alamat asal) sesuai `target`, sehingga pembatasan tetap berlaku bagi pihak yang belum punya akun.
+
 #### Keputusan skema
 
 | Keputusan | Penerapan | Alasan |
 |---|---|---|
-| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` bertipe `bigint` dengan `CHECK (total_price > 0)`. | Rupiah tidak dipecah di praktik B2B ini, dan tipe pecahan menimbulkan galat pembulatan yang sulit dilacak. |
-| **Minggu selalu Senin** | `week_start`, `horizon_until`, `readiness_week_start` bertipe `date` dengan `CHECK (EXTRACT(ISODOW ...) = 1)`. | Mencegah periode jatuh di tengah minggu, yang membuat kapasitas berkurang dari periode salah. |
-| **Platform tidak memegang dana** | `payment_record` tanpa kolom jumlah uang, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa menjadi perantara dana. |
-| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`; `used_capacity <= total_capacity`; penulisan satu transaksi dengan `SELECT ... FOR UPDATE` terurut menaik menurut `week_start`. | Batas ditegakkan database, dan urutan penguncian seragam mencegah deadlock. |
-| **Jejak keputusan lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan yang mewajibkan kolom pendukung terisi begitu status keluar dari pending. | Status terminal tidak dapat tersimpan tanpa catatan admin, waktu, dan pelaku. |
-| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` bertipe `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti pengambilalihan sesi. |
+| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` `bigint`, `CHECK (total_price > 0)`. | Rupiah tidak dipecah di B2B ini, dan tipe pecahan menimbulkan galat pembulatan. |
+| **Minggu selalu Senin** | `week_start`, `horizon_until`, `readiness_week_start` `date` dengan `CHECK (EXTRACT(ISODOW ...) = 1)`. | Periode tidak jatuh di tengah minggu, jadi kapasitas tidak berkurang dari periode salah. |
+| **Platform tidak memegang dana** | `payment_record` tanpa kolom jumlah, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa jadi perantara dana. |
+| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`, `used_capacity <= total_capacity`, satu transaksi dengan `SELECT ... FOR UPDATE` terurut `week_start`. | Batas ditegakkan database, dan urutan kunci seragam mencegah deadlock. |
+| **Jejak keputusan lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan: kolom pendukung wajib terisi begitu status keluar dari pending. | Status terminal tidak tersimpan tanpa catatan admin, waktu, dan pelaku. |
+| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti pengambilalihan sesi. |
 
 Definisi lengkap beserta indeks dan constraint ada di `docs/001-capacity-exchange-marketplace/data-model.md` dan `backend/db/migrations/`.
 
