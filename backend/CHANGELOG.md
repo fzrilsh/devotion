@@ -78,6 +78,18 @@ perubahannya.
   audit blok E (`docs/utang-teknis.md`).
 
 ### Diperbaiki
+- Tombol "Catat Pembayaran" (FR-041) dan "Beri Ulasan" (FR-047) tidak pernah
+  muncul di halaman detail pesanan mana pun. Kontrak menuntut `WorkOrderDetail`
+  membawa `can_record_payment`, `can_review`, dan `payment_mismatch`, dan
+  frontend merender tombolnya dari flag itu, tetapi struct `workOrderView` tak
+  pernah memuat ketiganya dan `buildDetailView` tak pernah menghitungnya,
+  sehingga selalu `undefined`. `can_record_payment` kini benar bila pemanggil
+  adalah pihak pesanan dan status bukan `cancelled`; `can_review` benar bila
+  pemanggil pihak, pesanan sudah `confirmed`, dan pemanggil belum mengulas;
+  `payment_mismatch` bersifat sama untuk kedua pihak dan admin, diturunkan dari
+  ada/tidaknya pasangan pernyataan pembayaran dan perbandingan tanggalnya, bukan
+  dari nilai uang (tidak ada kolom jumlah). Admin bukan pihak mendapat kedua
+  tombol nonaktif. Test menunjuk FR-041, FR-043, dan FR-047.
 - Build image CI gagal di `go mod download` karena stage build Dockerfile masih
   memakai `golang:1.24.1-alpine`, sedangkan `go.mod` menuntut `go >= 1.25.0`
   dengan `GOTOOLCHAIN=local`. Base image build dinaikkan ke `golang:1.25-alpine`
