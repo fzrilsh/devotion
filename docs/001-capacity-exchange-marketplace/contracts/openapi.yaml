@@ -2319,7 +2319,7 @@ components:
         latest_offer: { $ref: '#/components/schemas/Offer' }
         offers:
           type: array
-          description: Rantai penawaran kandidat terurut sequence naik, supaya subkontraktor melihat ronde sebelumnya saat membalas atau meng-counter (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          description: Seluruh rantai penawaran kandidat terurut sequence naik, sehingga subkontraktor melihat ronde buyer terbaru setelah counter-offer dan bisa membalas menawar (FR-032, FR-033). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
           items: { $ref: '#/components/schemas/Offer' }
 
     IncomingCandidateList:
@@ -2590,16 +2590,9 @@ components:
 
     WhatsAppStatus:
       type: object
-      required: [status]
+      required: [connected]
       properties:
-        status:
-          type: string
-          enum: [connected, pairing, disconnected]
-          description: |
-            connected: tautan terpasang dan kanal WhatsApp jalan. pairing: siklus
-            pemasangan berjalan dan kode QR menunggu dipindai. disconnected: tautan
-            terputus dan tidak ada siklus pemasangan yang berjalan. Bendera boolean
-            tidak dipakai karena tidak dapat membedakan pairing dari disconnected.
+        connected: { type: boolean }
         qr_code:
           type: string
           nullable: true

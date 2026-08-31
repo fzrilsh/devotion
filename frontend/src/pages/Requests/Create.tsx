@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
-import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
+import VerificationGate from "@components/common/VerificationGate";
+import { useAccountVerification } from "@hooks/useAccountVerification";
 import { useMasterProducts } from "@hooks/useListing";
 import { useCreateQuotaRequest } from "@hooks/useQuota";
 import { useEffect, useState } from "react";

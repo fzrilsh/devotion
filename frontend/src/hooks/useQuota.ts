@@ -1,4 +1,4 @@
-import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type QuotaRequestCreate, type RequestCandidate, type SearchParams } from "@api/search";
+import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type IncomingCandidate, type QuotaRequestCreate, type SearchParams } from "@api/search";
 import { appendSessionOffer, getSessionOffers, subscribeOfferSession } from "@lib/offerSession";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useSyncExternalStore } from "react";
@@ -102,7 +102,7 @@ export function useIncomingCandidate(candidateId: string) {
             throw new Error("CANDIDATE_NOT_LOADED");
         },
         select: (fresh) => {
-            const pages = queryClient.getQueryData<{ pages: { items: RequestCandidate[] }[] }>(quotaKeys.incoming());
+            const pages = queryClient.getQueryData<{ pages: { items: IncomingCandidate[] }[] }>(quotaKeys.incoming());
 
             return pages?.pages.flatMap((page) => page.items).find((item) => item.candidate_id === candidateId) ?? fresh;
         },

@@ -1,8 +1,9 @@
 import { ApiError } from "@api/client";
 import type { CatalogItem } from "@api/listing";
 import Loading from "@components/common/Loading";
-import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
+import VerificationGate from "@components/common/VerificationGate";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAccountVerification } from "@hooks/useAccountVerification";
 import { useCreateListing, useListingVisibility, useMasterMachines, useMasterProducts, useMyListing, useProposeMasterItem, useUpdateListing } from "@hooks/useListing";
 import { cn } from "@lib/utils";
 import { listingSchema, type ListingForm } from "@schemas/listing";

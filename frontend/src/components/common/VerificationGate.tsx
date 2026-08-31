@@ -1,19 +1,7 @@
+import { useAccountVerification } from "@hooks/useAccountVerification";
 import { useAuth } from "@hooks/useAuth";
 import { LuMail, LuPhone, LuShieldAlert } from "react-icons/lu";
 import { Link } from "react-router-dom";
-
-export function useAccountVerification() {
-    const { user } = useAuth();
-
-    const needsEmail = Boolean(user) && !user?.email_verified;
-    const needsPhone = Boolean(user) && !user?.phone_verified;
-
-    return {
-        needsEmail,
-        needsPhone,
-        needsVerification: needsEmail || needsPhone,
-    };
-}
 
 export default function VerificationGate({ action }: { action: string }) {
     const { user } = useAuth();
