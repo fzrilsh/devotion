@@ -1,20 +1,25 @@
 import type { CandidateStatus } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useIncomingCandidates } from "@hooks/useQuota";
+import { latestOffer, resolveOfferChain } from "@lib/offers";
+import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuInbox, LuSend } from "react-icons/lu";
 import { Link } from "react-router-dom";
 import { candidateStatusMeta, formatRupiah } from "./meta";
 
-const filterOptions: { value: CandidateStatus | "all"; label: string }[] = [
-    { value: "all", label: "Semua" },
-    { value: "awaiting_reply", label: "Menunggu Balasan" },
-    { value: "offered", label: "Sudah Dibalas" },
-    { value: "agreed", label: "Sepakat" },
-    { value: "rejected", label: "Ditolak" },
-    { value: "expired", label: "Kedaluwarsa" },
-];
+const filterOptions = statusFilters(candidateStatusMeta);
+
+// "Belum ada penawaran" hanya benar sebelum subkontraktor membalas. Status
+// offered berarti rantai penawaran sudah ada, jadi kalimat itu akan menyesatkan
+// bila rantainya tidak ikut terkirim oleh API.
+function offerlessNote(status: CandidateStatus): string {
+    if (status === "awaiting_reply") return "Menunggu balasan Anda";
+    if (status === "offered") return "Negosiasi berjalan, riwayat penawaran belum termuat";
+
+    return "Tanpa penawaran";
+}
 
 export default function Incoming() {
     const [status, setStatus] = useState<CandidateStatus | "all">("all");
@@ -65,6 +70,10 @@ export default function Incoming() {
                     {candidates.map((candidate) => {
                         const meta = candidateStatusMeta[candidate.status];
 
+                        // offers dan latest_offer sama-sama opsional di respons incoming.
+                        // Ronde terakhir dibaca dari rantai bila yang terkirim hanya rantai.
+                        const latest = latestOffer(resolveOfferChain(candidate));
+
                         return (
                             <li key={candidate.candidate_id}>
                                 <Link to={`/requests/incoming/${candidate.candidate_id}`} state={{ candidateId: candidate.candidate_id }} className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-industrial-blue-500/30 hover:shadow-md hover:shadow-slate-200">
@@ -78,12 +87,12 @@ export default function Incoming() {
                                             <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", meta.className)}>{meta.label}</span>
                                         </div>
 
-                                        {candidate.latest_offer ? (
+                                        {latest ? (
                                             <p className="mt-1 text-xs font-semibold text-slate-600">
-                                                Ronde {candidate.latest_offer.sequence}: {formatRupiah(candidate.latest_offer.total_price)} · kesiapan {candidate.latest_offer.readiness_lead_days} hari
+                                                Ronde {latest.sequence}: {formatRupiah(latest.total_price)} · kesiapan {latest.readiness_lead_days} hari
                                             </p>
                                         ) : (
-                                            <p className="mt-1 text-xs text-slate-400">{candidate.status === "awaiting_reply" ? "Menunggu balasan Anda" : "Belum ada penawaran"}</p>
+                                            <p className="mt-1 text-xs text-slate-400">{offerlessNote(candidate.status)}</p>
                                         )}
                                     </div>
 

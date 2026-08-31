@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getMyProfile, getPublicProfile, updateMyProfile, type ProfileUpdateRequest } from "@api/profile";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getMyProfile, getProfileReviews, getPublicProfile, updateMyProfile, type ProfileUpdateRequest } from "@api/profile";
 import { useAuth } from "@hooks/useAuth";
 
 const profileKeys = {
     me: (accountId: string | undefined) => ["profile", "me", accountId] as const,
     public: (profileId: string) => ["profile", "public", profileId] as const,
+    reviews: (profileId: string) => ["profile", "reviews", profileId] as const,
 };
 
 export function useMyProfile() {
@@ -29,6 +30,20 @@ export function usePublicProfile(profileId: string) {
         enabled: !!profileId,
         staleTime: 10 * 60 * 1000,
         gcTime: 30 * 60 * 1000,
+        retry: false,
+    });
+}
+
+// Ulasan per transaksi beserta identitas pengulas dan tanggalnya (FR-049).
+// Kursor diteruskan apa adanya supaya urutan antar halaman tetap stabil.
+export function useProfileReviews(profileId: string) {
+    return useInfiniteQuery({
+        queryKey: profileKeys.reviews(profileId),
+        queryFn: ({ pageParam }) => getProfileReviews(profileId, pageParam),
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
+        enabled: Boolean(profileId),
+        staleTime: 30 * 1000,
         retry: false,
     });
 }

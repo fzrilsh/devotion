@@ -2,9 +2,11 @@ import { ApiError, apiUrl } from "@api/client";
 import type { VerificationRequest, VerificationStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useDecideVerification, useVerificationQueue } from "@hooks/useAdmin";
+import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuCircleCheck, LuFileImage, LuInbox, LuShieldCheck, LuX } from "react-icons/lu";
+import { formatDateTimeId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
@@ -14,18 +16,7 @@ const statusMeta: Record<VerificationStatus, { label: string; className: string 
     rejected: { label: "Ditolak", className: "bg-red-500/10 text-red-600" },
 };
 
-const filterOptions: { value: VerificationStatus | "all"; label: string }[] = [
-    { value: "pending", label: "Menunggu" },
-    { value: "approved", label: "Disetujui" },
-    { value: "rejected", label: "Ditolak" },
-    { value: "all", label: "Semua" },
-];
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
+const filterOptions = statusFilters(statusMeta, { allLast: true });
 
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {

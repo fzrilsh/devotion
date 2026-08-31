@@ -239,9 +239,33 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Modul**: `frontend/src/pages/admin/`
   **FR**: FR-002, FR-052
   **Dependency**: T024a
-  **Kemampuan**: menampilkan QR dan status sambungan dari endpoint T024a, tombol sambung ulang tanpa akses server
-  **Selesai bila**: QR dapat dipindai lewat antarmuka; status tersambung terlihat
-  **Hati-hati**: halaman ini yang mencegah kehilangan demo saat sesi WhatsApp lepas. Render dari endpoint, jangan menyimpan status di sisi klien.
+  **Kemampuan**: menampilkan QR dan status sambungan dari endpoint T024a, tombol Sambungkan Ulang yang memanggil `POST /admin/whatsapp/reconnect` tanpa akses server
+  **Selesai bila**: QR dapat dipindai lewat antarmuka; ketiga keadaan `connected`, `pairing`, `disconnected` punya kalimat sendiri; Sambungkan Ulang menghasilkan QR baru
+  **Hati-hati**: halaman ini yang mencegah kehilangan demo saat sesi WhatsApp lepas. Render dari endpoint, jangan menyimpan status di sisi klien. Muat Ulang hanya membaca status, jadi kode QR yang kedaluwarsa tidak akan segar tanpa reconnect.
+
+- [ ] T024c [BE] Status sesi WhatsApp bertipe enum
+  **Modul**: `backend/internal/notification/`, `backend/internal/admin/`
+  **FR**: FR-002, FR-052
+  **Kemampuan**: `GET /admin/whatsapp` dan `POST /admin/whatsapp/reconnect` mengembalikan `status` bernilai `connected`, `pairing`, atau `disconnected`, menggantikan bendera boolean `connected`
+  **Dependency**: prasyarat T024a
+  **Selesai bila**: siklus pemasangan yang berjalan terlaporkan `pairing`, bukan `disconnected`; tautan terpasang terlaporkan `connected`; test menyebut FR-052
+  **Hati-hati**: boolean tidak dapat membedakan pairing dari disconnected, sehingga halaman admin menyuruh menyambungkan ulang padahal kode QR-nya sudah menunggu dipindai. Kontrak sudah memakai enum ini dan klien sudah merender ketiga keadaan.
+
+- [ ] T056d [US5] [BE] Bendera selisih pernyataan pembayaran pada WorkOrderDetail
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-043
+  **Kemampuan**: setiap jalur yang mengembalikan `WorkOrderDetail` mengisi `payment_mismatch`, yaitu `missing_counterpart` bila hanya satu pihak menyatakan dan `date_differs` beserta `day_difference` bila tanggal keduanya berbeda; null bila pernyataan cocok atau belum ada
+  **Dependency**: prasyarat T053, T056
+  **Selesai bila**: pesanan dengan satu pernyataan menghasilkan `missing_counterpart`; dua pernyataan bertanggal berbeda menghasilkan `date_differs` dengan selisih hari yang benar; dua pernyataan bertanggal sama menghasilkan null; test menyebut FR-043
+  **Hati-hati**: pembandingnya milik domain dan hanya boleh hidup di satu tempat. Klien merender tanda ini apa adanya dan sengaja tidak menyusun ulang aturannya dari daftar `payments`, supaya sisi pesanan dan sisi admin tidak pernah berbeda kesimpulan.
+
+- [x] T025b [FE] Halaman status sistem admin
+  **Modul**: `frontend/src/pages/Admin/System.tsx`, `frontend/src/api/system.ts`, `frontend/src/hooks/useSystem.ts`
+  **FR**: FR-052
+  **Kemampuan**: kartu kesehatan instance beserta ketiga ketergantungan (basis data, kanal WhatsApp, ruang unggahan dengan bilah terpakai), plus peringatan ringkas di dasbor admin yang menaut ke halaman ini
+  **Dependency**: prasyarat T025
+  **Selesai bila**: `near_full` dan `full` terlihat sebelum unggahan mulai ditolak; `degraded` terbaca tanpa membuka log server
+  **Hati-hati**: `apiClient` melemparkan galat pada 503, jadi badannya tidak terbaca. Halaman membaca permintaan yang gagal sebagai instance tidak sehat, bukan sebagai galat jaringan biasa, karena 503 memang hanya dipicu basis data gagal atau penyimpanan penuh.
 
 - [x] T025 [P] [BE] Health check dan Sentry
   **Modul**: `backend/internal/platform/`
@@ -570,6 +594,22 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tidak ada satu pun kolom jumlah uang maupun integrasi pembayaran
   **Hati-hati**: Batas Keuangan konstitusi. Dokumen sumber menempatkan escrow wajib sebagai mitigasi gagal bayar dan penipuan [1], sekaligus sebagai alat tawar dalam sengketa kualitas produk [1]. Keduanya sengaja tidak dibangun di versi ini, dan konsekuensinya tercatat di Assumptions spec. Jangan menambahkannya kembali tanpa mengubah spec lebih dulu.
   **Hati-hati (payments sudah ada di kontrak)**: `WorkOrderDetail` sudah punya field `payments`, dan jalur accept (T041) sudah mengisinya sebagai array kosong supaya kontrak dihormati. Task ini yang mengisinya sungguhan (FR-041..FR-043). Pastikan setiap jalur yang mengembalikan `WorkOrderDetail` menyertakan `payments` dari data, bukan lagi array kosong.
+
+- [ ] T056b [US5] [BE] Bendera kapabilitas pesanan pada WorkOrderDetail
+  **Modul**: `backend/internal/order/`, `backend/internal/reputation/`
+  **FR**: FR-039, FR-041, FR-047
+  **Kemampuan**: setiap jalur yang mengembalikan `WorkOrderDetail` mengisi `can_record_payment` (pemanggil adalah pihak pesanan dan statusnya masih menerima pernyataan) dan `can_review` (pesanan sudah dikonfirmasi dan pemanggil belum pernah mengulas)
+  **Dependency**: prasyarat T053, T056, T062
+  **Selesai bila**: kedua bendera false bagi bukan-pihak; `can_review` false setelah pemanggil mengulas sekali; test menyebut FR-041 dan FR-047
+  **Hati-hati**: aturannya sudah ada di penjaga endpoint `payments` dan `reviews`. Bendera ini wajib memakai fungsi yang sama, bukan salinan kedua, supaya tombol di klien tidak pernah menawarkan aksi yang endpoint-nya menolak. Klien merender kedua tombol murni dari bendera ini (FR-039).
+
+- [ ] T056c [US3] [BE] Rantai penawaran pada IncomingCandidate
+  **Modul**: `backend/internal/quota/`
+  **FR**: FR-032, FR-035
+  **Kemampuan**: `GET /quota-requests/incoming` mengisi `latest_offer` dan `offers` terurut sequence naik, sama seperti sisi pemberi order
+  **Dependency**: prasyarat T042
+  **Selesai bila**: subkontraktor melihat ronde sebelumnya saat meng-counter; `latest_offer` selalu elemen terakhir `offers`; test menyebut FR-032
+  **Hati-hati**: halaman request masuk sudah merender rantai ini. Tanpa pengisian di backend, ronde penawaran hilang dari tampilan subkontraktor tanpa galat apa pun.
 
 - [x] T057 [P] [US5] [BE] Pelaporan sengketa
   **Modul**: `backend/internal/order/`

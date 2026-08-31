@@ -121,18 +121,6 @@ export async function decideProposal(proposalId: string, data: ProposalDecisionR
     return apiClient<ItemProposal>(`/admin/proposals/${encodeURIComponent(proposalId)}/decision`, { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function getProfileReviews(profileId: string, cursor?: string): Promise<ReviewList> {
-    const searchParams = new URLSearchParams();
-
-    if (cursor) {
-        searchParams.set("cursor", cursor);
-    }
-
-    const query = searchParams.toString();
-
-    return apiClient<ReviewList>(`/profile/${profileId}/reviews${query ? `?${query}` : ""}`);
-}
-
 export async function hideReview(reviewId: string, reason: string): Promise<Review> {
     return apiClient<Review>(`/admin/reviews/${encodeURIComponent(reviewId)}/hide`, { method: "POST", body: JSON.stringify({ reason }) });
 }
@@ -147,4 +135,11 @@ export async function resolveDispute(disputeId: string, data: DisputeResolutionR
 
 export async function getWhatsAppStatus(): Promise<WhatsAppStatus> {
     return apiClient<WhatsAppStatus>("/admin/whatsapp");
+}
+
+// Membuang siklus pemasangan yang berjalan lalu memulai yang baru, sehingga admin
+// mendapat kode QR segar tanpa akses server. Bentuk balasannya sama dengan GET,
+// jadi hasilnya langsung ditulis ke cache status.
+export async function reconnectWhatsApp(): Promise<WhatsAppStatus> {
+    return apiClient<WhatsAppStatus>("/admin/whatsapp/reconnect", { method: "POST" });
 }

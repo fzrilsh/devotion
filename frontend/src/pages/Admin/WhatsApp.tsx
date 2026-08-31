@@ -1,13 +1,54 @@
+import { ApiError } from "@api/client";
+import type { WhatsAppStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
-import { useWhatsAppStatus } from "@hooks/useAdmin";
+import { useReconnectWhatsApp, useWhatsAppStatus } from "@hooks/useAdmin";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
-import { LuMessageCircle, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
+import { LuMessageCircle, LuPlug, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
+
+// Tiga keadaan, bukan boolean: pairing dan disconnected menuntut kalimat berbeda,
+// karena pada pairing admin cukup memindai kode QR yang sudah tersedia.
+const statusMeta: Record<WhatsAppStatus["status"], { title: string; body: string; card: string; icon: string; titleColor: string; bodyColor: string }> = {
+    connected: {
+        title: "Sesi terhubung",
+        body: "Kode verifikasi dan notifikasi WhatsApp terkirim normal.",
+        card: "border-emerald-200 bg-emerald-50",
+        icon: "bg-emerald-500/15 text-emerald-600",
+        titleColor: "text-emerald-800",
+        bodyColor: "text-emerald-700",
+    },
+    pairing: {
+        title: "Menunggu pemindaian",
+        body: "Siklus pemasangan sedang berjalan. Pindai kode QR di bawah dari perangkat layanan sebelum siklusnya berakhir.",
+        card: "border-amber-200 bg-amber-50",
+        icon: "bg-amber-500/15 text-amber-600",
+        titleColor: "text-amber-800",
+        bodyColor: "text-amber-700",
+    },
+    disconnected: {
+        title: "Sesi terputus",
+        body: "Kode verifikasi dan notifikasi WhatsApp tidak terkirim sampai sesi ditautkan ulang. Notifikasi email tetap berjalan.",
+        card: "border-red-200 bg-red-50",
+        icon: "bg-red-500/15 text-red-600",
+        titleColor: "text-red-800",
+        bodyColor: "text-red-700",
+    },
+};
+
+function getProblemMessage(error: unknown): string {
+    if (error instanceof ApiError && typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
+        return error.data.detail;
+    }
+
+    return "Sesi tidak dapat disambungkan ulang. Coba lagi beberapa saat lagi.";
+}
 
 export default function AdminWhatsApp() {
     const statusQuery = useWhatsAppStatus();
+    const reconnect = useReconnectWhatsApp();
     const status = statusQuery.data;
     const [qrResult, setQrResult] = useState<{ value: string; image: string | null; error: boolean } | null>(null);
+    const [reconnectError, setReconnectError] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -40,20 +81,46 @@ export default function AdminWhatsApp() {
     const qrValue = status?.qr_code?.trim();
     const qrImage = qrValue?.startsWith("data:image/") ? qrValue : qrResult?.value === qrValue ? qrResult?.image : null;
     const qrError = qrResult?.value === qrValue && Boolean(qrResult?.error);
+    const meta = status ? statusMeta[status.status] : null;
+
+    async function handleReconnect() {
+        setReconnectError("");
+
+        try {
+            await reconnect.mutateAsync();
+        } catch (err) {
+            setReconnectError(getProblemMessage(err));
+        }
+    }
 
     return (
         <div className="mx-auto space-y-6">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 className="text-xl font-bold text-slate-900">WhatsApp</h1>
                     <p className="mt-1 text-sm text-slate-500">Status sesi WhatsApp yang mengirim kode verifikasi dan notifikasi ke pengguna.</p>
                 </div>
 
-                <button type="button" onClick={() => statusQuery.refetch()} disabled={statusQuery.isFetching} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" aria-label="Muat ulang status">
-                    <LuRefreshCw className={statusQuery.isFetching ? "size-4 animate-spin" : "size-4"} aria-hidden />
-                    Muat Ulang
-                </button>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => statusQuery.refetch()} disabled={statusQuery.isFetching} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60" aria-label="Muat ulang status">
+                        <LuRefreshCw className={statusQuery.isFetching ? "size-4 animate-spin" : "size-4"} aria-hidden />
+                        Muat Ulang
+                    </button>
+
+                    <button type="button" onClick={handleReconnect} disabled={reconnect.isPending} className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-deep-navy-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
+                        <LuPlug className={reconnect.isPending ? "size-4 animate-pulse" : "size-4"} aria-hidden />
+                        {reconnect.isPending ? "Menyambungkan..." : "Sambungkan Ulang"}
+                    </button>
+                </div>
             </div>
+
+            <p className="text-xs leading-5 text-slate-500">Muat Ulang hanya membaca status. Sambungkan Ulang memulai siklus pemasangan baru sehingga kode QR-nya segar; bila sesi masih terpasang, soketnya disambungkan ulang tanpa menghapus tautan.</p>
+
+            {reconnectError ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert" aria-live="polite">
+                    {reconnectError}
+                </div>
+            ) : null}
 
             {statusQuery.isLoading ? (
                 <Loading />
@@ -61,20 +128,16 @@ export default function AdminWhatsApp() {
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
                     <p className="text-sm font-semibold text-red-700">Status WhatsApp tidak dapat dimuat. Coba muat ulang.</p>
                 </div>
-            ) : status ? (
+            ) : status && meta ? (
                 <div className="space-y-4">
-                    <div className={`flex items-start gap-4 rounded-2xl border p-6 ${status.connected ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
-                        <span className={`grid size-12 shrink-0 place-items-center rounded-xl ${status.connected ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-600"}`}>
+                    <div className={`flex items-start gap-4 rounded-2xl border p-6 ${meta.card}`}>
+                        <span className={`grid size-12 shrink-0 place-items-center rounded-xl ${meta.icon}`}>
                             <LuMessageCircle className="size-6" aria-hidden />
                         </span>
 
                         <div>
-                            <p className={`text-sm font-bold ${status.connected ? "text-emerald-800" : "text-red-800"}`}>{status.connected ? "Sesi terhubung" : "Sesi terputus"}</p>
-                            <p className={`mt-1 text-sm leading-6 ${status.connected ? "text-emerald-700" : "text-red-700"}`}>
-                                {status.connected
-                                    ? "Kode verifikasi dan notifikasi WhatsApp terkirim normal."
-                                    : "Kode verifikasi dan notifikasi WhatsApp tidak terkirim sampai sesi ditautkan ulang. Notifikasi email tetap berjalan."}
-                            </p>
+                            <p className={`text-sm font-bold ${meta.titleColor}`}>{meta.title}</p>
+                            <p className={`mt-1 text-sm leading-6 ${meta.bodyColor}`}>{meta.body}</p>
                         </div>
                     </div>
 
@@ -99,7 +162,12 @@ export default function AdminWhatsApp() {
 
                             {qrImage ? <img src={qrImage} alt="Kode QR penautan sesi WhatsApp" className="mx-auto mt-4 size-56 rounded-xl border border-slate-200" /> : qrError ? <p className="mt-4 text-sm text-red-600">Kode QR tidak dapat dibuat. Muat ulang status untuk mencoba lagi.</p> : <p className="mt-4 text-sm text-slate-500">Menyiapkan kode QR...</p>}
 
-                            <p className="mt-3 text-[11px] text-slate-400">Kode QR diperbarui otomatis. Halaman ini memuat ulang status tiap 30 detik.</p>
+                            <p className="mt-3 text-[11px] text-slate-400">Halaman ini memuat ulang status tiap 30 detik. Bila kode QR-nya kedaluwarsa, tekan Sambungkan Ulang.</p>
+                        </div>
+                    ) : status.status === "disconnected" ? (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
+                            <LuQrCode className="mx-auto size-8 text-slate-300" aria-hidden />
+                            <p className="mt-2 text-sm text-slate-500">Belum ada kode QR. Tekan Sambungkan Ulang untuk memulai siklus pemasangan.</p>
                         </div>
                     ) : null}
                 </div>

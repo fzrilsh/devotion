@@ -1,5 +1,7 @@
 import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type QuotaRequestCreate, type RequestCandidate, type SearchParams } from "@api/search";
+import { appendSessionOffer, getSessionOffers, subscribeOfferSession } from "@lib/offerSession";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useSyncExternalStore } from "react";
 
 export const quotaKeys = {
     search: (params: SearchParams | null) => ["quota", "search", params] as const,
@@ -60,24 +62,38 @@ export function useIncomingCandidates(status?: CandidateStatus) {
     });
 }
 
-// Kandidat request masuk diidentifikasi candidate_id. Endpoint detail request
-// (/quota-requests/{id}) khusus pembanding milik pemberi order, jadi halaman
-// subkontraktor membaca kandidatnya dari daftar incoming.
+// Kandidat request masuk diidentifikasi candidate_id. Kontrak belum punya
+// GET /candidates/{candidateId}, dan endpoint detail request (/quota-requests/{id})
+// khusus pembanding milik pemberi order, jadi halaman subkontraktor menyusuri
+// daftar incoming sampai kandidatnya ketemu.
+//
+// Penyusuran mengikuti has_next sampai habis, bukan berhenti pada jumlah halaman
+// tetap: kandidat lama tetap dapat dibuka dari notifikasi meski sudah terdorong
+// jauh ke belakang daftar. Batas 200 halaman hanya jaring pengaman terhadap
+// kursor yang tidak maju, bukan batas jangkauan yang diharapkan tercapai.
+const MAX_INCOMING_SCAN_PAGES = 200;
+
 export function useIncomingCandidate(candidateId: string) {
     const queryClient = useQueryClient();
 
     return useQuery({
         queryKey: ["quota", "incoming", "detail", candidateId] as const,
         queryFn: async () => {
+            const seen = new Set<string>();
             let cursor: string | undefined;
 
-            for (let page = 0; page < 5; page += 1) {
+            for (let page = 0; page < MAX_INCOMING_SCAN_PAGES; page += 1) {
                 const result = await getIncomingCandidates({ cursor });
                 const found = result.items.find((item) => item.candidate_id === candidateId);
 
                 if (found) return found;
                 if (!result.pagination.has_next || !result.pagination.next_cursor) break;
 
+                // Kursor bersifat opaque, jadi kemajuannya tidak bisa diperiksa selain
+                // dengan membandingkan nilainya. Kursor yang berulang berarti berputar.
+                if (seen.has(result.pagination.next_cursor)) break;
+
+                seen.add(result.pagination.next_cursor);
                 cursor = result.pagination.next_cursor;
             }
 
@@ -104,12 +120,27 @@ function useQuotaInvalidator() {
     };
 }
 
+// Rantai penawaran yang sudah diterima dari backend selama sesi ini, dibaca dari
+// penampung di luar React supaya nilainya bertahan saat halaman detail dilepas
+// dan dipasang ulang (misalnya setelah menutup panel atau berpindah kandidat).
+export function useSessionOffers(candidateId: string) {
+    const getSnapshot = useCallback(() => getSessionOffers(candidateId), [candidateId]);
+
+    return useSyncExternalStore(subscribeOfferSession, getSnapshot, getSnapshot);
+}
+
 export function useSendOffer(candidateId: string) {
     const invalidate = useQuotaInvalidator();
 
     return useMutation({
         mutationFn: (data: { total_price: number; readiness_lead_days: number; note?: string }) => sendOffer(candidateId, data),
-        onSuccess: () => invalidate(),
+        // Respons POST /candidates/{id}/offers adalah Offer utuh. Daftar incoming
+        // tidak mengirim rantai penawaran, jadi Offer ini disimpan apa adanya supaya
+        // ronde yang baru terkirim tetap terlihat setelah daftar dimuat ulang.
+        onSuccess: (offer) => {
+            appendSessionOffer(candidateId, offer);
+            invalidate();
+        },
     });
 }
 
@@ -122,12 +153,18 @@ export function useRejectCandidate(candidateId: string) {
     });
 }
 
-export function useCounterOffer() {
+// candidateId opsional: sisi pemberi order sudah menerima rantai penawaran utuh
+// dari GET /quota-requests/{requestId}, jadi hanya sisi subkontraktor yang perlu
+// menampung Offer hasil counter.
+export function useCounterOffer(candidateId?: string) {
     const invalidate = useQuotaInvalidator();
 
     return useMutation({
         mutationFn: ({ offerId, data }: { offerId: string; data: { total_price: number; note?: string } }) => counterOffer(offerId, data),
-        onSuccess: () => invalidate(),
+        onSuccess: (offer) => {
+            if (candidateId) appendSessionOffer(candidateId, offer);
+            invalidate();
+        },
     });
 }
 

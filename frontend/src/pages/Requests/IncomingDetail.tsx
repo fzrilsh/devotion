@@ -1,23 +1,19 @@
 import { ApiError } from "@api/client";
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
-import { useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer } from "@hooks/useQuota";
+import { useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
+import { canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { cn } from "@lib/utils";
 import { useState } from "react";
-import { LuArrowLeft, LuCircleCheck, LuHourglass, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
+import { LuArrowLeft, LuCircleCheck, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { candidateStatusMeta, formatDateShort, formatRupiah } from "./meta";
+import { formatDayTimeId as formatDateTimeId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 
 type DetailLocationState = { candidateId?: string };
-
-function formatDateTimeId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 type CapacityInfo = { quantityRequested: number; remainingCapacity: number; untilWeek?: string };
 
@@ -84,10 +80,11 @@ export default function IncomingDetail() {
     const candidateId = stateCandidateId ?? paramCandidateId;
 
     const candidateQuery = useIncomingCandidate(candidateId);
+    const sessionOffers = useSessionOffers(candidateId);
 
     const sendOfferMutation = useSendOffer(candidateId);
     const rejectMutation = useRejectCandidate(candidateId);
-    const counterMutation = useCounterOffer();
+    const counterMutation = useCounterOffer(candidateId);
 
     const [panel, setPanel] = useState<"none" | "offer" | "counter" | "reject">("none");
     const [totalPrice, setTotalPrice] = useState("");
@@ -117,13 +114,19 @@ export default function IncomingDetail() {
     }
 
     const candidate = candidateQuery.data;
-    const latest = candidate.latest_offer;
-    const offers = candidate.offers ?? [];
 
-    const canOffer = candidate.status === "awaiting_reply";
-    const canCounter = candidate.status === "offered" && latest?.party === "buyer";
-    const waitingBuyer = candidate.status === "offered" && latest?.party === "subcontractor";
-    const terminal = ["rejected", "expired", "not_continued", "agreed"].includes(candidate.status);
+    // offers dan latest_offer keduanya opsional pada respons incoming. Yang dikirim
+    // server dipakai lebih dulu; sessionOffers hanya menambal ronde yang dikirim
+    // backend sebagai respons mutasi di sesi ini.
+    const offers = resolveOfferChain(candidate, sessionOffers);
+    const latest = latestOffer(offers);
+
+    const canOffer = canSendFirstOffer(candidate.status, offers);
+    const canCounter = canCounterOffer(candidate.status, latest);
+    const waitingBuyer = isWaitingBuyer(candidate.status, latest);
+    const terminal = isTerminalCandidate(candidate.status);
+    const offerChainMissing = isOfferChainMissing(candidate.status, offers);
+    const chainFromSessionOnly = isChainFromSessionOnly(candidate, offers);
     const busy = sendOfferMutation.isPending || rejectMutation.isPending || counterMutation.isPending;
 
     async function handleSendOffer(event: React.FormEvent) {
@@ -160,7 +163,9 @@ export default function IncomingDetail() {
         event.preventDefault();
         setError("");
 
-        if (!latest) return;
+        // offer_id datang dari Offer yang benar-benar diterima backend, tidak pernah
+        // disusun sendiri dari status atau nomor ronde.
+        if (!latest?.offer_id) return;
 
         const price = Number(counterPrice);
         if (!Number.isInteger(price) || price < 1) {
@@ -269,10 +274,30 @@ export default function IncomingDetail() {
                 ) : null}
 
                 {waitingBuyer ? (
-                    <p className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4 text-sm text-slate-500">
-                        <LuHourglass className="size-4 text-amber-500" aria-hidden />
-                        Penawaran Anda sudah terkirim. Menunggu keputusan pemberi order.
-                    </p>
+                    <div className="mt-4 border-t border-slate-100 pt-4">
+                        <p className="flex items-center gap-2 text-sm text-slate-500">
+                            <LuHourglass className="size-4 shrink-0 text-amber-500" aria-hidden />
+                            Penawaran Anda sudah terkirim. Menunggu keputusan pemberi order.
+                        </p>
+
+                        {chainFromSessionOnly ? (
+                            <>
+                                <p className="mt-2 text-xs leading-5 text-slate-400">
+                                    Ronde di atas berasal dari balasan server atas penawaran yang baru Anda kirim, bukan dari daftar request. Bila pemberi order sudah meng-counter, balasannya belum tentu terlihat di sini: muat ulang data untuk memeriksa.
+                                </p>
+
+                                <button
+                                    type="button"
+                                    onClick={() => candidateQuery.refetch()}
+                                    disabled={candidateQuery.isFetching}
+                                    className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <LuRefreshCw className={cn("size-4", candidateQuery.isFetching && "animate-spin")} aria-hidden />
+                                    {candidateQuery.isFetching ? "Memuat..." : "Muat ulang data"}
+                                </button>
+                            </>
+                        ) : null}
+                    </div>
                 ) : null}
 
                 {candidate.status === "agreed" ? (
@@ -294,7 +319,28 @@ export default function IncomingDetail() {
                     </p>
                 ) : null}
 
-                {canOffer || canCounter ? (
+                {offerChainMissing ? (
+                    <div className="mt-4 border-t border-amber-100 pt-4">
+                        <p className="flex items-start gap-2 text-sm text-slate-600">
+                            <LuTriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden />
+                            <span>
+                                Riwayat penawaran request ini tidak ikut terkirim oleh server, jadi tombol counter belum bisa ditampilkan: meng-counter membutuhkan nomor penawaran yang asli, dan itu hanya bisa datang dari server. Negosiasi masih berjalan dan belum ada kesepakatan, jadi request ini belum berakhir. Coba muat ulang data; bila tetap kosong, laporkan ke admin dengan menyebut status <strong>{candidateStatusMeta[candidate.status].label.toLowerCase()}</strong>. Anda tetap bisa menolak request ini.
+                            </span>
+                        </p>
+
+                        <button
+                            type="button"
+                            onClick={() => candidateQuery.refetch()}
+                            disabled={candidateQuery.isFetching}
+                            className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <LuRefreshCw className={cn("size-4", candidateQuery.isFetching && "animate-spin")} aria-hidden />
+                            {candidateQuery.isFetching ? "Memuat..." : "Muat ulang data"}
+                        </button>
+                    </div>
+                ) : null}
+
+                {canOffer || canCounter || offerChainMissing ? (
                     <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                         {panel === "offer" ? (
                             <form onSubmit={handleSendOffer} className="space-y-3">
@@ -383,13 +429,13 @@ export default function IncomingDetail() {
                                     <button type="button" onClick={() => setPanel("counter")} className="flex-1 cursor-pointer rounded-xl bg-industrial-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                                         Counter Penawaran
                                     </button>
-                                ) : (
+                                ) : canOffer ? (
                                     <button type="button" onClick={() => setPanel("offer")} className="flex-1 cursor-pointer rounded-xl bg-industrial-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                                         Buat Penawaran
                                     </button>
-                                )}
+                                ) : null}
 
-                                <button type="button" onClick={() => setPanel("reject")} className="cursor-pointer rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50">
+                                <button type="button" onClick={() => setPanel("reject")} className={cn("cursor-pointer rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50", offerChainMissing && "flex-1")}>
                                     Tolak
                                 </button>
                             </div>

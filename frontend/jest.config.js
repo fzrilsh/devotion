@@ -26,6 +26,10 @@ export default {
             {
                 tsconfig: {
                     jsx: "react-jsx",
+                    // Sejajar dengan tsconfig.app.json. Tanpa ini ts-jest memakai target
+                    // bawaannya yang lebih tua, jadi metode seperti Array.prototype.at
+                    // gagal typecheck di pengujian meski lolos di build aplikasi.
+                    target: "es2023",
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,
                     verbatimModuleSyntax: false,

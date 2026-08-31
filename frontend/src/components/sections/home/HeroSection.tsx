@@ -7,7 +7,7 @@ export default function HeroSection() {
             <div className="relative mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center *:content-center">
                 <div className="flex flex-col gap-4">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
-                        <span className="text-industrial-blue-500">Delegasikan</span> kelebihan produksi Anda
+                        <span className="text-industrial-blue-500">Delegate</span> Your Overload Production
                     </h1>
                     <p className="text-base text-slate-500 max-w-lg">Devotion menghubungkan UMKM konveksi dengan subkontraktor terpercaya yang siap memenuhi kebutuhan produksi Anda. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                     <div className="flex flex-col sm:flex-row gap-3 mt-2">
@@ -23,8 +23,10 @@ export default function HeroSection() {
                 <div className="grid grid-cols-1 gap-4 h-full md:p-16 w-full">
                     <div className="grid grid-cols-1 md:grid-cols-2 relative gap-4 items-center justify-center w-full min-h-full">
                         <div className="w-full h-full bg-slate-100 p-6 rounded-xl justify-between flex flex-col items-start">
-                            <h1 className="text-4xl font-extrabold tracking-tight text-industrial-blue-500">Kapasitas menganggur, terpakai</h1>
-                            <p className="text-slate-500">Subkontraktor mengisi kalender mingguannya, pemberi order melihat sisa kapasitas sampai deadline sebelum mengirim request.</p>
+                            <h1 className="text-4xl font-extrabold tracking-tight text-industrial-blue-500">
+                                120<span className="text-deep-navy-300">+</span>
+                            </h1>
+                            <p className="text-slate-500 text-sm">Mitra industri terpercaya dengan kapasitas produksi yang siap pakai</p>
                         </div>
                         <div className="w-full h-full rounded-xl overflow-hidden">
                             <img src="https://images.unsplash.com/photo-1741275271362-bb17c416dca9?w=800&h=800&fit=crop&auto=format" alt="Penjahit wanita bekerja di pabrik garmen" className="w-full h-full object-cover" />

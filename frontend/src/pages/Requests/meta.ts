@@ -9,12 +9,6 @@ export const candidateStatusMeta: Record<CandidateStatus, { label: string; class
     agreed: { label: "Sepakat", className: "bg-emerald-500/10 text-emerald-600" },
 };
 
-export function formatDateShort(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
-
-export function formatRupiah(amount: number): string {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
-}
+// formatDateShort dipertahankan sebagai nama lokal karena dipakai empat halaman;
+// implementasinya sekarang pemformat bersama di @lib/datetime.
+export { formatDateId as formatDateShort, formatRupiah } from "@lib/datetime";

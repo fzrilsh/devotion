@@ -1,5 +1,9 @@
 import type { WorkOrderDetail, WorkOrderStatus } from "@api/workOrders";
 
+// Pemformat tanggal dan rupiah tinggal di @lib/datetime; direkspor di sini supaya
+// halaman yang sudah mengimpor dari modul meta ini tidak perlu diubah.
+export { formatDateId, formatDateTimeId, formatRupiah } from "@lib/datetime";
+
 export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; className: string }> = {
     accepted: { label: "Diterima", className: "bg-industrial-blue-500/10 text-industrial-blue-600" },
     production: { label: "Produksi", className: "bg-violet-500/10 text-violet-600" },
@@ -9,50 +13,6 @@ export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; class
     cancelled: { label: "Dibatalkan", className: "bg-red-500/10 text-red-600" },
     in_mediation: { label: "Mediasi", className: "bg-amber-500/10 text-amber-600" },
 };
-
-function parseSafeDate(value?: string | null): Date | null {
-    if (!value) return null;
-
-    const raw = String(value).trim();
-    if (!raw) return null;
-
-    const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
-    const date = new Date(normalized);
-
-    return Number.isNaN(date.getTime()) ? null : date;
-}
-
-export function formatDateId(isoDate?: string | null): string {
-    const date = parseSafeDate(isoDate);
-    if (!date) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "Asia/Jakarta",
-    }).format(date);
-}
-
-export function formatDateTimeId(isoDate?: string | null): string {
-    const date = parseSafeDate(isoDate);
-    if (!date) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "Asia/Jakarta",
-    }).format(date);
-}
-
-export function formatRupiah(amount?: number | null): string {
-    if (amount == null) return "-";
-
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(amount);
-}
 
 export type WorkOrderSide = "buyer" | "subcontractor" | null;
 

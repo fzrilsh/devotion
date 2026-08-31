@@ -2316,6 +2316,11 @@ components:
         can_fulfill:
           type: boolean
           description: Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090).
+        latest_offer: { $ref: '#/components/schemas/Offer' }
+        offers:
+          type: array
+          description: Rantai penawaran kandidat terurut sequence naik, supaya subkontraktor melihat ronde sebelumnya saat membalas atau meng-counter (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          items: { $ref: '#/components/schemas/Offer' }
 
     IncomingCandidateList:
       type: object
@@ -2333,7 +2338,7 @@ components:
 
     WorkOrderDetail:
       type: object
-      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, allowed_transitions, self_cancellable]
+      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, allowed_transitions, self_cancellable, can_record_payment, can_review, payment_mismatch]
       properties:
         work_order_id: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/WorkOrderStatus' }
@@ -2355,6 +2360,12 @@ components:
         self_cancellable:
           type: boolean
           description: Benar hanya selama status accepted (FR-066).
+        can_record_payment:
+          type: boolean
+          description: Benar bila pemanggil adalah pihak pesanan dan status saat ini masih menerima pernyataan pembayaran (FR-041). Klien merender tombolnya dari sini, tidak menyusun ulang aturannya.
+        can_review:
+          type: boolean
+          description: Benar bila pemanggil boleh mengulas pesanan ini, yaitu pesanan sudah dikonfirmasi diterima dan pemanggil belum pernah mengulasnya (FR-047).
         auto_confirm_at: { type: string, format: date-time, nullable: true }
         allocations:
           type: array
@@ -2370,6 +2381,14 @@ components:
         payments:
           type: array
           items: { $ref: '#/components/schemas/PaymentRecord' }
+        payment_mismatch:
+          allOf: [ { $ref: '#/components/schemas/PaymentMismatch' } ]
+          nullable: true
+          description: |
+            Terisi bila pernyataan pembayaran kedua pihak tidak cocok (FR-043), null bila
+            cocok atau belum ada pernyataan sama sekali. Ditandai server dan ditampilkan
+            kepada admin saat sengketa dilaporkan. Klien tidak menyusun ulang aturannya
+            dari daftar payments.
 
     WorkOrderList:
       type: object
@@ -2446,6 +2465,25 @@ components:
         declared_by_profile_id: { type: string, format: uuid }
         note: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
+
+    PaymentMismatch:
+      type: object
+      description: |
+        Ketidakcocokan pernyataan pembayaran antar pihak (FR-043). Platform tidak
+        memverifikasi terjadinya pembayaran, jadi yang ditandai hanyalah pertentangan
+        antar pernyataan, bukan siapa yang benar.
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [missing_counterpart, date_differs]
+          description: |
+            missing_counterpart: satu pihak menyatakan, pihak lawan belum menyatakan apa pun.
+            date_differs: kedua pihak menyatakan, tetapi tanggalnya berbeda.
+        day_difference:
+          type: integer
+          minimum: 1
+          description: Selisih hari antar tanggal pernyataan, hanya pada kind date_differs.
 
     Dispute:
       type: object
@@ -2552,9 +2590,16 @@ components:
 
     WhatsAppStatus:
       type: object
-      required: [connected]
+      required: [status]
       properties:
-        connected: { type: boolean }
+        status:
+          type: string
+          enum: [connected, pairing, disconnected]
+          description: |
+            connected: tautan terpasang dan kanal WhatsApp jalan. pairing: siklus
+            pemasangan berjalan dan kode QR menunggu dipindai. disconnected: tautan
+            terputus dan tidak ada siklus pemasangan yang berjalan. Bendera boolean
+            tidak dipakai karena tidak dapat membedakan pairing dari disconnected.
         qr_code:
           type: string
           nullable: true

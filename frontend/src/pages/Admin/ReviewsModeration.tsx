@@ -1,19 +1,15 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
-import { useHideReview, useProfileReviews } from "@hooks/useAdmin";
+import { useHideReview } from "@hooks/useAdmin";
+import { useProfileReviews } from "@hooks/useProfile";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuEyeOff, LuInbox, LuSearch, LuStar } from "react-icons/lu";
+import { formatDateId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
 const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-function formatDateId(isoDate?: string | null): string {
-    if (!isoDate) return "-";
-
-    return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" }).format(new Date(isoDate));
-}
 
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {

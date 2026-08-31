@@ -5,8 +5,9 @@ export type WorkOrderList = components["schemas"]["WorkOrderList"];
 export type WorkOrderDetail = components["schemas"]["WorkOrderDetail"];
 export type WorkOrderStatus = components["schemas"]["WorkOrderStatus"];
 export type PaymentRecord = components["schemas"]["PaymentRecord"];
+export type PaymentMismatch = components["schemas"]["PaymentMismatch"];
 export type Review = components["schemas"]["Review"];
-export type Dispute = components["schemas"]["Dispute"];
+export type WorkOrderContacts = components["schemas"]["WorkOrderContacts"];
 
 // work_order_id kadang tiba sebagai path penuh ("/work-orders/<id>").
 // Ambil segmen terakhir supaya request tidak pernah membawa prefix dobel.
@@ -33,6 +34,12 @@ export async function getWorkOrder(workOrderId: string): Promise<WorkOrderDetail
     return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}`);
 }
 
+// Hanya kedua pihak pesanan yang boleh membacanya; pemanggil lain menerima 404
+// supaya keberadaan pesanan tidak terbocorkan (FR-092).
+export async function getWorkOrderContacts(workOrderId: string): Promise<WorkOrderContacts> {
+    return apiClient<WorkOrderContacts>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/contacts`);
+}
+
 export async function changeWorkOrderStatus(workOrderId: string, newStatus: "production" | "completed" | "shipped", note?: string): Promise<WorkOrderDetail> {
     return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/status`, { method: "POST", body: JSON.stringify({ new_status: newStatus, note }) });
 }
@@ -45,12 +52,12 @@ export async function cancelWorkOrder(workOrderId: string, reason: string): Prom
     return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/cancel`, { method: "POST", body: JSON.stringify({ reason }) });
 }
 
-export async function recordPayment(workOrderId: string, data: { direction: "sent" | "received"; date: string; note?: string }): Promise<PaymentRecord> {
-    return apiClient<PaymentRecord>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/payments`, { method: "POST", body: JSON.stringify(data) });
+export async function recordPayment(workOrderId: string, data: { direction: "sent" | "received"; date: string; note?: string }): Promise<WorkOrderDetail> {
+    return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/payments`, { method: "POST", body: JSON.stringify(data) });
 }
 
-export async function reportDispute(workOrderId: string, reportBody: string): Promise<Dispute> {
-    return apiClient<Dispute>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/disputes`, { method: "POST", body: JSON.stringify({ report_body: reportBody }) });
+export async function reportDispute(workOrderId: string, reportBody: string): Promise<WorkOrderDetail> {
+    return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/disputes`, { method: "POST", body: JSON.stringify({ report_body: reportBody }) });
 }
 
 export async function submitReview(workOrderId: string, data: { rating: number; text?: string }): Promise<Review> {
