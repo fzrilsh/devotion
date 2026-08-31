@@ -142,6 +142,9 @@ func runServe(ctx context.Context, args []string) error {
 	// owner nudge (FR-021). The reference is kept so that job joins the scheduler.
 	ls := listing.New(pool, clock, notif)
 	ls.Register(router, acc)
+	// account renders the public profile's capacity card (FR-016) through the
+	// listing service, wired here because account is built before listing.
+	acc.SetListingViewer(ls)
 	search.New(pool, clock, ls).Register(router, acc)
 	wa.Register(router, acc)
 
