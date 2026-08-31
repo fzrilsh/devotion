@@ -109,7 +109,7 @@ Yang di bawah ini tidak terlihat di alur utama, tapi ikut menentukan apakah apli
 - **Notifikasi in-app** dengan penanda sudah dibaca, jumlah belum dibaca, dan pilihan kanal email atau WhatsApp. Notifikasi transaksional sengaja tidak bisa dimatikan.
 - **Rate limiting berbasis data domain** untuk percobaan login, kode verifikasi per nomor dan per alamat asal, serta request kuota per pengguna. Penegakannya di aplikasi, tidak diserahkan ke proxy tepi.
 - **Health check** untuk database, sambungan WhatsApp, dan ruang penyimpanan. Endpoint yang sama dipakai sebagai healthcheck container.
-- **Galat yang konsisten** dalam format `application/problem+json`, dengan 33 kode mesin yang stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
+- **Galat yang konsisten** dalam format `application/problem+json`, dengan 34 kode mesin yang stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
 - **Swagger UI** di `/docs` saat mode development, membaca kontrak OpenAPI yang sama dengan yang disematkan ke binary.
 
 ---
@@ -150,7 +150,7 @@ Screenshot belum ikut disimpan di repository. Setelah deployment jalan, taruh be
 #### Frontend
 
 ```text
-Framework    : React 18.3.1, TypeScript 5.7.2
+Framework    : React 18.3.1, TypeScript 5.8.3
 Build tool   : Vite 8.2.0, hasil build di-embed ke binary Go
 Styling      : Tailwind CSS 4.3.3, tanpa component library kedua
 Server state : TanStack Query 5.102.1
@@ -201,7 +201,8 @@ Satu batasan menentukan hampir semua pilihan: aturan panitia yang membatasi laya
 Frontend  react, react-dom, vite, @tanstack/react-query,
           react-hook-form, zod, @hookform/resolvers, react-router-dom,
           tailwindcss, @tailwindcss/vite, leaflet, react-leaflet,
-          motion, react-icons, clsx, tailwind-merge, qrcode
+          motion, react-icons, clsx, tailwind-merge, qrcode,
+          axios, react-compiler-runtime
 
 Backend   github.com/jackc/pgx/v5
           github.com/golang-migrate/migrate/v4
@@ -557,7 +558,7 @@ erDiagram
     notification {
         uuid id PK
         uuid account_id FK
-        event_type event "15 jenis kejadian"
+        event_type event "16 jenis kejadian"
         boolean transactional "tidak dapat dimatikan pengguna"
         text title
         text body
@@ -618,13 +619,13 @@ devotion/
 │   │   ├── reputation/     # ulasan, nilai turunan, moderasi
 │   │   ├── notification/   # antrean, pengiriman, percobaan ulang
 │   │   └── admin/          # status dan penyambungan WhatsApp
-│   ├── db/migrations/      # 19 migrasi golang-migrate
+│   ├── db/migrations/      # 22 migrasi golang-migrate
 │   ├── db/queries/         # 15 berkas SQL sumber sqlc
 │   └── webdist/            # hasil build frontend, disematkan lewat embed.FS
 ├── frontend/src/
 │   ├── api/                # klien fetch dan tipe hasil generate dari OpenAPI
 │   ├── components/         # layout, section, komponen bersama
-│   ├── pages/              # 31 halaman, dikelompokkan per user story
+│   ├── pages/              # 37 halaman, dikelompokkan per user story
 │   ├── hooks/              # hook TanStack Query per domain
 │   ├── schemas/            # skema Zod
 │   ├── routes/             # GuestRoute, ProtectedRoute
@@ -720,7 +721,7 @@ npm run dev
 
 Vite jalan di `http://localhost:5173` dan memproksikan `/api` ke port 8080. Proxy ini wajib: tanpanya frontend dan backend terlihat sebagai origin berbeda, cookie `SameSite=Lax` tidak terkirim, dan setiap permintaan tampak belum login meski login berhasil.
 
-> `npm run build` pada branch `staging` masih gagal. `tsconfig.app.json` dan `tsconfig.node.json` memakai opsi `erasableSyntaxOnly` yang baru dikenal TypeScript 5.8, sedangkan yang terpasang 5.7.2. Hapus opsi itu atau naikkan versi TypeScript sebelum menjalankan build.
+> `npm run build` lolos di TypeScript 5.8.3 — `tsconfig.app.json` dan `tsconfig.node.json` memakai `erasableSyntaxOnly` yang didukung sejak TypeScript 5.8.
 
 ---
 
@@ -856,7 +857,7 @@ POST  /api/admin/reviews/{reviewId}/hide
 GET   /api/admin/whatsapp
 ```
 
-Kontrak memuat 64 operasi, 63 terdaftar di router. Satu yang tersisa, `POST /api/work-orders/{workOrderId}/confirm`, ada di kontrak dan dipanggil frontend tapi belum ada di backend. Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
+Kontrak memuat 66 operasi pada 58 path, seluruhnya terdaftar di router termasuk `POST /api/work-orders/{workOrderId}/confirm` (`backend/internal/order/confirm.go:23`). Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
 
 ### Contoh request
 
@@ -945,7 +946,7 @@ Uji integrasi memakai skema terpisah pada layanan Postgres yang sama, bukan cont
 
 ### Hasil eksekusi pada branch staging
 
-Go 1.25.0, tanpa `DATABASE_URL_TEST`.
+Go 1.25.0, tanpa `DATABASE_URL_TEST` (`npx tsc -b` exit 0, `vite build` lolos di TypeScript 5.8.3).
 
 ```text
 go vet ./...           lulus, tanpa temuan
@@ -953,14 +954,14 @@ go test ./... -p 1     23 paket ok, 0 gagal
                        79 lulus, 274 dilewati karena database tidak dijangkau
 apidocs-sync           salinan openapi.yaml identik dengan sumber
 npm run lint           1 galat, react-refresh/only-export-components
-                       pada src/components/common/VerificationGate.tsx
-npm run build          gagal, opsi tsconfig erasableSyntaxOnly tidak dikenal
-npm test               script test belum ada di package.json
+                       pada src/components/common/VerificationGate.tsx:5:17
+npm run build          lolos (tsc -b + vite build, 723 modul)
+npm test               4 suite lulus, 19 uji lulus
 ```
 
 ### Cakupan
 
-Bukan persentase, tapi keterlacakan: **64 berkas uji Go**, **353 kasus uji**, setiap uji menyebut FR yang diverifikasinya di nama fungsinya (`TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`), sehingga **57 requirement** dapat ditelusuri dari nama uji ke spec.
+Bukan persentase, tapi keterlacakan: **70 berkas uji Go**, **388 kasus uji**, setiap uji menyebut FR yang diverifikasinya di nama fungsinya (`TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`), sehingga **57 requirement** dapat ditelusuri dari nama uji ke spec.
 
 Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus: urutan hasil pencarian dapat diulang termasuk antar halaman; skor bebas dari pengaruh reputasi, verifikasi, kebaruan kalender, dan jarak; kapasitas terjumlah lintas periode sampai tenggat; dua kesepakatan berbarengan atas periode yang sama hanya satu berhasil; pembatalan pra-produksi membalik seluruh baris alokasi; request kuota ke listing sendiri ditolak; konfirmasi otomatis 7 hari dan penghentiannya oleh sengketa; tingkat penyelesaian membebani hanya pihak yang membatalkan; dokumen identitas tertutup selain bagi pemilik dan admin; validasi berkas dari magic bytes beserta batas ukuran, kuota storage, dan pembuangan metadata gambar; idempotensi horizon kalender; migrasi dan constraint PostgreSQL.
 
