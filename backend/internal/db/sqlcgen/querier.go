@@ -776,6 +776,12 @@ type Querier interface {
 	// and confirm_warn_sent_at are left untouched here; RestartAutoConfirmClock handles
 	// them separately, and only when the restored status is 'shipped'.
 	RestoreWorkOrderStatus(ctx context.Context, arg RestoreWorkOrderStatusParams) (WorkOrder, error)
+	// Reports whether a given profile has already reviewed a given work order, the
+	// not-yet-reviewed leg of WorkOrderDetail.can_review (FR-047). The detail view
+	// offers the review button only while this is false, so the client never shows
+	// an action the one_review_per_order_per_reviewer constraint would reject. Rides
+	// that same unique key (work_order_id, reviewer_id).
+	ReviewExistsForOrderReviewer(ctx context.Context, arg ReviewExistsForOrderReviewerParams) (bool, error)
 	// SearchCandidates ranks published listings against the four hard criteria
 	// (FR-023..FR-025) and returns one keyset page. The query shape follows
 	// data-model.md section 10: score lives in the `ranked` CTE so the keyset WHERE

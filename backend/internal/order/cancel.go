@@ -175,5 +175,5 @@ func (s *Service) cancel(ctx context.Context, accountID, workOrderID pgtype.UUID
 	if err != nil {
 		return workOrderView{}, err
 	}
-	return s.buildDetailView(ctx, row)
+	return s.buildDetailView(ctx, row, accountID)
 }
