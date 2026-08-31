@@ -62,21 +62,22 @@ type myProfileBody struct {
 
 // publicProfileBody is the PublicProfile response. It hides the account's own
 // coordinates? No: FR-016 exposes city, province, and coordinates for the map.
-// listing is null in this handler; the listing package supplies it when a public
-// profile view is joined with its listing.
+// listing carries the profile's published capacity listing (FR-016), or null
+// when the profile has no listing or has hidden it; the account service asks the
+// injected ListingViewer to render it.
 type publicProfileBody struct {
-	ProfileID        string         `json:"profile_id"`
-	BusinessName     string         `json:"business_name"`
-	Description      *string        `json:"description"`
-	CityCode         *string        `json:"city_code"`
-	CityName         *string        `json:"city_name"`
-	ProvinceCode     *string        `json:"province_code"`
-	ProvinceName     *string        `json:"province_name"`
-	Latitude         *float64       `json:"latitude"`
-	Longitude        *float64       `json:"longitude"`
-	IdentityVerified bool           `json:"identity_verified"`
+	ProfileID        string          `json:"profile_id"`
+	BusinessName     string          `json:"business_name"`
+	Description      *string         `json:"description"`
+	CityCode         *string         `json:"city_code"`
+	CityName         *string         `json:"city_name"`
+	ProvinceCode     *string         `json:"province_code"`
+	ProvinceName     *string         `json:"province_name"`
+	Latitude         *float64        `json:"latitude"`
+	Longitude        *float64        `json:"longitude"`
+	IdentityVerified bool            `json:"identity_verified"`
 	Listing          json.RawMessage `json:"listing"`
-	Reputation       reputationBody `json:"reputation"`
+	Reputation       reputationBody  `json:"reputation"`
 }
 
 // strPtr returns a pointer to a copy of s, for the nullable string fields whose
@@ -217,7 +218,26 @@ func (s *Service) handleGetPublicProfile(w http.ResponseWriter, r *http.Request)
 		Latitude:         floatFromNumeric(row.Latitude),
 		Longitude:        floatFromNumeric(row.Longitude),
 		IdentityVerified: row.Verified,
-		Listing:          nil,
+		Listing:          s.publicListing(r.Context(), row.ID),
 		Reputation:       s.reputationOf(r.Context(), row.ID),
 	})
+}
+
+// publicListing renders the profile's published listing for the public card
+// (FR-016) through the injected viewer, or null when there is none. A nil viewer
+// (early wiring, tests that do not exercise the card) or a read failure degrades
+// to null and is logged rather than failing the profile read: the card is
+// informative, and a profile page that 500s over it would be worse than one that
+// omits the card.
+func (s *Service) publicListing(ctx context.Context, profileID pgtype.UUID) json.RawMessage {
+	if s.listings == nil {
+		return nil
+	}
+	raw, err := s.listings.PublicListingView(ctx, profileID)
+	if err != nil {
+		slog.ErrorContext(ctx, "account: gagal membaca listing profil publik",
+			"profile_id", uuidString(profileID))
+		return nil
+	}
+	return raw
 }
