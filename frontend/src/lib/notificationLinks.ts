@@ -2,10 +2,19 @@ import type { Notification } from "@api/notifications";
 
 export type NotificationLink = { to: string; label: string };
 
-// Notification membawa link generik ke sumber kejadiannya. Bila null, tautan
-// dipilih dari jenis kejadian dan peran pemanggil supaya tidak ada notifikasi
-// yang berlabel tanpa tujuan.
-export function normalizeLink(link: string): string | null {
+// Rute yang hanya ada di bawah gerbang peran pemberi order. Subkontraktor yang
+// membukanya dipantulkan ke profilnya, jadi tautan ke sana bukan tautan mati
+// tapi tautan menyesatkan: labelnya menjanjikan halaman yang tidak pernah tampil.
+const buyerOnlyPrefixes = ["/quota-requests", "/search"];
+
+function isBuyerOnlyPath(path: string): boolean {
+    return buyerOnlyPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}?`));
+}
+
+// Notification membawa link generik ke sumber kejadiannya. Bila tujuannya tidak
+// dapat dipakai peran pemanggil, kembalikan null supaya pemanggil jatuh ke
+// tujuan bawaan menurut jenis kejadian, bukan ke halaman yang memantul.
+export function normalizeLink(link: string, isBuyer: boolean): string | null {
     const trimmed = link.trim();
     if (!trimmed) return null;
 
@@ -14,12 +23,20 @@ export function normalizeLink(link: string): string | null {
     const workOrderMatch = /^\/?(?:api\/)?work-orders\/([^/?#]+)/.exec(trimmed);
     if (workOrderMatch) return `/orders/${workOrderMatch[1]}`;
 
+    // Notifikasi negosiasi dikirim ke kedua pihak dengan link yang sama, yaitu
+    // request_id. Pemberi order punya halamannya; subkontraktor tidak, karena
+    // detail request masuk dikunci candidate_id, bukan request_id. Kembalikan
+    // null supaya tujuannya jatuh ke daftar request masuk yang memang ada.
     const quotaRequestMatch = /^\/?(?:api\/)?quota-requests\/([^/?#]+)/.exec(trimmed);
-    if (quotaRequestMatch) return `/quota-requests/${quotaRequestMatch[1]}`;
+    if (quotaRequestMatch) return isBuyer ? `/quota-requests/${quotaRequestMatch[1]}` : null;
 
-    return trimmed.startsWith("/") ? trimmed : null;
+    if (!trimmed.startsWith("/")) return null;
+
+    return isBuyer || !isBuyerOnlyPath(trimmed) ? trimmed : null;
 }
 
+// Tujuan bawaan menurut jenis kejadian dan peran pemanggil, supaya tidak ada
+// notifikasi yang berlabel tanpa tujuan.
 export function getFallbackLink(event: Notification["event"], isBuyer: boolean): NotificationLink | null {
     switch (event) {
         case "request_received":
@@ -62,7 +79,7 @@ export function getFallbackLink(event: Notification["event"], isBuyer: boolean):
 
 export function getNotificationLink(notification: Notification, isBuyer: boolean): NotificationLink | null {
     const fallback = getFallbackLink(notification.event, isBuyer);
-    const target = notification.link ? normalizeLink(notification.link) : null;
+    const target = notification.link ? normalizeLink(notification.link, isBuyer) : null;
 
     if (target) {
         return { to: target, label: fallback?.label ?? "Lihat detail" };

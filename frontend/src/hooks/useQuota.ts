@@ -1,5 +1,7 @@
 import { acceptOffer, counterOffer, createQuotaRequest, getIncomingCandidates, getQuotaRequest, getSentQuotaRequests, rejectCandidate, searchSubcontractors, sendOffer, type CandidateStatus, type QuotaRequestCreate, type RequestCandidate, type SearchParams } from "@api/search";
+import { appendSessionOffer, getSessionOffers, subscribeOfferSession } from "@lib/offerSession";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useSyncExternalStore } from "react";
 
 export const quotaKeys = {
     search: (params: SearchParams | null) => ["quota", "search", params] as const,
@@ -118,12 +120,27 @@ function useQuotaInvalidator() {
     };
 }
 
+// Rantai penawaran yang sudah diterima dari backend selama sesi ini, dibaca dari
+// penampung di luar React supaya nilainya bertahan saat halaman detail dilepas
+// dan dipasang ulang (misalnya setelah menutup panel atau berpindah kandidat).
+export function useSessionOffers(candidateId: string) {
+    const getSnapshot = useCallback(() => getSessionOffers(candidateId), [candidateId]);
+
+    return useSyncExternalStore(subscribeOfferSession, getSnapshot, getSnapshot);
+}
+
 export function useSendOffer(candidateId: string) {
     const invalidate = useQuotaInvalidator();
 
     return useMutation({
         mutationFn: (data: { total_price: number; readiness_lead_days: number; note?: string }) => sendOffer(candidateId, data),
-        onSuccess: () => invalidate(),
+        // Respons POST /candidates/{id}/offers adalah Offer utuh. Daftar incoming
+        // tidak mengirim rantai penawaran, jadi Offer ini disimpan apa adanya supaya
+        // ronde yang baru terkirim tetap terlihat setelah daftar dimuat ulang.
+        onSuccess: (offer) => {
+            appendSessionOffer(candidateId, offer);
+            invalidate();
+        },
     });
 }
 
@@ -136,12 +153,18 @@ export function useRejectCandidate(candidateId: string) {
     });
 }
 
-export function useCounterOffer() {
+// candidateId opsional: sisi pemberi order sudah menerima rantai penawaran utuh
+// dari GET /quota-requests/{requestId}, jadi hanya sisi subkontraktor yang perlu
+// menampung Offer hasil counter.
+export function useCounterOffer(candidateId?: string) {
     const invalidate = useQuotaInvalidator();
 
     return useMutation({
         mutationFn: ({ offerId, data }: { offerId: string; data: { total_price: number; note?: string } }) => counterOffer(offerId, data),
-        onSuccess: () => invalidate(),
+        onSuccess: (offer) => {
+            if (candidateId) appendSessionOffer(candidateId, offer);
+            invalidate();
+        },
     });
 }
 

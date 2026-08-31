@@ -1,11 +1,12 @@
-import { ApiError } from "@api/client";
+import { ApiError, apiUrl } from "@api/client";
 import type { FileKind, VerificationStatus } from "@api/verification";
 import Loading from "@components/common/Loading";
 import { useProfile } from "@hooks/useProfile";
 import { useMyVerificationRequests, useSubmitVerification, useUploadFile } from "@hooks/useVerification";
 import { cn } from "@lib/utils";
 import { useRef, useState } from "react";
-import { LuCircleCheck, LuCloudUpload, LuFileCheck, LuHourglass, LuShieldCheck, LuTriangleAlert, LuX } from "react-icons/lu";
+import { Link } from "react-router-dom";
+import { LuCircleCheck, LuCloudUpload, LuFileCheck, LuFileImage, LuHourglass, LuRefreshCw, LuShieldCheck, LuTriangleAlert, LuUserPen, LuX } from "react-icons/lu";
 import { formatDateTimeLongId as formatDateTimeId } from "@lib/datetime";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -31,6 +32,20 @@ function getProblemMessage(error: unknown, fallback: string): string {
     }
 
     return fallback;
+}
+
+const documentLinkClassName = "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-industrial-blue-500/50 hover:bg-industrial-blue-500/5 hover:text-industrial-blue-600";
+
+// Berkas tidak pernah dilayani dari path statis, jadi tautannya menunjuk handler
+// yang memeriksa peran. Pemilik berkas dan admin yang boleh membukanya, dan di
+// halaman ini pemanggilnya selalu pemiliknya sendiri.
+function DocumentButton({ fileId, label }: { fileId: string; label: string }) {
+    return (
+        <a href={apiUrl(`/files/${fileId}`)} target="_blank" rel="noreferrer" className={documentLinkClassName}>
+            <LuFileImage className="size-3.5" aria-hidden />
+            {label}
+        </a>
+    );
 }
 
 type FileSlotProps = {
@@ -200,6 +215,11 @@ export default function Verification() {
                             Lencana terverifikasi tampil pada profil publik dan hasil pencarian.
                             {latest?.decided_at ? ` Disetujui pada ${formatDateTimeId(latest.decided_at)}.` : ""}
                         </p>
+
+                        <Link to="/profile/me" className="mt-3 inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-4 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50">
+                            <LuUserPen className="size-3.5" aria-hidden />
+                            Lihat profil saya
+                        </Link>
                     </div>
                 </div>
             ) : pendingRequest ? (
@@ -211,6 +231,16 @@ export default function Verification() {
                     <div>
                         <p className="text-sm font-bold text-amber-800">Pengajuan sedang ditinjau admin</p>
                         <p className="mt-1 text-sm leading-6 text-amber-700">Diajukan pada {formatDateTimeId(pendingRequest.submitted_at)}. Anda akan menerima notifikasi setelah ada keputusan.</p>
+
+                        <button
+                            type="button"
+                            onClick={() => requestsQuery.refetch()}
+                            disabled={requestsQuery.isFetching}
+                            className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-4 py-2 text-xs font-bold text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <LuRefreshCw className={cn("size-3.5", requestsQuery.isFetching && "animate-spin")} aria-hidden />
+                            {requestsQuery.isFetching ? "Memeriksa..." : "Periksa keputusan"}
+                        </button>
                     </div>
                 </div>
             ) : null}
@@ -264,13 +294,20 @@ export default function Verification() {
                             const meta = statusMeta[request.status];
 
                             return (
-                                <li key={request.request_id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+                                <li key={request.request_id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                                     <div className="min-w-0">
                                         <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-[11px] font-bold", meta.className)}>{meta.label}</span>
-                                        <p className="mt-1 text-xs text-slate-400">Diajukan {formatDateTimeId(request.submitted_at)}</p>
+                                        <p className="mt-1 text-xs text-slate-400">
+                                            Diajukan {formatDateTimeId(request.submitted_at)}
+                                            {request.decided_at ? ` · Diputuskan ${formatDateTimeId(request.decided_at)}` : ""}
+                                        </p>
                                     </div>
 
-                                    {request.status === "approved" ? <LuCircleCheck className="size-5 shrink-0 text-emerald-500" aria-hidden /> : null}
+                                    <div className="flex shrink-0 items-center gap-2">
+                                        {request.identity_file_id ? <DocumentButton fileId={request.identity_file_id} label="Dokumen Identitas" /> : null}
+                                        {request.location_file_id ? <DocumentButton fileId={request.location_file_id} label="Foto Lokasi" /> : null}
+                                        {request.status === "approved" ? <LuCircleCheck className="size-5 shrink-0 text-emerald-500" aria-hidden /> : null}
+                                    </div>
                                 </li>
                             );
                         })}

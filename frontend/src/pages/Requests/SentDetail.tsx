@@ -2,6 +2,7 @@ import { ApiError } from "@api/client";
 import type { Offer, RequestCandidate } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useAcceptOffer, useCounterOffer, useQuotaRequest } from "@hooks/useQuota";
+import { latestOffer, resolveOfferChain } from "@lib/offers";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuClock, LuHandshake, LuHourglass, LuSend } from "react-icons/lu";
@@ -53,8 +54,11 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
     const [error, setError] = useState("");
 
     const meta = candidateStatusMeta[candidate.status];
-    const latest = candidate.latest_offer;
-    const offers = candidate.offers ?? [];
+    // Sisi pemberi order memang menerima rantainya, tetapi kedua field tetap
+    // opsional di kontrak, jadi ronde terakhir dibaca lewat penyelesai yang sama
+    // dengan sisi subkontraktor daripada bergantung pada latest_offer saja.
+    const offers = resolveOfferChain(candidate);
+    const latest = latestOffer(offers);
     const buyerTurn = candidate.status === "offered" && latest?.party === "subcontractor";
 
     async function handleAccept() {
