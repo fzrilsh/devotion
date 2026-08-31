@@ -2316,6 +2316,11 @@ components:
         can_fulfill:
           type: boolean
           description: Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090).
+        latest_offer: { $ref: '#/components/schemas/Offer' }
+        offers:
+          type: array
+          description: Seluruh rantai penawaran kandidat terurut sequence naik, sehingga subkontraktor melihat ronde buyer terbaru setelah counter-offer dan bisa membalas menawar (FR-032, FR-033). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini.
+          items: { $ref: '#/components/schemas/Offer' }
 
     IncomingCandidateList:
       type: object

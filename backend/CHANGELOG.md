@@ -6,6 +6,18 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diperbaiki
+- `GET /quota-requests/incoming` kini mengirim rantai penawaran per kandidat
+  (`offers` dan `latest_offer`), sebelumnya kosong. Akibatnya subkontraktor yang
+  memuat ulang setelah pembeli mengirim counter ronde berikutnya tidak pernah
+  melihat ronde itu dan mentok hanya bisa menolak; ronde counter hanya ada di
+  basis data, tak pernah sampai ke respons incoming. Handler `listIncoming`
+  sekarang mengambil offer untuk kandidat di halaman lewat query baru
+  `ListOffersByCandidates`, mengelompokkannya per kandidat, dan mengisi
+  `latest_offer` dari elemen terakhir chain, sejajar dengan sisi pembeli
+  `requestDetail` (FR-032, FR-033). Skema `IncomingCandidate` di `openapi.yaml`
+  ikut menyatakan kedua field yang tadinya dijanjikan tapi tak pernah diisi.
+
 ### Ditambahkan
 - Dua kejadian notifikasi FR-051 yang selama ini terdefinisi di enum `event_type`
   tapi tak pernah di-enqueue kini tersambung. `verification_decision` dikirim ke

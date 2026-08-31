@@ -13,15 +13,17 @@ import (
 // whether it covers the requested quantity (FR-035, FR-090).
 type incomingResp struct {
 	Items []struct {
-		CandidateID     string `json:"candidate_id"`
-		ListingID       string `json:"listing_id"`
-		ProfileID       string `json:"profile_id"`
-		BusinessName    string `json:"business_name"`
-		Status          string `json:"status"`
-		Quantity        int32  `json:"quantity"`
-		Deadline        string `json:"deadline"`
-		CapacityInRange int64  `json:"capacity_in_range"`
-		CanFulfill      bool   `json:"can_fulfill"`
+		CandidateID     string      `json:"candidate_id"`
+		ListingID       string      `json:"listing_id"`
+		ProfileID       string      `json:"profile_id"`
+		BusinessName    string      `json:"business_name"`
+		Status          string      `json:"status"`
+		Quantity        int32       `json:"quantity"`
+		Deadline        string      `json:"deadline"`
+		CapacityInRange int64       `json:"capacity_in_range"`
+		CanFulfill      bool        `json:"can_fulfill"`
+		Offers          []offerResp `json:"offers"`
+		LatestOffer     *offerResp  `json:"latest_offer"`
 	} `json:"items"`
 	Pagination struct {
 		HasNext    bool    `json:"has_next"`
@@ -138,6 +140,48 @@ func TestIncoming_FiltersByStatus_FR031(t *testing.T) {
 	}
 	if d.Items[0].CandidateID != uuidString(f.candidateID) {
 		t.Fatalf("candidate_id %q, mau %q", d.Items[0].CandidateID, uuidString(f.candidateID))
+	}
+}
+
+// TestIncoming_CarriesOfferChainWithBuyerCounter_FR032_FR033 proves the incoming
+// list carries each candidate's full offer chain, so a subcontractor who reloads
+// after the buyer counters sees the buyer's round as latest_offer (party buyer)
+// and can counter back. Without the chain the subcontractor is stuck: the counter
+// round lives only in the database, never reaching the incoming response.
+func TestIncoming_CarriesOfferChainWithBuyerCounter_FR032_FR033(t *testing.T) {
+	h := newHarness(t, "incoming_chain")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+
+	// Round 1: subcontractor offers. Round 2: buyer counters.
+	offerID := h.firstOffer(t, f, 3_000_000)
+	h.asBuyer(h.buyerAcc)
+	rec := h.doJSON(http.MethodPost, "/api/offers/"+offerID+"/counter", counterBody(2_400_000, "Bisa turun?"))
+	mustStatus(t, rec, http.StatusCreated)
+
+	// Subcontractor reloads the incoming list.
+	h.asSubcontractor(f.subconAcc)
+	rec = h.do(http.MethodGet, "/api/quota-requests/incoming?status=offered")
+	mustStatus(t, rec, http.StatusOK)
+
+	d := decodeIncoming(t, rec)
+	if len(d.Items) != 1 {
+		t.Fatalf("mau 1 kandidat offered, dapat %d; body %s", len(d.Items), rec.Body.String())
+	}
+	it := d.Items[0]
+	if len(it.Offers) != 2 {
+		t.Fatalf("mau 2 ronde di offers, dapat %d; body %s", len(it.Offers), rec.Body.String())
+	}
+	if it.Offers[0].Party != "subcontractor" || it.Offers[0].Sequence != 1 {
+		t.Fatalf("ronde 1 party %q sequence %d, mau subcontractor/1", it.Offers[0].Party, it.Offers[0].Sequence)
+	}
+	if it.LatestOffer == nil {
+		t.Fatalf("latest_offer kosong; body %s", rec.Body.String())
+	}
+	if it.LatestOffer.Party != "buyer" {
+		t.Fatalf("latest_offer.party %q, mau buyer (counter ronde 2)", it.LatestOffer.Party)
+	}
+	if it.LatestOffer.Sequence != 2 {
+		t.Fatalf("latest_offer.sequence %d, mau 2", it.LatestOffer.Sequence)
 	}
 }
 
