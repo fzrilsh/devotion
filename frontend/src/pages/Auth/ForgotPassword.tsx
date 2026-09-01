@@ -1,7 +1,7 @@
-import { ApiError } from "@api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRequestPasswordRecovery } from "@hooks/useAuth";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { recoverRequestSchema, type RecoverRequestForm } from "@schemas/auth";
 import { useForm } from "react-hook-form";
 import { LuKeyRound, LuMail } from "react-icons/lu";
@@ -9,26 +9,6 @@ import { Link, useNavigate } from "react-router-dom";
 
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        const data = error.data;
-
-        if (typeof data === "object" && data !== null && "detail" in data && typeof data.detail === "string") {
-            return data.detail;
-        }
-
-        if (typeof data === "object" && data !== null && "title" in data && typeof data.title === "string") {
-            return data.title;
-        }
-
-        if (error.status === 429) {
-            return "Terlalu banyak permintaan. Coba lagi beberapa saat.";
-        }
-    }
-
-    return "Permintaan tidak dapat diproses. Silakan coba lagi.";
-}
 
 export default function ForgotPassword() {
     const navigate = useNavigate();
@@ -51,7 +31,7 @@ export default function ForgotPassword() {
             await recoverMutation.mutateAsync({ email: values.email });
             navigate("/auth/reset-password", { state: { email: values.email } });
         } catch (error) {
-            setError("root", { message: getProblemMessage(error) });
+            setError("root", { message: getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 429: "Terlalu banyak permintaan. Coba lagi beberapa saat." }) });
         }
     }
 

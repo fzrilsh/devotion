@@ -1,7 +1,7 @@
-import { ApiError } from "@api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useConfirmPasswordRecovery } from "@hooks/useAuth";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { recoverConfirmSchema, type RecoverConfirmForm } from "@schemas/auth";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -14,30 +14,6 @@ const labelClassName = "sr-only";
 type ResetPasswordLocationState = {
     email?: string;
 };
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (error.status === 410) {
-            return "Kode pemulihan kedaluwarsa atau sudah dipakai. Minta kode baru.";
-        }
-
-        if (error.status === 429) {
-            return "Terlalu banyak percobaan. Coba lagi beberapa saat.";
-        }
-
-        const data = error.data;
-
-        if (typeof data === "object" && data !== null && "detail" in data && typeof data.detail === "string") {
-            return data.detail;
-        }
-
-        if (typeof data === "object" && data !== null && "title" in data && typeof data.title === "string") {
-            return data.title;
-        }
-    }
-
-    return "Permintaan tidak dapat diproses. Silakan coba lagi.";
-}
 
 export default function ResetPassword() {
     const navigate = useNavigate();
@@ -102,7 +78,7 @@ export default function ResetPassword() {
 
             navigate("/auth/login", { replace: true });
         } catch (error) {
-            setError("root", { message: getProblemMessage(error) });
+            setError("root", { message: getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 410: "Kode pemulihan kedaluwarsa atau sudah dipakai. Minta kode baru.", 429: "Terlalu banyak percobaan. Coba lagi beberapa saat." }) });
         }
     }
 

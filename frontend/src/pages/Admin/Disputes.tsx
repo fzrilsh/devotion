@@ -1,10 +1,10 @@
-import { ApiError } from "@api/client";
 import type { Dispute, DisputeResult, DisputeStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
 import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useDisputes, useMediateDispute, useResolveDispute } from "@hooks/useAdmin";
 import { useWorkOrder } from "@hooks/useWorkOrders";
 import { statusFilters } from "@lib/statusFilters";
+import { getProblemMessage } from "@lib/problem";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowRight, LuGavel, LuHandshake, LuInbox, LuMessagesSquare } from "react-icons/lu";
@@ -23,16 +23,6 @@ const resultMeta: Record<DisputeResult, { label: string; hint: string }> = {
 const resultOptions = (Object.entries(resultMeta) as [DisputeResult, { label: string; hint: string }][]).map(([value, meta]) => ({ value, ...meta }));
 
 const filterOptions = statusFilters(disputeStatusMeta);
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-    }
-
-    return "Aksi tidak dapat diproses. Silakan coba lagi.";
-}
 
 function DisputeCard({ dispute }: { dispute: Dispute }) {
     const mediateMutation = useMediateDispute();

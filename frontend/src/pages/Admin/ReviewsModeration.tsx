@@ -1,8 +1,8 @@
-import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
 import { useHideReview } from "@hooks/useAdmin";
 import { useProfileReviews } from "@hooks/useProfile";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuEyeOff, LuInbox, LuSearch, LuStar } from "react-icons/lu";
 import { formatDateId } from "@lib/datetime";
@@ -10,18 +10,6 @@ import { formatDateId } from "@lib/datetime";
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
 const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (error.status === 404) return "Profil dengan ID tersebut tidak ditemukan.";
-    }
-
-    return "Ulasan tidak dapat dimuat. Silakan coba lagi.";
-}
 
 function StarRating({ rating }: { rating: number }) {
     return (
@@ -77,7 +65,7 @@ export default function AdminReviewsModeration() {
             setHideTarget("");
             setHideReason("");
         } catch (err) {
-            setActionError(getProblemMessage(err));
+            setActionError(getProblemMessage(err, "Ulasan tidak dapat dimuat. Silakan coba lagi.", { 404: "Profil dengan ID tersebut tidak ditemukan." }));
         }
     }
 
@@ -121,7 +109,7 @@ export default function AdminReviewsModeration() {
                 <Loading />
             ) : reviewsQuery.isError ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-red-700">{getProblemMessage(reviewsQuery.error)}</p>
+                    <p className="text-sm font-semibold text-red-700">{getProblemMessage(reviewsQuery.error, "Ulasan tidak dapat dimuat. Silakan coba lagi.", { 404: "Profil dengan ID tersebut tidak ditemukan." })}</p>
                 </div>
             ) : reviews.length === 0 ? (
                 <div className="flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">

@@ -1,22 +1,12 @@
-import { ApiError } from "@api/client";
 import type { CatalogItem } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useCreateMasterItem, useMasterItems, useUpdateMasterItem } from "@hooks/useAdmin";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuCircleCheck, LuCog, LuInbox, LuPackage, LuPencil, LuPlus, LuX } from "react-icons/lu";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
-
-function getProblemMessage(error: unknown, fallback: string): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-    }
-
-    return fallback;
-}
 
 function ItemRow({ item }: { item: CatalogItem }) {
     const updateMutation = useUpdateMasterItem();

@@ -1,4 +1,4 @@
-import { ApiError } from "@api/client";
+import { getProblemMessage } from "@lib/problem";
 import type { CatalogItem } from "@api/listing";
 import Loading from "@components/common/Loading";
 import VerificationGate from "@components/common/VerificationGate";
@@ -15,19 +15,6 @@ import { Link } from "react-router-dom";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 403) return "Anda tidak berwenang mengubah listing ini.";
-    }
-
-    return "Terjadi kesalahan. Silakan coba lagi.";
-}
 
 function ProposalBox({ kind, title }: { kind: "product" | "machine"; title: string }) {
     const proposeMutation = useProposeMasterItem();
@@ -48,7 +35,7 @@ function ProposalBox({ kind, title }: { kind: "product" | "machine"; title: stri
             setName("");
             setMessage({ tone: "success", text: "Usulan terkirim. Admin akan meninjau sebelum item masuk daftar baku." });
         } catch (error) {
-            setMessage({ tone: "error", text: getProblemMessage(error) });
+            setMessage({ tone: "error", text: getProblemMessage(error, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang mengubah listing ini." }) });
         }
     }
 
@@ -135,7 +122,7 @@ function ListingFormCard({ products, machines, defaultValues, isEdit, onCancel, 
             });
             onSaved();
         } catch (error) {
-            setError("root", { message: getProblemMessage(error) });
+            setError("root", { message: getProblemMessage(error, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang mengubah listing ini." }) });
         }
     }
 
@@ -357,7 +344,7 @@ export default function Listing() {
                     {visibilityMutation.isError ? (
                         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3" role="alert">
                             <LuTriangleAlert className="mt-0.5 size-4.5 shrink-0 text-red-500" aria-hidden />
-                            <p className="text-sm text-red-700">{getProblemMessage(visibilityMutation.error)}</p>
+                            <p className="text-sm text-red-700">{getProblemMessage(visibilityMutation.error, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang mengubah listing ini." })}</p>
                         </div>
                     ) : null}
 

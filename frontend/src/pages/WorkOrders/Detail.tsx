@@ -5,29 +5,13 @@ import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useAuth } from "@hooks/useAuth";
 import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder, useWorkOrderContacts } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuMail, LuPackage, LuPhone, LuShieldAlert, LuStar, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
 import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, paymentDirectionForSide, paymentDirectionLabel, transitionsForSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (typeof error.data === "object" && error.data !== null && "title" in error.data && typeof error.data.title === "string") {
-            return error.data.title;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 403) return "Anda tidak berwenang melakukan aksi ini pada pesanan ini.";
-    }
-
-    return "Aksi tidak dapat diproses. Silakan coba lagi.";
-}
 
 function ActionPanel({ title, icon: Icon, tone = "slate", error, onClose, children }: { title: string; icon: React.ElementType; tone?: "slate" | "red" | "amber"; error: string; onClose: () => void; children: React.ReactNode }) {
     const tones = {
@@ -185,7 +169,7 @@ export default function Detail() {
             setPanel(null);
             setActionSuccess(successMessage);
         } catch (error) {
-            setActionError(getProblemMessage(error));
+            setActionError(getProblemMessage(error, "Aksi tidak dapat diproses. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang melakukan aksi ini pada pesanan ini." }));
         }
     }
 

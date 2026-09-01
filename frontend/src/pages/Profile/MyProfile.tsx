@@ -1,5 +1,3 @@
-import { ApiError } from "@api/client";
-import type { components } from "@api/types";
 import Loading from "@components/common/Loading";
 import LocationMap from "@components/common/LocationMap";
 import VerificationGate from "@components/common/VerificationGate";
@@ -10,6 +8,7 @@ import { useAuth, useUpdateMyRoles } from "@hooks/useAuth";
 import { useProfile } from "@hooks/useProfile";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { profileSchema, type ProfileForm } from "@schemas/profile";
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -18,17 +17,6 @@ import { Link } from "react-router-dom";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        const data = error.data as components["schemas"]["Problem"] | undefined;
-        if (data?.detail) return data.detail;
-        if (data?.title) return data.title;
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 403) return "Anda tidak berwenang mengubah profil ini.";
-    }
-    return "Terjadi kesalahan. Silakan coba lagi.";
-}
 
 const verificationMeta = {
     approved: { label: "Terverifikasi", icon: LuCircleCheck, className: "border-emerald-200 bg-emerald-50 text-emerald-700" },
@@ -146,7 +134,7 @@ function RolesCard() {
             await updateRoles.mutateAsync(next);
             setSuccess(next[key] ? `Peran ${key === "buyer" ? "pemberi order" : "subkontraktor"} ditambahkan.` : `Peran ${key === "buyer" ? "pemberi order" : "subkontraktor"} dicabut.`);
         } catch (err) {
-            setError(getProblemMessage(err));
+            setError(getProblemMessage(err, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang mengubah profil ini." }));
         }
     }
 
@@ -294,7 +282,7 @@ export default function MyProfile() {
             });
             setEditMode(false);
         } catch (error) {
-            setError("root", { message: getProblemMessage(error) });
+            setError("root", { message: getProblemMessage(error, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 403: "Anda tidak berwenang mengubah profil ini." }) });
         }
     }
 

@@ -1,10 +1,10 @@
-import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
 import VerificationGate from "@components/common/VerificationGate";
 import { useAccountVerification } from "@hooks/useAccountVerification";
 import { useMasterProducts } from "@hooks/useListing";
 import { useCreateQuotaRequest } from "@hooks/useQuota";
 import { useEffect, useState } from "react";
+import { getProblemMessage } from "@lib/problem";
 import { LuArrowLeft, LuSend, LuTriangleAlert, LuUsers } from "react-icons/lu";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -19,19 +19,6 @@ type CreateLocationState = {
     quantity?: number;
     deadline?: string;
 };
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 429) return "Terlalu banyak request dalam waktu singkat. Coba lagi beberapa saat.";
-    }
-
-    return "Request tidak dapat dikirim. Silakan coba lagi.";
-}
 
 export default function Create() {
     const navigate = useNavigate();
@@ -99,7 +86,7 @@ export default function Create() {
 
             navigate(`/quota-requests/${request.request_id}`, { replace: true });
         } catch (error) {
-            setErrorMessage(getProblemMessage(error));
+            setErrorMessage(getProblemMessage(error, "Request tidak dapat dikirim. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 429: "Terlalu banyak request dalam waktu singkat. Coba lagi beberapa saat." }));
         }
     }
 

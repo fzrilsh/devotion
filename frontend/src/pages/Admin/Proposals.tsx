@@ -1,9 +1,9 @@
-import { ApiError } from "@api/client";
 import type { ItemProposal } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useDecideProposal, useItemProposals } from "@hooks/useAdmin";
 import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuCircleCheck, LuCog, LuInbox, LuPackage, LuX } from "react-icons/lu";
 import { formatDateTimeId } from "@lib/datetime";
@@ -17,16 +17,6 @@ const proposalStatusMeta: Record<ItemProposal["status"], { label: string; classN
 };
 
 const filterOptions = statusFilters(proposalStatusMeta, { allLast: true });
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-    }
-
-    return "Keputusan tidak dapat disimpan. Silakan coba lagi.";
-}
 
 function ProposalCard({ proposal }: { proposal: ItemProposal }) {
     const decideMutation = useDecideProposal();
@@ -49,7 +39,7 @@ function ProposalCard({ proposal }: { proposal: ItemProposal }) {
             setRejectOpen(false);
             setReason("");
         } catch (err) {
-            setError(getProblemMessage(err));
+            setError(getProblemMessage(err, "Keputusan tidak dapat disimpan. Silakan coba lagi."));
         }
     }
 

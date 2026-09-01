@@ -1,10 +1,10 @@
-import { ApiError } from "@api/client";
 import type { WhatsAppStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useReconnectWhatsApp, useWhatsAppStatus } from "@hooks/useAdmin";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { LuMessageCircle, LuPlug, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
+import { getProblemMessage } from "@lib/problem";
 
 type SessionState = "connected" | "pairing" | "disconnected";
 
@@ -40,14 +40,6 @@ const statusMeta: Record<SessionState, { title: string; body: string; card: stri
         bodyColor: "text-red-700",
     },
 };
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError && typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-        return error.data.detail;
-    }
-
-    return "Sesi tidak dapat disambungkan ulang. Coba lagi beberapa saat lagi.";
-}
 
 export default function AdminWhatsApp() {
     const statusQuery = useWhatsAppStatus();
@@ -96,7 +88,7 @@ export default function AdminWhatsApp() {
         try {
             await reconnect.mutateAsync();
         } catch (err) {
-            setReconnectError(getProblemMessage(err));
+            setReconnectError(getProblemMessage(err, "Sesi tidak dapat disambungkan ulang. Coba lagi beberapa saat lagi."));
         }
     }
 
