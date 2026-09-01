@@ -55,9 +55,6 @@ function DependencyCard({ title, icon: Icon, label, detail, tone, children }: { 
     );
 }
 
-// 503 justru keadaan yang paling perlu tampil, tetapi apiClient melemparkan galat
-// pada respons non-2xx sehingga badannya tidak terbaca. Kegagalan permintaan karena
-// itu dibaca sebagai instance tidak sehat, bukan sekadar galat jaringan.
 function UnhealthyCard({ error }: { error: unknown }) {
     const status = error instanceof ApiError ? error.status : null;
 

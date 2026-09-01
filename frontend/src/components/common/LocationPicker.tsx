@@ -15,6 +15,7 @@ type LocationPickerProps = {
     latitude: number | null;
     longitude: number | null;
     onChange: (latitude: number, longitude: number) => void;
+    onLocationSelected?: (latitude: number, longitude: number) => void;
     disabled?: boolean;
 };
 
@@ -22,30 +23,24 @@ const DEFAULT_CENTER: [number, number] = [-2.5489, 118.0149];
 const DEFAULT_ZOOM = 4;
 const MARKER_ZOOM = 13;
 
-// Batas zoom saat mengepaskan pandangan ke hasil pencarian. Kotak batas sebuah
-// kota bisa sangat kecil (satu kelurahan) atau sangat luas (satu kabupaten);
-// tanpa batas ini, hasil sempit membuat peta melompat ke zoom maksimum.
 const SEARCH_MAX_ZOOM = 16;
 
-// focusTarget adalah satu perintah gerak untuk peta. Objeknya dibuat baru tiap
-// kali supaya memilih tempat yang sama dua kali tetap menggerakkan peta.
 type FocusTarget = { point: Coordinate; bounds: GeocodeBounds | null };
 
-function ClickHandler({ onChange, disabled }: { onChange: (latitude: number, longitude: number) => void; disabled?: boolean }) {
+function ClickHandler({ onChange, onLocationSelected, disabled }: { onChange: (latitude: number, longitude: number) => void; onLocationSelected?: (latitude: number, longitude: number) => void; disabled?: boolean }) {
     useMapEvents({
         click(event) {
             if (disabled) return;
-            onChange(Number(event.latlng.lat.toFixed(6)), Number(event.latlng.lng.toFixed(6)));
+            const latitude = Number(event.latlng.lat.toFixed(6));
+            const longitude = Number(event.latlng.lng.toFixed(6));
+            onChange(latitude, longitude);
+            onLocationSelected?.(latitude, longitude);
         },
     });
 
     return null;
 }
 
-// MapController hanya bergerak saat diperintah lewat focus, bukan setiap kali
-// titiknya berubah. Menggerakkan peta pada tiap perubahan titik berarti setiap
-// klik memaksa zoom kembali ke MARKER_ZOOM, jadi pengguna yang sudah memperbesar
-// peta untuk menandai lokasi dengan tepat justru terlempar keluar.
 function MapController({ focus }: { focus: FocusTarget | null }) {
     const map = useMap();
 
@@ -63,10 +58,6 @@ function MapController({ focus }: { focus: FocusTarget | null }) {
     return null;
 }
 
-// useLeafletControl membuat satu L.Control kosong di posisi yang diminta, lalu
-// mengembalikan elemen DOM-nya. Konten sebenarnya dirender lewat React portal
-// dari komponen pemanggil, jadi kontrol tetap bisa memakai hook & state biasa
-// walau secara DOM ia hidup di luar pohon <MapContainer>.
 function useLeafletControl(position: L.ControlPosition, className = "leaflet-control") {
     const map = useMap();
     const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -76,9 +67,6 @@ function useLeafletControl(position: L.ControlPosition, className = "leaflet-con
 
         control.onAdd = () => {
             const el = L.DomUtil.create("div", className) as HTMLDivElement;
-            // Tanpa ini, klik atau scroll di dalam kontrol akan diteruskan ke
-            // peta di bawahnya — misalnya klik pada hasil pencarian akan ikut
-            // menandai titik lewat ClickHandler.
             L.DomEvent.disableClickPropagation(el);
             L.DomEvent.disableScrollPropagation(el);
             setContainer(el);
@@ -145,15 +133,7 @@ function PlaceResults({ places, isSearching, error, query, onSelect }: { places:
     );
 }
 
-// SearchControl menempatkan pencarian tempat sebagai kontrol peta ala
-// leaflet-control-geocoder: ikon saja saat tertutup, kotak pencarian penuh
-// saat diklik. Posisinya kiri bawah supaya tidak menimpa kontrol zoom di kiri
-// atas maupun tombol lokasi di kanan atas. Memilih hasil hanya menggeser peta
-// (lihat komentar pada selectPlace di komponen utama), titik lokasi usaha tetap
-// harus ditandai sengaja oleh pengguna (FR-057).
 function SearchControl({ query, setQuery, places, isSearching, error, onSelect, disabled }: { query: string; setQuery: (value: string) => void; places: GeocodePlace[]; isSearching: boolean; error: string; onSelect: (place: GeocodePlace) => void; disabled: boolean }) {
-    // Kelas dasar sengaja tidak lewat "leaflet-bar", bentuknya pil/kartu
-    // sendiri, bukan deret tombol kotak seperti kontrol zoom.
     const container = useLeafletControl("bottomleft", "leaflet-control");
     const [expanded, setExpanded] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -171,10 +151,6 @@ function SearchControl({ query, setQuery, places, isSearching, error, onSelect, 
 
     return createPortal(
         expanded ? (
-            // flex-col-reverse: kotak pencarian tetap di bawah (dekat sudut
-            // kontrolnya) dan daftar hasil tumbuh ke atas, jadi panel tidak
-            // pernah keluar dari batas bawah peta. Urutan DOM tetap input lalu
-            // hasil supaya pembaca layar dan Tab membacanya berurutan.
             <div className="flex w-[min(20rem,80vw)] flex-col-reverse gap-2 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-lg">
                 <div className="relative">
                     <LuSearch className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden />
@@ -217,10 +193,7 @@ function SearchControl({ query, setQuery, places, isSearching, error, onSelect, 
     );
 }
 
-// LocateControl langsung menandai titik dari GPS pengguna — tidak seperti hasil
-// pencarian, ini "to the point": begitu izin lokasi diberikan, titiknya langsung
-// tersimpan lewat onChange, bukan cuma memindahkan pandangan peta.
-function LocateControl({ onLocate, disabled }: { onLocate: (latitude: number, longitude: number) => void; disabled: boolean }) {
+function LocateControl({ onLocate, onLocationSelected, disabled }: { onLocate: (latitude: number, longitude: number) => void; onLocationSelected?: (latitude: number, longitude: number) => void; disabled: boolean }) {
     const map = useMap();
     const container = useLeafletControl("topright", "leaflet-control");
     const [isLocating, setIsLocating] = useState(false);
@@ -244,6 +217,7 @@ function LocateControl({ onLocate, disabled }: { onLocate: (latitude: number, lo
 
                 map.flyTo([latitude, longitude], MARKER_ZOOM);
                 onLocate(latitude, longitude);
+                onLocationSelected?.(latitude, longitude);
                 setIsLocating(false);
             },
             (geoError) => {
@@ -279,7 +253,7 @@ function LocateControl({ onLocate, disabled }: { onLocate: (latitude: number, lo
     );
 }
 
-export default function LocationPicker({ latitude, longitude, onChange, disabled = false }: LocationPickerProps) {
+export default function LocationPicker({ latitude, longitude, onChange, onLocationSelected, disabled = false }: LocationPickerProps) {
     const hasMarker = latitude != null && longitude != null;
     const center: [number, number] = hasMarker ? [latitude, longitude] : DEFAULT_CENTER;
 
@@ -287,9 +261,6 @@ export default function LocationPicker({ latitude, longitude, onChange, disabled
     const [focus, setFocus] = useState<FocusTarget | null>(null);
     const { places, isSearching, error } = usePlaceSearch(disabled ? "" : query);
 
-    // Titik yang tersimpan bisa datang setelah peta terpasang (profil dimuat
-    // belakangan). Geser satu kali ke titik itu, lalu serahkan kendali zoom
-    // sepenuhnya ke pengguna.
     const initialFocusDone = useRef(false);
 
     useEffect(() => {
@@ -299,9 +270,6 @@ export default function LocationPicker({ latitude, longitude, onChange, disabled
         setFocus({ point: { latitude, longitude }, bounds: null });
     }, [latitude, longitude]);
 
-    // Memilih hasil pencarian menggeser peta saja, tidak memindahkan titiknya.
-    // Titik lokasi usaha tampil publik (FR-057), jadi yang tersimpan harus yang
-    // sengaja ditandai pengguna, bukan pusat wilayah yang kebetulan cocok namanya.
     function selectPlace(place: GeocodePlace) {
         setFocus({ point: place.point, bounds: place.bounds });
         setQuery(place.label);
@@ -312,11 +280,11 @@ export default function LocationPicker({ latitude, longitude, onChange, disabled
             <MapContainer center={center} zoom={hasMarker ? MARKER_ZOOM : DEFAULT_ZOOM} scrollWheelZoom={!disabled} className="h-full w-full">
                 <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                <ClickHandler onChange={onChange} disabled={disabled} />
+                <ClickHandler onChange={onChange} onLocationSelected={onLocationSelected} disabled={disabled} />
                 <MapController focus={focus} />
 
                 <SearchControl query={query} setQuery={setQuery} places={places} isSearching={isSearching} error={error} onSelect={selectPlace} disabled={disabled} />
-                <LocateControl onLocate={onChange} disabled={disabled} />
+                <LocateControl onLocate={onChange} onLocationSelected={onLocationSelected} disabled={disabled} />
 
                 {hasMarker ? <Marker position={[latitude, longitude]} /> : null}
             </MapContainer>

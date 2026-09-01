@@ -42,8 +42,6 @@ export default function AdminOrderDetail() {
     const navigate = useNavigate();
     const workOrderQuery = useWorkOrder(workOrderId);
 
-    // Sengketa dibaca dari antrean admin lalu disaring, karena tidak ada endpoint
-    // sengketa per pesanan. Ini yang menyambungkan halaman pantau ke mediasi.
     const disputesQuery = useDisputes();
     const disputes = (disputesQuery.data ?? []).filter((dispute) => dispute.work_order_id === workOrderId);
 

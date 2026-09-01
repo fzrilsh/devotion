@@ -14,8 +14,6 @@ const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 
 type RegionLevel = "city" | "province" | "national";
 
-// Region levels the searcher can actually reach, narrowest first (FR-063). A profile
-// without a city code has no city level to start from, so that step is skipped.
 function availableRegionLevels(hasCity: boolean, hasProvince: boolean): RegionLevel[] {
     const levels: RegionLevel[] = [];
 
@@ -43,8 +41,6 @@ function formatDate(value: string): string {
     return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
 
-// Fallback when the response carries no relaxation object: name the narrowest
-// hard filter the searcher actually set, plus one concrete way to loosen it (FR-028).
 function fallbackRelaxation(params: SearchParams, machineName?: string): { most_restrictive: string; suggestion: string } {
     if (params.machine_item_id) {
         return {
@@ -190,7 +186,6 @@ export default function Search() {
     const regionLevels = availableRegionLevels(Boolean(profile?.city_code), Boolean(profile?.province_code));
     const startLevel = regionLevels[0];
 
-    // The level the response says it used, not the one we asked for (FR-063).
     const activeLevel: RegionLevel | null = firstPage?.region_level ?? submitted?.region_level ?? null;
     const activeIndex = activeLevel ? regionLevels.indexOf(activeLevel) : -1;
     const expandLevel = activeIndex >= 0 && activeIndex < regionLevels.length - 1 ? regionLevels[activeIndex + 1] : null;
@@ -207,17 +202,13 @@ export default function Search() {
         return next;
     }
 
-    // Naikkan cakupan tepat satu tingkat, filter lain dibiarkan apa adanya (FR-063).
     function handleExpandRegion() {
         if (!submitted || !expandLevel) return;
-
-        // Kandidat cakupan lebih sempit tetap ada di cakupan yang lebih luas, jadi pilihan tidak direset.
         setSubmitted(withRegionLevel(submitted, expandLevel));
     }
 
     const machineName = machines.find((item) => item.item_id === submitted?.machine_item_id)?.name;
 
-    // Saran pelonggaran hanya relevan saat sudah tidak ada tingkat wilayah untuk diperluas (FR-028).
     const relaxation = submitted && candidates.length === 0 && !expandLevel ? (firstPage?.relaxation ?? fallbackRelaxation(submitted, machineName)) : null;
 
     const expandAction = expandLevel ? (

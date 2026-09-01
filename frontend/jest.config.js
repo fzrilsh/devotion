@@ -3,6 +3,9 @@ export default {
     preset: "ts-jest",
     testEnvironment: "jsdom",
     roots: ["<rootDir>/src"],
+    // Ini bukan konfigurasi acak: test di Vite memakai TypeScript modern, dan
+    // konfigurasi ini menghindari kegagalan runtime saat Jest membaca fitur ES2023
+    // dan path alias yang sama seperti aplikasi utama.
     setupFiles: ["<rootDir>/src/test/polyfills.ts"],
     setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
     moduleNameMapper: {
@@ -26,20 +29,17 @@ export default {
             {
                 tsconfig: {
                     jsx: "react-jsx",
-                    // Sejajar dengan tsconfig.app.json. Tanpa ini ts-jest memakai target
-                    // bawaannya yang lebih tua, jadi metode seperti Array.prototype.at
-                    // gagal typecheck di pengujian meski lolos di build aplikasi.
+                    // Jest dan Vite harus menilai project dengan target ES2023 yang sama,
+                    // supaya Array.prototype.at dan fitur modern lain tidak gagal saat test.
                     target: "es2023",
-                    // ts-jest mengetik tiap berkas uji sendiri-sendiri, jadi import
-                    // jest-dom di src/test/setup.ts tidak ikut terbaca. Tanpa entri
-                    // ini, matcher seperti toBeInTheDocument ditolak TS2339.
+                    // types dan moduleResolution eksplisit menutup masalah lint/resolve
+                    // yang muncul di setup ts-jest; tanpa ini, test bisa lewat di editor
+                    // namun pecah saat Jest menjalankan transform.
                     types: ["jest", "node", "@testing-library/jest-dom"],
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,
                     verbatimModuleSyntax: false,
                     noEmit: true,
-                    // jest-dom v7 meletakkan tipe di balik kondisi exports;
-                    // "bundler" yang membacanya, "node" (bawaan) tidak.
                     moduleResolution: "bundler",
                     baseUrl: ".",
                     paths: {

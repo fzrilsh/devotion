@@ -270,8 +270,6 @@ export default function Listing() {
         return <Loading />;
     }
 
-    // getMyListing mengembalikan null saat listing belum ada (404), jadi
-    // isError di sini hanya untuk kegagalan sungguhan.
     const listing = listingQuery.data ?? null;
     const loadError = listingQuery.isError;
     const blocked = needsVerification && !listing;
@@ -331,7 +329,6 @@ export default function Listing() {
                 )
             ) : (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut" }} className="space-y-6">
-                    {/* Status tayang */}
                     <div className={cn("flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center sm:justify-between", listing.published ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
                         <div className="flex items-center gap-3">
                             <span className={cn("grid size-11 shrink-0 place-items-center rounded-xl", listing.published ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600")}>
@@ -364,7 +361,6 @@ export default function Listing() {
                         </div>
                     ) : null}
 
-                    {/* Ringkasan angka */}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <div className="flex items-center gap-3">
@@ -406,7 +402,6 @@ export default function Listing() {
                         </div>
                     </div>
 
-                    {/* Detail produk dan mesin */}
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <div className="rounded-2xl border border-slate-200 bg-white p-6">
                             <div className="flex items-center gap-2.5">
@@ -444,7 +439,6 @@ export default function Listing() {
                         </div>
                     </div>
 
-                    {/* Aksi lanjutan */}
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <Link to="/listing/calendar" className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-industrial-blue-500/30 hover:shadow-md hover:shadow-slate-200">
                             <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-industrial-blue-500/10 text-industrial-blue-600">

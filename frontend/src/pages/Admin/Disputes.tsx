@@ -14,8 +14,6 @@ import { formatDateTimeId } from "@lib/datetime";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
-// Record, bukan array literal, supaya hasil mediasi baru pada kontrak menggagalkan
-// typecheck di sini. Urutan kunci menentukan urutan pilihan pada formulir.
 const resultMeta: Record<DisputeResult, { label: string; hint: string }> = {
     continued: { label: "Pesanan Dilanjutkan", hint: "Kedua pihak sepakat melanjutkan produksi." },
     confirmed: { label: "Pesanan Dinyatakan Selesai", hint: "Barang dianggap diterima; pesanan ditutup." },
@@ -39,10 +37,6 @@ function getProblemMessage(error: unknown): string {
 function DisputeCard({ dispute }: { dispute: Dispute }) {
     const mediateMutation = useMediateDispute();
     const resolveMutation = useResolveDispute();
-
-    // Spec mengarahkan selisih pernyataan pembayaran ke admin saat sengketa
-    // dilaporkan (FR-043), jadi pesanannya dibaca di sini. Sengketa yang sudah
-    // diputus tidak perlu bahan mediasi lagi.
     const orderQuery = useWorkOrder(dispute.work_order_id, { enabled: dispute.status !== "resolved" });
 
     const [resolveOpen, setResolveOpen] = useState(false);

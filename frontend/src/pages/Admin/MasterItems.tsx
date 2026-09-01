@@ -88,31 +88,36 @@ function ItemRow({ item }: { item: CatalogItem }) {
                 ) : null}
             </div>
 
-            <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold", item.active ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-200 text-slate-500")}>{item.active ? "Aktif" : "Nonaktif"}</span>
+            {!editing && <span className={cn("shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold", item.active ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-200 text-slate-500")}>{item.active ? "Aktif" : "Nonaktif"}</span>}
 
             <div className="flex shrink-0 gap-2">
+                {" "}
                 {!editing ? (
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setEditing(true);
-                            setName(item.name);
-                        }}
-                        className="cursor-pointer rounded-lg border border-slate-300 p-2 text-slate-500 transition hover:bg-slate-50"
-                        aria-label={`Ubah nama ${item.name}`}
-                    >
-                        <LuPencil className="size-4" aria-hidden />
-                    </button>
-                ) : null}
-
-                <button
-                    type="button"
-                    onClick={toggleActive}
-                    disabled={updateMutation.isPending}
-                    className={cn("cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60", item.active ? "border-red-300 text-red-600 hover:bg-red-50" : "border-emerald-300 text-emerald-600 hover:bg-emerald-50")}
-                >
-                    {item.active ? "Nonaktifkan" : "Aktifkan"}
-                </button>
+                    <>
+                        {" "}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setEditing(true);
+                                setName(item.name);
+                            }}
+                            className="cursor-pointer rounded-lg border border-slate-300 p-2 text-slate-500 transition hover:bg-slate-50"
+                            aria-label={`Ubah nama ${item.name}`}
+                        >
+                            {" "}
+                            <LuPencil className="size-4" aria-hidden />{" "}
+                        </button>{" "}
+                        <button
+                            type="button"
+                            onClick={toggleActive}
+                            disabled={updateMutation.isPending}
+                            className={cn("cursor-pointer rounded-lg border px-3 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60", item.active ? "border-red-300 text-red-600 hover:bg-red-50" : "border-emerald-300 text-emerald-600 hover:bg-emerald-50")}
+                        >
+                            {" "}
+                            {item.active ? "Nonaktifkan" : "Aktifkan"}{" "}
+                        </button>{" "}
+                    </>
+                ) : null}{" "}
             </div>
         </li>
     );
@@ -178,7 +183,11 @@ export default function AdminMasterItems() {
 
                 <div className="flex gap-2">
                     <input id="new_item_name" type="text" value={newName} onChange={(event) => setNewName(event.target.value)} className={inputClassName} placeholder={kind === "product" ? "Misalnya: kemeja flanel" : "Misalnya: mesin obras"} minLength={2} maxLength={100} />
-                    <button type="submit" disabled={createMutation.isPending} className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-industrial-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600 disabled:cursor-not-allowed disabled:opacity-60">
+                    <button
+                        type="submit"
+                        disabled={createMutation.isPending}
+                        className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-industrial-blue-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-industrial-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
                         <LuPlus className="size-4" aria-hidden />
                         {createMutation.isPending ? "Menyimpan..." : "Tambah"}
                     </button>
@@ -205,10 +214,12 @@ export default function AdminMasterItems() {
             ) : (
                 <div className="rounded-2xl border border-slate-200 bg-white">
                     <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                        <h2 className="text-sm font-bold text-slate-800">{items.length} item {kind === "product" ? "produk" : "mesin"}</h2>
+                        <h2 className="text-sm font-bold text-slate-800">
+                            {items.length} item {kind === "product" ? "produk" : "mesin"}
+                        </h2>
                     </div>
 
-                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y divide-x divide-slate-100">
+                    <ul className="grid grid-cols-1 lg:grid-cols-2 divide-y divide-x divide-slate-100">
                         {items.map((item) => (
                             <ItemRow key={item.item_id} item={item} />
                         ))}

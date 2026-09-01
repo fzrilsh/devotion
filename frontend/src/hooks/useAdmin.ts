@@ -146,8 +146,6 @@ export function useWhatsAppStatus() {
     });
 }
 
-// Balasan reconnect sebentuk dengan GET /admin/whatsapp, jadi ditulis langsung ke
-// cache status supaya kode QR baru tampil tanpa menunggu polling berikutnya.
 export function useReconnectWhatsApp() {
     const queryClient = useQueryClient();
 

@@ -2,9 +2,6 @@ import type { PaymentMismatch } from "@api/workOrders";
 import { cn } from "@lib/utils";
 import { LuTriangleAlert } from "react-icons/lu";
 
-// Penjelasan ketidakcocokan pernyataan pembayaran. Bendera datang dari server
-// (FR-043); halaman tidak membandingkan sendiri daftar payments, karena aturan
-// pembandingnya milik domain dan hanya boleh hidup di satu tempat.
 function describe(mismatch: PaymentMismatch): string {
     if (mismatch.kind === "missing_counterpart") {
         return "Satu pihak sudah menyatakan pembayaran, pihak lawan belum menyatakan apa pun.";

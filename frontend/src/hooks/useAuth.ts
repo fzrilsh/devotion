@@ -19,8 +19,6 @@ export function useMe() {
         refetchOnReconnect: false,
         refetchOnMount: false,
 
-        // Jangan pernah menampilkan data akun dari cache saat fetch ulang.
-        // Setelah ganti akun, data lama harus hilang sebelum data baru tiba.
         placeholderData: undefined,
     });
 }
@@ -42,9 +40,6 @@ export function useLogout() {
     return useMutation({
         mutationFn: logout,
         onSuccess: () => {
-            // Bersihkan seluruh cache, bukan hanya data akun. Kalau hanya
-            // authKeys.me yang dihapus, query lain (profil, listing, pesanan)
-            // masih menyimpan data akun sebelumnya dan ikut ke sesi akun baru.
             queryClient.clear();
         },
     });

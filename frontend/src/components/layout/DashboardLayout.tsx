@@ -174,7 +174,7 @@ export default function DashboardLayout({ title, navItems, header }: DashboardLa
                 </Link>
             </div>
 
-            <nav aria-label={`Navigasi ${title}`} className="mt-8 flex flex-1 flex-col gap-1 overflow-y-auto">
+            <nav aria-label={`Navigasi ${title}`} className="mt-8 flex flex-1 flex-col gap-1 overflow-y-auto scrollbar-none">
                 {navItems.map((item) => (item.children && item.children.length > 0 ? <NavItemWithChildren key={item.to} item={item} theme={theme} onNavigate={closeSidebar} /> : <NavItemLink key={item.to} item={item} theme={theme} onNavigate={closeSidebar} />))}
             </nav>
 
@@ -204,7 +204,6 @@ export default function DashboardLayout({ title, navItems, header }: DashboardLa
                 <div className={cn("flex h-full w-full flex-col rounded-2xl p-4 shadow-sm", theme.isAdmin ? "bg-linear-to-b from-deep-navy-500 to-industrial-blue-500 shadow-deep-navy-500/20" : "border border-slate-200 bg-white")}>{sidebarContent}</div>
             </aside>
 
-            {/* Sidebar mobile */}
             <AnimatePresence>
                 {sidebarOpen ? (
                     <div className="fixed inset-0 z-99 lg:hidden">
@@ -221,7 +220,6 @@ export default function DashboardLayout({ title, navItems, header }: DashboardLa
                 ) : null}
             </AnimatePresence>
 
-            {/* Konten utama */}
             <div className="flex min-h-screen flex-1 flex-col lg:pl-72 sm:pr-4">
                 <header className="sticky top-0 sm:top-4 z-20 flex h-16 items-center gap-4 sm:rounded-2xl p-4 shadow-sm bg-white/80 px-5 backdrop-blur-xl sm:px-8">
                     <button type="button" onClick={() => setSidebarOpen(true)} className="cursor-pointer text-slate-500 transition-colors hover:text-slate-700 lg:hidden" aria-label="Buka menu navigasi">

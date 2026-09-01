@@ -11,9 +11,6 @@ import { candidateStatusMeta, formatRupiah } from "./meta";
 
 const filterOptions = statusFilters(candidateStatusMeta);
 
-// "Belum ada penawaran" hanya benar sebelum subkontraktor membalas. Status
-// offered berarti rantai penawaran sudah ada, jadi kalimat itu akan menyesatkan
-// bila rantainya tidak ikut terkirim oleh API.
 function offerlessNote(status: CandidateStatus): string {
     if (status === "awaiting_reply") return "Menunggu balasan Anda";
     if (status === "offered") return "Negosiasi berjalan, riwayat penawaran belum termuat";
@@ -70,8 +67,6 @@ export default function Incoming() {
                     {candidates.map((candidate) => {
                         const meta = candidateStatusMeta[candidate.status];
 
-                        // offers dan latest_offer sama-sama opsional di respons incoming.
-                        // Ronde terakhir dibaca dari rantai bila yang terkirim hanya rantai.
                         const latest = latestOffer(resolveOfferChain(candidate));
 
                         return (

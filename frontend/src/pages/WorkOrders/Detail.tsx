@@ -60,8 +60,6 @@ function ActionPanel({ title, icon: Icon, tone = "slate", error, onClose, childr
     );
 }
 
-// Nomor WhatsApp datang dalam format 62xxxxxxxxxx (FR-092). wa.me memakai format
-// yang sama, jadi hanya digit non-angka yang dibuang, tanpa mengubah kode negara.
 function waLink(whatsapp: string): string {
     return `https://wa.me/${whatsapp.replace(/\D/g, "")}`;
 }

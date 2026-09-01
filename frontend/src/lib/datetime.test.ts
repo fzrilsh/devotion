@@ -6,9 +6,6 @@ describe("parseApiDate", () => {
     });
 
     it("mengurai bentuk berspasi yang tidak dijamin peramban", () => {
-        // "2026-08-31 10:00:00Z" bukan format yang wajib diterima ECMAScript.
-        // Chrome menerimanya, Safari mengembalikan Invalid Date, jadi normalisasi
-        // di util ini yang menjaga hasilnya seragam.
         expect(parseApiDate("2026-08-31 10:00:00Z")?.toISOString()).toBe("2026-08-31T10:00:00.000Z");
     });
 
@@ -28,7 +25,6 @@ describe("pemformat tanggal", () => {
     });
 
     it("merender pada WIB, bukan zona waktu peramban", () => {
-        // 31 Agustus 2026 17.30 UTC adalah 1 September 2026 00.30 WIB.
         expect(formatDateId("2026-08-31T17:30:00Z")).toContain("2026");
         expect(formatDateId("2026-08-31T17:30:00Z")).toContain("1");
         expect(formatDateTimeId("2026-08-31T17:30:00Z")).toContain("00.30");

@@ -39,8 +39,7 @@ export default function Footer() {
     return (
         <footer className="border-t border-deep-navy-950 bg-linear-to-b from-deep-navy-500 to-deep-navy-800">
             <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-10 px-4 py-14 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
-                {/* Identitas */}
-                <div>
+                                <div>
                     <Link to="/" className="flex items-center gap-2.5">
                         <span className="text-lg font-bold tracking-tight text-white">Devotion</span>
                     </Link>
@@ -48,7 +47,6 @@ export default function Footer() {
                     <p className="mt-4 max-w-xs text-sm leading-6 text-slate-400">Devotion menghubungkan UMKM konveksi dengan subkontraktor terpercaya yang siap memenuhi kebutuhan produksi Anda. Temukan, bandingkan, dan sepakati dalam satu platform.</p>
                 </div>
 
-                {/* Jelajah (anchor di beranda) */}
                 <div>
                     <h3 className="text-sm font-bold uppercase tracking-wider text-white">Jelajah</h3>
 
@@ -67,7 +65,6 @@ export default function Footer() {
                 <FooterLinkGroup title="Perusahaan" links={companyLinks} />
             </div>
 
-            {/* Bar bawah */}
             <div className="border-t border-white/10">
                 <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 px-4 py-6 sm:flex-row sm:px-6 lg:px-8">
                     <p className="text-xs text-slate-500">&copy; {new Date().getFullYear()} Devotion. Hak cipta dilindungi undang-undang.</p>

@@ -36,9 +36,6 @@ function getProblemMessage(error: unknown, fallback: string): string {
 
 const documentLinkClassName = "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-industrial-blue-500/50 hover:bg-industrial-blue-500/5 hover:text-industrial-blue-600";
 
-// Berkas tidak pernah dilayani dari path statis, jadi tautannya menunjuk handler
-// yang memeriksa peran. Pemilik berkas dan admin yang boleh membukanya, dan di
-// halaman ini pemanggilnya selalu pemiliknya sendiri.
 function DocumentButton({ fileId, label }: { fileId: string; label: string }) {
     return (
         <a href={apiUrl(`/files/${fileId}`)} target="_blank" rel="noreferrer" className={documentLinkClassName}>

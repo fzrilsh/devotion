@@ -7,8 +7,6 @@ export type AvailabilityPeriod = components["schemas"]["AvailabilityPeriod"];
 export type PeriodUpdateItem = components["schemas"]["PeriodUpdateItem"];
 export type CatalogItem = components["schemas"]["CatalogItem"];
 
-// 404 di sini berarti "belum punya listing" (LISTING_NOT_FOUND), bukan galat.
-// Kembalikan null supaya TanStack Query tidak memperlakukannya sebagai error.
 export async function getMyListing(): Promise<Listing | null> {
     try {
         return await apiClient<Listing>("/listing/me");

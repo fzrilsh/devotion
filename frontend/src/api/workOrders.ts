@@ -9,8 +9,6 @@ export type PaymentMismatch = components["schemas"]["PaymentMismatch"];
 export type Review = components["schemas"]["Review"];
 export type WorkOrderContacts = components["schemas"]["WorkOrderContacts"];
 
-// work_order_id kadang tiba sebagai path penuh ("/work-orders/<id>").
-// Ambil segmen terakhir supaya request tidak pernah membawa prefix dobel.
 function normalizeWorkOrderId(workOrderId: string): string {
     return workOrderId.split("/").filter(Boolean).pop() ?? workOrderId;
 }
@@ -34,8 +32,6 @@ export async function getWorkOrder(workOrderId: string): Promise<WorkOrderDetail
     return apiClient<WorkOrderDetail>(`/work-orders/${normalizeWorkOrderId(workOrderId)}`);
 }
 
-// Hanya kedua pihak pesanan yang boleh membacanya; pemanggil lain menerima 404
-// supaya keberadaan pesanan tidak terbocorkan (FR-092).
 export async function getWorkOrderContacts(workOrderId: string): Promise<WorkOrderContacts> {
     return apiClient<WorkOrderContacts>(`/work-orders/${normalizeWorkOrderId(workOrderId)}/contacts`);
 }

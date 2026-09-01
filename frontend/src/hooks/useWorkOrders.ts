@@ -27,8 +27,6 @@ export function useWorkOrder(workOrderId: string, options?: { enabled?: boolean 
     });
 }
 
-// Kontak lawan memuat email dan nomor WhatsApp, jadi hanya diminta ketika
-// pemanggil memang pihak pesanan. Bukan-pihak menerima 404 dan tidak diulang.
 export function useWorkOrderContacts(workOrderId: string, enabled: boolean) {
     return useQuery({
         queryKey: workOrderKeys.contacts(workOrderId),

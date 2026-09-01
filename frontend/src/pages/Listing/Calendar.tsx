@@ -142,7 +142,6 @@ export default function Calendar() {
             marked_full: week.current.marked_full,
         }));
 
-        // week_start wajib Senin sesuai kontrak; jangan pernah kirim tanggal lain.
         const invalid = periods.some((period) => {
             const [year, month, day] = period.week_start.split("-").map(Number);
             return new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== 1;

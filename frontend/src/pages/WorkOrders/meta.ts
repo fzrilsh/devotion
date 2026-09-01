@@ -1,7 +1,5 @@
 import type { WorkOrderDetail, WorkOrderStatus } from "@api/workOrders";
 
-// Pemformat tanggal dan rupiah tinggal di @lib/datetime; direkspor di sini supaya
-// halaman yang sudah mengimpor dari modul meta ini tidak perlu diubah.
 export { formatDateId, formatDateTimeId, formatRupiah } from "@lib/datetime";
 
 export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; className: string }> = {
@@ -16,8 +14,6 @@ export const workOrderStatusMeta: Record<WorkOrderStatus, { label: string; class
 
 export type WorkOrderSide = "buyer" | "subcontractor" | null;
 
-// Posisi pemanggil di dalam pesanan, diturunkan dari profile_id akun sendiri.
-// Bukan mesin keadaan: tombol aksi tetap dirender dari allowed_transitions.
 export function getWorkOrderSide(order: Pick<WorkOrderDetail, "buyer_profile_id" | "subcontractor_profile_id">, myProfileId?: string | null): WorkOrderSide {
     if (!myProfileId) return null;
     if (order.buyer_profile_id === myProfileId) return "buyer";
@@ -30,10 +26,6 @@ export const workOrderSideMeta: Record<Exclude<WorkOrderSide, null>, { label: st
     subcontractor: { label: "Anda subkontraktor", className: "bg-sky-500/10 text-sky-600" },
 };
 
-// Transisi yang masuk akal untuk masing-masing pihak. Produksi, selesai, dan
-// dikirim dilaporkan pihak yang mengerjakan; konfirmasi penerimaan hanya milik
-// pihak yang menerima barang. Pembatalan dan sengketa terbuka untuk keduanya.
-//
 // Ini penyaring tampilan di atas allowed_transitions, bukan mesin keadaan kedua:
 // daftar transisi tetap datang dari backend, di sini hanya dibuang yang bukan
 // urusan pihak yang sedang melihat halaman. Kalau backend mempersempit lebih
@@ -50,10 +42,6 @@ export function transitionsForSide(transitions: readonly WorkOrderStatus[], side
     return transitions.filter((status) => sideTransitions[side].includes(status));
 }
 
-// Arah pernyataan pembayaran mengikuti posisi pihak: pemberi order menyatakan
-// sudah membayar, subkontraktor menyatakan sudah menerima. Deteksi
-// ketidakcocokan (FR-043) memang membandingkan pernyataan kedua pihak, jadi satu
-// pihak tidak perlu memilih arah lawannya.
 export const paymentDirectionForSide: Record<Exclude<WorkOrderSide, null>, "sent" | "received"> = {
     buyer: "sent",
     subcontractor: "received",

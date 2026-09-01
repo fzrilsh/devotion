@@ -24,8 +24,6 @@ function parseStatusParam(value: string | null): WorkOrderStatus | "all" {
 export default function List() {
     const { user } = useAuth();
 
-    // Notifikasi permintaan ulasan menautkan ke ?status=confirmed supaya pengguna
-    // mendarat pada pesanan yang memang bisa diulas (FR-047).
     const [searchParams, setSearchParams] = useSearchParams();
     const status = parseStatusParam(searchParams.get("status"));
     const [role, setRole] = useState<"as_buyer" | "as_subcontractor" | undefined>(undefined);

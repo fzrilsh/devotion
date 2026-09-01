@@ -72,9 +72,6 @@ function QueueSection({ title, to, icon: Icon, isLoading, isError, isEmpty, empt
     );
 }
 
-// Peringatan ringkas saja; rinciannya di halaman Status Sistem. Health yang gagal
-// dibaca sebagai tidak sehat, karena 503 memang jawaban untuk basis data gagal
-// atau penyimpanan penuh.
 function SystemHealthBanner() {
     const healthQuery = useHealth();
     const health = healthQuery.data;

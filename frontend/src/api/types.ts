@@ -1743,7 +1743,12 @@ export interface paths {
         put?: never;
         /**
          * Terima penawaran dan bentuk pesanan
-         * @description Membentuk pesanan beserta seluruh baris alokasi kapasitas dalam satu tindakan utuh:
+         * @description Dipanggil oleh pihak lawan dari penawaran terakhir: bila ronde terakhir milik
+         *     subkontraktor maka buyer yang menyetujui, bila milik buyer maka subkontraktor yang
+         *     menyetujui (FR-033). Pihak yang mengajukan penawaran terakhir tidak bisa menyetujui
+         *     penawarannya sendiri.
+         *
+         *     Membentuk pesanan beserta seluruh baris alokasi kapasitas dalam satu tindakan utuh:
          *     bila salah satu periode gagal dialokasikan, seluruh pembentukan dibatalkan dan tidak
          *     ada kapasitas yang tersisa terpakai (FR-084).
          *
@@ -1774,6 +1779,18 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkOrderDetail"];
+                    };
+                };
+                /**
+                 * @description Pemanggil mengajukan penawaran terakhir, jadi masih menunggu persetujuan pihak
+                 *     lawan (FR-033).
+                 */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
                 /**

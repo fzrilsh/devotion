@@ -20,8 +20,6 @@ function RatingStars({ rating }: { rating: number }) {
     );
 }
 
-// Ulasan tidak pernah anonim: nama usaha pengulas dan tanggal transaksinya
-// selalu ikut tampil (FR-049).
 function ReviewItem({ review }: { review: Review }) {
     return (
         <li className="border-b border-slate-100 py-4 first:pt-0 last:border-0 last:pb-0">
@@ -92,8 +90,6 @@ export default function PublicProfile() {
     const { profileId } = useParams<{ profileId: string }>();
     const { data: profile, isLoading, error } = usePublicProfile(profileId ?? "");
 
-    // Jarak dihitung terhadap lokasi profil usaha pemanggil sendiri, jadi hanya
-    // muncul bagi pengguna usaha yang sudah memasang titik lokasinya.
     const { user } = useAuth();
     const { data: myProfile } = useMyProfile();
     const viewerPoint = user?.is_admin ? null : toCoordinate(myProfile?.latitude, myProfile?.longitude);
@@ -133,7 +129,6 @@ export default function PublicProfile() {
         <HomeLayout>
             <div className="bg-slate-50 mt-24 min-h-screen h-full">
                 <div className="mx-auto max-w-7xl px-5 py-10">
-                    {/* Kepala profil */}
                     <div className="rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
                         <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
                             <span className="grid size-16 shrink-0 place-items-center rounded-2xl bg-linear-to-tl from-deep-navy-500 to-deep-navy-800 text-2xl font-extrabold text-white">{profile.business_name.charAt(0).toUpperCase()}</span>
@@ -162,7 +157,6 @@ export default function PublicProfile() {
                         </div>
                     </div>
 
-                    {/* Reputasi */}
                     <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                         <div className="rounded-xl border border-slate-200 bg-white p-5">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tingkat Penyelesaian</p>
@@ -187,7 +181,6 @@ export default function PublicProfile() {
                         </div>
                     </div>
 
-                    {/* Listing kapasitas */}
                     {listing ? (
                         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
                             <h2 className="text-lg font-bold text-slate-900">Kapasitas Produksi</h2>
@@ -233,8 +226,6 @@ export default function PublicProfile() {
                         </div>
                     ) : null}
 
-                    {/* Lokasi usaha di peta. Jarak informatif saja: tidak menyaring dan
-                        tidak mempengaruhi urutan hasil pencarian (FR-064). */}
                     {profilePoint ? (
                         <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 sm:p-8">
                             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -260,7 +251,6 @@ export default function PublicProfile() {
 
                     <ReviewsSection profileId={profile.profile_id} />
 
-                    {/* Catatan kepercayaan */}
                     <div className="mt-6 flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4">
                         <LuShieldCheck className="mt-0.5 size-5 shrink-0 text-industrial-blue-500" aria-hidden />
                         <p className="text-xs leading-5 text-slate-500">Transaksi dan pembayaran dilakukan langsung antara Anda dan pemilik usaha. Devotion hanya mempertemukan kedua pihak dan tidak menahan dana pihak mana pun.</p>
