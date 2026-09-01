@@ -8,7 +8,7 @@ import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuCircleAlert, LuMail, LuPackage, LuPhone, LuShieldAlert, LuStar, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useParams } from "react-router-dom";
-import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
+import { formatDateId, formatDateTimeId, formatRupiah, getWorkOrderSide, paymentDirectionForSide, paymentDirectionLabel, transitionsForSide, workOrderSideMeta, workOrderStatusMeta } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
@@ -163,7 +163,6 @@ export default function Detail() {
     const [actionSuccess, setActionSuccess] = useState("");
 
     const [cancelReason, setCancelReason] = useState("");
-    const [paymentDirection, setPaymentDirection] = useState<"sent" | "received">("sent");
     const [paymentDate, setPaymentDate] = useState("");
     const [paymentNote, setPaymentNote] = useState("");
     const [disputeBody, setDisputeBody] = useState("");
@@ -220,11 +219,13 @@ export default function Detail() {
     const order: WorkOrderDetail = orderQuery.data;
     const meta = workOrderStatusMeta[order.status];
     const side = getWorkOrderSide(order, user?.profile_id ?? null);
-    const transitions = order.allowed_transitions ?? [];
+    const transitions = transitionsForSide(order.allowed_transitions ?? [], side);
     const availableStatusActions = statusActions.filter((action) => transitions.includes(action.status));
     const canConfirm = transitions.includes("confirmed");
     const canDispute = transitions.includes("in_mediation");
-    const canRecordPayment = order.can_record_payment;
+    const canCancel = order.self_cancellable && side !== null;
+    const canRecordPayment = order.can_record_payment && side !== null;
+    const paymentDirection = side ? paymentDirectionForSide[side] : "sent";
     const canReview = order.can_review;
     const anyPending = changeStatus.isPending || confirmOrder.isPending || cancelOrder.isPending || recordPayment.isPending || reportDispute.isPending || submitReview.isPending;
 
@@ -315,7 +316,7 @@ export default function Detail() {
                     </button>
                 ) : null}
 
-                {order.self_cancellable ? (
+                {canCancel ? (
                     <button type="button" onClick={() => openPanel("cancel")} className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50">
                         <LuCircleAlert className="size-4" aria-hidden />
                         Batalkan Pesanan
@@ -368,25 +369,9 @@ export default function Detail() {
                 <ActionPanel title="Catat Pernyataan Pembayaran" icon={LuBanknote} error={actionError} onClose={() => setPanel(null)}>
                     <p className="text-xs leading-5 text-slate-500">Platform tidak menahan atau memproses dana. Yang dicatat hanya pernyataan Anda, tanpa jumlah uang.</p>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                        {(
-                            [
-                                { value: "sent", label: "Saya sudah membayar" },
-                                { value: "received", label: "Saya sudah menerima" },
-                            ] as const
-                        ).map((option) => (
-                            <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => setPaymentDirection(option.value)}
-                                className={cn(
-                                    "cursor-pointer rounded-xl border px-3 py-2.5 text-xs font-semibold transition",
-                                    paymentDirection === option.value ? "border-industrial-blue-500 bg-industrial-blue-500 text-white" : "border-slate-300 bg-white text-slate-600 hover:border-industrial-blue-500/50",
-                                )}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
+                    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                        <LuBanknote className="size-4 shrink-0 text-slate-500" aria-hidden />
+                        <p className="text-xs font-semibold text-slate-700">{paymentDirectionLabel[paymentDirection]}</p>
                     </div>
 
                     <label className="mt-3 block">
@@ -488,7 +473,7 @@ export default function Detail() {
                     <PaymentMismatchNotice mismatch={order.payment_mismatch} audience="party" className="mt-3" />
 
                     <ul className="mt-3 space-y-2">
-                        {order.payments.map((payment) => (
+                        {order.payments?.map((payment) => (
                             <li key={payment.payment_id} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3">
                                 <div>
                                     <p className="text-sm font-semibold text-slate-700">{payment.direction === "sent" ? "Pembayaran dikirim" : "Pembayaran diterima"}</p>
