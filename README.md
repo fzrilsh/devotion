@@ -953,10 +953,9 @@ go vet ./...           lulus, tanpa temuan
 go test ./... -p 1     23 paket ok, 0 gagal
                        79 lulus, 274 dilewati karena database tidak dijangkau
 apidocs-sync           salinan openapi.yaml identik dengan sumber
-npm run lint           1 galat, react-refresh/only-export-components
-                       pada src/components/common/VerificationGate.tsx:5:17
+npm run lint           lulus, tanpa galat
 npm run build          lolos (tsc -b + vite build, 723 modul)
-npm test               12 suite lulus, 82 uji lulus
+npm test               13 suite lulus, 89 uji lulus
 ```
 
 ### Cakupan
