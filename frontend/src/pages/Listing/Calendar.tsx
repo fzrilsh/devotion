@@ -1,8 +1,8 @@
-import { ApiError } from "@api/client";
 import type { AvailabilityPeriod, PeriodUpdateItem } from "@api/listing";
 import Loading from "@components/common/Loading";
 import { useListingPeriods, useMyListing, useUpdateListingPeriods } from "@hooks/useListing";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useMemo, useState } from "react";
 import { LuArrowLeft, LuCalendarX, LuChevronLeft, LuChevronRight, LuInfo } from "react-icons/lu";
 import { Link } from "react-router-dom";
@@ -39,19 +39,6 @@ function formatWeekRange(weekStartIso: string): string {
     const end = new Date(Date.UTC(year, month - 1, day + 6));
 
     return `${weekFormatter.format(start)} - ${weekYearFormatter.format(end)}`;
-}
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string" && error.data.detail) {
-            return error.data.detail;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 422) return "Data periode tidak sah. Awal minggu harus jatuh pada hari Senin.";
-    }
-
-    return "Perubahan tidak dapat disimpan. Silakan coba lagi.";
 }
 
 type DraftPeriod = {
@@ -156,7 +143,7 @@ export default function Calendar() {
             await updateMutation.mutateAsync(periods);
             setDraft({});
         } catch (error) {
-            setErrorMessage(getProblemMessage(error));
+            setErrorMessage(getProblemMessage(error, "Perubahan tidak dapat disimpan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 422: "Data periode tidak sah. Awal minggu harus jatuh pada hari Senin." }));
         }
     }
 

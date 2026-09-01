@@ -1,8 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ApiError } from "@api/client";
-import type { components } from "@api/types";
 import { useAuth, useLogin } from "@hooks/useAuth";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { loginSchema, type LoginForm } from "@schemas/auth";
 import { forwardRef, useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
@@ -13,18 +12,6 @@ import { HiOutlineLockClosed } from "react-icons/hi2";
 
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        const data = error.data as components["schemas"]["Problem"] | undefined;
-        if (data?.detail) return data.detail;
-        if (data?.title) return data.title;
-        if (error.status === 401) return "Email atau kata sandi salah.";
-        if (error.status === 429) return "Terlalu banyak percobaan masuk, coba lagi beberapa saat.";
-    }
-
-    return "Terjadi kesalahan. Silakan coba lagi.";
-}
 
 const Field = forwardRef<
     HTMLInputElement,
@@ -85,7 +72,7 @@ export default function Login() {
             });
             navigate(redirectPath, { replace: true });
         } catch (error) {
-            setError("root", { message: getProblemMessage(error) });
+            setError("root", { message: getProblemMessage(error, "Terjadi kesalahan. Silakan coba lagi.", { 401: "Email atau kata sandi salah.", 429: "Terlalu banyak percobaan masuk, coba lagi beberapa saat." }) });
         }
     }
 

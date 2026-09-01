@@ -1,25 +1,11 @@
-import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
 import { useNotificationPreferences, useUpdateNotificationPreferences } from "@hooks/useNotifications";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuInfo, LuMail, LuMessageCircle } from "react-icons/lu";
 
 type ChannelKey = "email" | "whatsapp";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        const data = error.data;
-
-        if (typeof data === "object" && data !== null && "detail" in data && typeof data.detail === "string") {
-            return data.detail;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-    }
-
-    return "Preferensi tidak dapat disimpan. Silakan coba lagi.";
-}
 
 function ChannelToggle({ icon: Icon, title, description, checked, disabled, onChange }: { icon: React.ElementType; title: string; description: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
     return (
@@ -68,7 +54,7 @@ export default function Preferences() {
                 },
             },
             {
-                onError: (error) => setErrorMessage(getProblemMessage(error)),
+                onError: (error) => setErrorMessage(getProblemMessage(error, "Preferensi tidak dapat disimpan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali." })),
             },
         );
     }

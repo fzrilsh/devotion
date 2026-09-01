@@ -1,9 +1,10 @@
-import { ApiError, apiUrl } from "@api/client";
+import { apiUrl } from "@api/client";
 import type { FileKind, VerificationStatus } from "@api/verification";
 import Loading from "@components/common/Loading";
 import { useProfile } from "@hooks/useProfile";
 import { useMyVerificationRequests, useSubmitVerification, useUploadFile } from "@hooks/useVerification";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { LuCircleCheck, LuCloudUpload, LuFileCheck, LuFileImage, LuHourglass, LuRefreshCw, LuShieldCheck, LuTriangleAlert, LuUserPen, LuX } from "react-icons/lu";
@@ -20,19 +21,6 @@ const statusMeta: Record<VerificationStatus, { label: string; className: string 
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
-
-function getProblemMessage(error: unknown, fallback: string): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (error.status === 413) return "Ukuran berkas maksimal 5 MB.";
-        if (error.status === 415) return "Tipe berkas tidak diizinkan. Gunakan JPG, PNG, atau PDF.";
-    }
-
-    return fallback;
-}
 
 const documentLinkClassName = "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-industrial-blue-500/50 hover:bg-industrial-blue-500/5 hover:text-industrial-blue-600";
 
@@ -187,7 +175,7 @@ export default function Verification() {
             setIdentityFile(null);
             setLocationFile(null);
         } catch (error) {
-            setErrorMessage(getProblemMessage(error, "Pengajuan verifikasi tidak dapat dikirim. Silakan coba lagi."));
+            setErrorMessage(getProblemMessage(error, "Pengajuan verifikasi tidak dapat dikirim. Silakan coba lagi.", { 413: "Ukuran berkas maksimal 5 MB.", 415: "Tipe berkas tidak diizinkan. Gunakan JPG, PNG, atau PDF." }));
         }
     }
 

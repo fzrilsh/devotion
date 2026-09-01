@@ -2,6 +2,7 @@ import Blob from "@components/common/Blob";
 import AuthLayout from "@components/layout/AuthLayout";
 import { ApiError } from "@api/client";
 import { useAuth, useResendCode, useVerifyEmail } from "@hooks/useAuth";
+import { getProblemMessage } from "@lib/problem";
 import { useEffect, useRef, useState } from "react";
 import { LuMail, LuRefreshCw, LuShieldCheck } from "react-icons/lu";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -9,30 +10,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 type VerifyEmailLocationState = {
     email?: string;
 };
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (error.status === 401) {
-            return "Sesi Anda tidak terbaca. Silakan masuk kembali, lalu ulangi verifikasi.";
-        }
-
-        if (error.status === 410) {
-            return "Kode verifikasi kedaluwarsa atau sudah dipakai. Kirim ulang kode baru.";
-        }
-
-        if (typeof error.data === "object" && error.data !== null) {
-            if ("detail" in error.data && typeof error.data.detail === "string") {
-                return error.data.detail;
-            }
-
-            if ("title" in error.data && typeof error.data.title === "string") {
-                return error.data.title;
-            }
-        }
-    }
-
-    return "Permintaan tidak dapat diproses. Silakan coba lagi.";
-}
 
 export default function VerifyEmail() {
     const navigate = useNavigate();
@@ -107,7 +84,7 @@ export default function VerifyEmail() {
             if (error instanceof ApiError && error.status === 401) {
                 setSessionLost(true);
             }
-            setErrorMessage(getProblemMessage(error));
+            setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 401: "Sesi Anda tidak terbaca. Silakan masuk kembali, lalu ulangi verifikasi.", 410: "Kode verifikasi kedaluwarsa atau sudah dipakai. Kirim ulang kode baru." }));
         }
     }
 
@@ -122,7 +99,7 @@ export default function VerifyEmail() {
             setCountdown(60);
             setSuccessMessage("Kode verifikasi baru sudah dikirim ke email Anda.");
         } catch (error) {
-            setErrorMessage(getProblemMessage(error));
+            setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 401: "Sesi Anda tidak terbaca. Silakan masuk kembali, lalu ulangi verifikasi.", 410: "Kode verifikasi kedaluwarsa atau sudah dipakai. Kirim ulang kode baru." }));
         }
     }
 

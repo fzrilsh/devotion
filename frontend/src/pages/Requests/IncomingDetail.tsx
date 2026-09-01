@@ -1,8 +1,8 @@
-import { ApiError } from "@api/client";
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
 import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
+import { getProblem, getProblemMessage } from "@lib/problem";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuHandshake, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
@@ -16,25 +16,6 @@ const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 type DetailLocationState = { candidateId?: string };
 
 type CapacityInfo = { quantityRequested: number; remainingCapacity: number; untilWeek?: string };
-
-function getProblem(error: unknown): { code?: string; detail: string; meta?: Record<string, unknown> } | null {
-    if (!(error instanceof ApiError)) return null;
-
-    if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-        const data = error.data as { code?: string; detail: string; meta?: Record<string, unknown> };
-        return { code: data.code, detail: data.detail, meta: data.meta };
-    }
-
-    if (error.status === 401) return { detail: "Sesi Anda habis, silakan masuk kembali." };
-    if (error.status === 403) return { detail: "Anda tidak berwenang melakukan aksi ini." };
-    if (error.status === 410) return { detail: "Batas waktu balasan request ini sudah terlampaui." };
-
-    return null;
-}
-
-function getProblemMessage(error: unknown): string {
-    return getProblem(error)?.detail ?? "Aksi tidak dapat diproses. Silakan coba lagi.";
-}
 
 function getCapacityInfo(error: unknown): CapacityInfo | null {
     const problem = getProblem(error);

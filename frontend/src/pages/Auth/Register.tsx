@@ -1,8 +1,8 @@
-import { ApiError } from "@api/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRegister } from "@hooks/useAuth";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { registerSchema, type RegisterForm } from "@schemas/auth";
 import { forwardRef, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
@@ -34,11 +34,6 @@ const roles = [
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
 
-type ValidationError = {
-    field?: string;
-    message?: string;
-};
-
 function normalizePhone(value: string): string {
     const digits = value.replace(/\D/g, "");
 
@@ -51,41 +46,6 @@ function normalizePhone(value: string): string {
     }
 
     return digits;
-}
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        const data = error.data;
-
-        if (typeof data === "object" && data !== null && "detail" in data && typeof data.detail === "string") {
-            if ("errors" in data && Array.isArray(data.errors)) {
-                const fieldMessages = data.errors
-                    .filter((item): item is ValidationError => typeof item === "object" && item !== null)
-                    .map((item) => item.message)
-                    .filter((message): message is string => Boolean(message));
-
-                if (fieldMessages.length > 0) {
-                    return `${data.detail} ${fieldMessages.join(" ")}`;
-                }
-            }
-
-            return data.detail;
-        }
-
-        if (typeof data === "object" && data !== null && "title" in data && typeof data.title === "string") {
-            return data.title;
-        }
-
-        if (error.status === 409) {
-            return "Email atau data akun tersebut sudah terdaftar.";
-        }
-
-        if (error.status === 429) {
-            return "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa saat.";
-        }
-    }
-
-    return "Pendaftaran gagal. Silakan coba lagi.";
 }
 
 const Field = forwardRef<
@@ -161,7 +121,7 @@ export default function Register() {
             navigate("/auth/verify-email", { replace: true, state: { email: values.email } });
         } catch (error) {
             setError("root", {
-                message: getProblemMessage(error),
+                message: getProblemMessage(error, "Pendaftaran gagal. Silakan coba lagi.", { 409: "Email atau data akun tersebut sudah terdaftar.", 429: "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa saat." }),
             });
         }
     }

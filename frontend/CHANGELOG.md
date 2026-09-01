@@ -1,35 +1,22 @@
 # Changelog
 
-Engineering changelogs are written in English. User-facing product copy remains in Indonesian; this file records implementation and contract work, not screen text.
-
 ## [Unreleased]
-
-### Fixed
-
-* Added the subcontractor accept path for buyer counter-offers by using the shared `canAcceptOffer` predicate in `lib/offers.ts`, exposing the "Terima Penawaran" action in `pages/Requests/IncomingDetail.tsx`, and navigating to the created work order at `/orders/{id}` after a successful accept. This restores the missing US3 acceptance path that was previously blocked by the UI.
-
-* Added the missing `PageTitle` component in `components/common/PageTitle.tsx` so each routed page can set document title metadata without hardcoding it in the page component.
-
-* Added the SEO and Open Graph metadata updates in `index.html`, including `lang="id"` replacing the default English document language and the new metadata fields used by browser and social previews.
-
-* Added the missing icon assets and `site.webmanifest` updates under `public/`, covering the final set of platform assets and app metadata used by the landing page and install prompt.
-
-* Normalized the generated auth request types to use the typed `paths[...]` structures instead of handwritten request payloads in `api/auth.ts`, and replaced the local `ProblemPayload` definitions with the generated `components["schemas"]["Problem"]` contracts in `Login.tsx` and `MyProfile.tsx`.
-
-### Changed
-
-* Extracted `TrustStatsSection` and `FinalCTASection` out of `Home.tsx` and left the imported component files as the source of truth for the landing page structure. This is a behavior change in the home page because those sections are no longer rendered inline in the page component itself.
-
-### Added
-
-* Added the missing work-order action filter and frontend-side invariants in `pages/WorkOrders/meta.ts`, so the UI keeps using a view-layer filter over backend `allowed_transitions` instead of inventing a second state machine.
-
-* Added release notes for the UI acceptance fix, metadata work, auth type cleanup, and landing-page component extraction in the same changelog stream so the rationale for the shipped behavior remains discoverable.
-
 
 ### Diperbaiki
 
+* Menetapkan metadata SEO dan Open Graph di `index.html`, termasuk description, keywords, author, `og:type`, `og:site_name`, `og:title`, `og:description`, `og:image`, serta metadata Twitter Card. Atribut root HTML juga diubah menjadi `lang="id"`, sehingga bahasa halaman yang diumumkan pembaca layar dan yang digunakan mesin pencari sesuai dengan antarmuka Indonesia. Judul dokumen dan tema browser memakai branding Devotion.
+
+* Mengubah tipe body autentikasi di `src/api/auth.ts` agar diturunkan dari `paths` hasil generate OpenAPI untuk login, pemulihan kata sandi, konfirmasi pemulihan, pengiriman ulang kode, dan pembaruan peran. Dengan begitu request frontend mengikuti kontrak `openapi.yaml` dan tidak kembali memakai tipe payload auth tulis tangan yang dapat menyimpang dari backend.
+
+* Memusatkan penurunan pesan galat di `src/lib/problem.ts` dan mengganti 21 halaman agar memakai helper bersama. Helper ini menangani `detail`, `title`, error validasi berlapis, fallback per status, serta fallback per konteks tanpa menghilangkan pesan domain seperti sesi kedaluwarsa, kode OTP, konflik pendaftaran, kapasitas, dan unggahan berkas. Halaman tetap dapat memasok fallback khusus, sementara ekstraksi problem tidak lagi disalin di setiap halaman.
+
+* Membedakan judul halaman detail request berdasarkan sisi alurnya: `/requests/incoming/:requestId` memakai "Detail Permintaan Masuk", sedangkan `/quota-requests/:requestId` memakai "Detail Permintaan Terkirim". Dengan begitu judul tidak lagi menyebut dua jenis request sebagai "Detail Permintaan" yang sama.
+
+* Memindahkan judul halaman dari tabel pathname terpisah di `PageTitle.tsx` ke `handle` pada definisi route di `App.tsx`, lalu membacanya melalui `useMatches()` pada data router. Ini menghilangkan dua sumber kebenaran untuk path yang sama, menjaga route admin nested tetap sejajar dengan definisinya, dan memberi judul fallback yang benar untuk route dinamis. Judul yang masih berbahasa Inggris atau campur juga dinormalisasi menjadi "Beranda", "Lupa Kata Sandi", "Atur Ulang Kata Sandi", dan "Moderasi Ulasan".
+
 * Menyatukan aturan tombol Terima Penawaran di halaman request terkirim dan masuk ke fungsi bersama `canAcceptOffer` di `lib/offers.ts`, sehingga buyer dan subcontractor memakai predikat yang sama dan tidak menilai ulang status negosiasi secara berbeda. Aturan ini membatasi aksi menerima hanya saat status `offered` dan `latest.offer_id` benar-benar ada, jadi tombol tidak lagi muncul untuk ronde yang tidak valid dan backend `FORBIDDEN` tetap menjadi satu-satunya sumber kebenaran untuk penolakan oleh pihak yang mengajukan ronde terakhir.
+
+* Menambahkan komentar invariant pada `SentDetail.tsx` dan `lib/offers.ts` untuk menjaga dua keputusan penting tetap terlihat saat refactor: `acceptMutation` sengaja dimiliki induk karena satu penerimaan membuat pesanan bersama, menonaktifkan kandidat lain, dan menampilkan pesanan yang dibuat; `canAcceptOffer` sengaja mensyaratkan status `offered`, bukan sekadar status non-terminal, serta hanya menyaring tampilan. Backend tetap menjadi penegak aturan sebenarnya melalui `FORBIDDEN`/`own_offer` pada penerimaan penawaran.
 
 * Meregenerasi `src/api/types.ts` dari `openapi.yaml` agar `POST /offers/{offerId}/accept` memuat respons `403` yang menjelaskan bahwa pihak yang mengajukan penawaran terakhir tidak boleh menerima tawarannya sendiri dan bahwa persetujuan harus datang dari pihak lawan (FR-033). Ini menjaga `Problem` yang dipakai UI tetap sinkron dengan kontrak backend dan mencegah tipe yang ketinggalan dari versi kontrak lama.
 
@@ -155,11 +142,13 @@ Engineering changelogs are written in English. User-facing product copy remains 
 
 * Menata ulang halaman My Profile agar sesuai dengan layout dashboard: bagian berbasis kartu, dan tombol simpan sekarang mencerminkan status pending dari mutation update.
 
-* Mendesain ulang bagian Final CTA pada halaman utama: kartu dua kolom dengan bentuk abstrak yang sesuai dengan halaman autentikasi, panel sorotan fitur, tombol rounded dengan tautan `react-router-dom`, serta panah hover pada aksi sekunder.
+* Mendesain ulang Final CTA pada halaman utama: kartu dua kolom dengan bentuk abstrak yang sesuai dengan halaman autentikasi, panel sorotan fitur, tombol rounded dengan tautan `react-router-dom`, serta panah hover pada aksi sekunder.
 
 * Menata ulang `DashboardLayout` menjadi sidebar terang dan blur: item aktif dengan warna aksen, submenu yang dapat diciutkan, dan tombol logout yang dipasang di footer sidebar. Area akun pada header disederhanakan menjadi blok identitas statis. Navigasi admin sekarang mengelompokkan master data dan supervisi order ke dalam submenu.
 
 * Mendesain ulang footer publik: layout empat kolom (brand dengan deskripsi pertukaran kapasitas dan catatan bahwa dana tidak ditahan, navigasi dalam halaman, tautan platform, tautan perusahaan) dengan bottom bar untuk copyright dan tautan legal.
+
+* Halaman Master Items admin diperbarui: badge Aktif/Nonaktif sekarang disembunyikan saat baris masuk mode edit (`{!editing && <span ...>}`), grid diubah dari `md:grid-cols-2 lg:grid-cols-3` menjadi `lg:grid-cols-2` agar jumlah kolom lebih konsisten di tablet dan desktop, dan node spasi yang tidak perlu di antara tombol aksi dihapus (`{\" \"}` hasil format ulang yang menciptakan text node di DOM tanpa dampak visual).
 
 ### Diperbaiki
 
@@ -217,7 +206,12 @@ Engineering changelogs are written in English. User-facing product copy remains 
 
 * Registrasi sekarang melanjutkan ke halaman Verify Email dengan email yang didaftarkan alih-alih mengembalikan pengguna ke login, dan verifikasi email yang berhasil melanjutkan ke Verify Phone.
 
+* Menghubungkan manifest aplikasi web ke index.html dan memperbaiki konfigurasinya: `site.webmanifest` sekarang dilintas dengan `<link rel="manifest">`, nama dan short_name diubah ke "Devotion", theme_color disesuaikan ke #0f172a (sesuai brand), icon diperkecil menjadi hanya favicon.svg yang benar-benar ada, dan menghapus referensi ke PNG icon yang sudah tidak digunakan dari public/. Bersamanya, aset ikon yang tidak dirujuk dari HTML (apple-touch-icon.png, favicon-96x96.png, favicon.ico, web-app-manifest-192x192.png, web-app-manifest-512x512.png) dihapus dari folder public/, mengurangi ukuran build.
+
+
 ### Dihapus
+
+* Menghapus komponen dead code `TrustStatsSection` dan `FinalCTASection`. Keduanya tidak pernah diimpor setelah commit yang diklaim mengekstraksi mereka, sehingga tetap disimpan di berkas dirinya sendiri tanpa digunakan dari `pages/Home.tsx`. Bagian tersebut digantikan oleh redesign Final CTA yang lebih sederhana.
 
 * Menghapus dependensi `axios`. Tidak ada kode yang mengimpornya: setiap request berjalan melalui wrapper `fetch` di `api/client.ts`, yang membutuhkan `credentials: "include"` untuk session cookie.
 

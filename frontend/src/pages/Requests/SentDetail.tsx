@@ -1,8 +1,8 @@
-import { ApiError } from "@api/client";
 import type { Offer, RequestCandidate } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useAcceptOffer, useCounterOffer, useQuotaRequest } from "@hooks/useQuota";
 import { canAcceptOffer, latestOffer, resolveOfferChain } from "@lib/offers";
+import { getProblemMessage } from "@lib/problem";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuClock, LuHandshake, LuHourglass, LuSend } from "react-icons/lu";
@@ -11,19 +11,6 @@ import { formatDayTimeId as formatDateTimeId, formatRupiah } from "@lib/datetime
 import { candidateStatusMeta, formatDateShort } from "./meta";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-
-        if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
-        if (error.status === 403) return "Anda tidak berwenang melakukan aksi ini.";
-    }
-
-    return "Aksi tidak dapat diproses. Silakan coba lagi.";
-}
 
 function OfferHistory({ offers }: { offers: Offer[] }) {
     if (offers.length === 0) return null;
@@ -122,7 +109,12 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="button" onClick={handleCounter} disabled={counterMutation.isPending} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
+                                <button
+                                    type="button"
+                                    onClick={handleCounter}
+                                    disabled={counterMutation.isPending}
+                                    className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
                                     {counterMutation.isPending ? "Mengirim..." : "Kirim Counter"}
                                 </button>
                                 <button type="button" onClick={() => setCounterOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
@@ -132,7 +124,12 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
                         </div>
                     ) : (
                         <div className="flex gap-2">
-                            <button type="button" onClick={handleAccept} disabled={accepting} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                            <button
+                                type="button"
+                                onClick={handleAccept}
+                                disabled={accepting}
+                                className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
                                 <LuHandshake className="size-4" aria-hidden />
                                 {accepting ? "Memproses..." : "Terima Penawaran"}
                             </button>
@@ -161,6 +158,9 @@ export default function SentDetail() {
     const navigate = useNavigate();
     const requestQuery = useQuotaRequest(requestId);
 
+    // Gunakan satu mutasi penerimaan untuk seluruh request. Saat satu kandidat
+    // diterima, pesanan bersama dibuat, semua kartu kandidat dinonaktifkan,
+    // dan banner pesanan yang dibuat ditampilkan.
     const acceptMutation = useAcceptOffer();
 
     if (requestQuery.isLoading) return <Loading />;

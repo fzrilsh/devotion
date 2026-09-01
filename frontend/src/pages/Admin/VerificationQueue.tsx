@@ -1,9 +1,10 @@
-import { ApiError, apiUrl } from "@api/client";
+import { apiUrl } from "@api/client";
 import type { VerificationRequest, VerificationStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
 import { useDecideVerification, useVerificationQueue } from "@hooks/useAdmin";
 import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
+import { getProblemMessage } from "@lib/problem";
 import { useState } from "react";
 import { LuCircleCheck, LuFileImage, LuInbox, LuShieldCheck, LuX } from "react-icons/lu";
 import { formatDateTimeId } from "@lib/datetime";
@@ -17,16 +18,6 @@ const statusMeta: Record<VerificationStatus, { label: string; className: string 
 };
 
 const filterOptions = statusFilters(statusMeta, { allLast: true });
-
-function getProblemMessage(error: unknown): string {
-    if (error instanceof ApiError) {
-        if (typeof error.data === "object" && error.data !== null && "detail" in error.data && typeof error.data.detail === "string") {
-            return error.data.detail;
-        }
-    }
-
-    return "Keputusan tidak dapat disimpan. Silakan coba lagi.";
-}
 
 function RequestCard({ request }: { request: VerificationRequest }) {
     const decideMutation = useDecideVerification();
@@ -49,7 +40,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
             setRejectOpen(false);
             setReason("");
         } catch (err) {
-            setError(getProblemMessage(err));
+            setError(getProblemMessage(err, "Keputusan tidak dapat disimpan. Silakan coba lagi."));
         }
     }
 
