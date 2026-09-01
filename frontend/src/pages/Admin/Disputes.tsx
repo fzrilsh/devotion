@@ -31,6 +31,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
 
     const [resolveOpen, setResolveOpen] = useState(false);
     const [result, setResult] = useState<DisputeResult>("continued");
+    const [liableProfileId, setLiableProfileId] = useState<string>("");
     const [note, setNote] = useState("");
     const [error, setError] = useState("");
 
@@ -51,17 +52,24 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
         event.preventDefault();
         setError("");
 
+        if (result === "cancelled" && !liableProfileId) {
+            setError("Pilih pihak yang menanggung pembatalan.");
+            return;
+        }
+
         try {
             await resolveMutation.mutateAsync({
                 disputeId: dispute.dispute_id,
                 data: {
                     result,
                     allocation_reversed: result === "cancelled",
+                    liable_profile_id: result === "cancelled" ? liableProfileId : undefined,
                     note: note.trim() || undefined,
                 },
             });
             setResolveOpen(false);
             setNote("");
+            setLiableProfileId("");
         } catch (err) {
             setError(getProblemMessage(err));
         }
@@ -117,6 +125,24 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                                 ))}
                             </div>
 
+                            {result === "cancelled" && orderQuery.data ? (
+                                <div>
+                                    <label htmlFor={`liable-${dispute.dispute_id}`} className="mb-2 block text-sm font-semibold text-slate-500">
+                                        Pihak yang Menanggung <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        id={`liable-${dispute.dispute_id}`}
+                                        value={liableProfileId}
+                                        onChange={(event) => setLiableProfileId(event.target.value)}
+                                        className={inputClassName}
+                                    >
+                                        <option value="">-- Pilih pihak --</option>
+                                        <option value={orderQuery.data.buyer_profile_id}>Pembeli</option>
+                                        <option value={orderQuery.data.subcontractor_profile_id}>Subkontraktor</option>
+                                    </select>
+                                </div>
+                            ) : null}
+
                             <div>
                                 <label htmlFor={`note-${dispute.dispute_id}`} className="mb-2 block text-sm font-semibold text-slate-500">
                                     Catatan Keputusan (opsional)
@@ -125,15 +151,18 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="submit" disabled={busy} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
+                                <button type="submit" disabled={busy || (result === "cancelled" && !liableProfileId)} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
                                     {resolveMutation.isPending ? "Menyimpan..." : "Putuskan Sengketa"}
                                 </button>
-                                <button type="button" onClick={() => setResolveOpen(false)} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
+                                <button type="button" onClick={() => {
+                                    setResolveOpen(false);
+                                    setLiableProfileId("");
+                                }} className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50">
                                     Batal
                                 </button>
                             </div>
 
-                            <p className="text-[11px] leading-4 text-slate-400">Pembatalan lewat keputusan sengketa membalik seluruh alokasi kapasitas. Pihak yang menanggung ditetapkan sistem dari hasil yang dipilih.</p>
+                            <p className="text-[11px] leading-4 text-slate-400">Pembatalan lewat keputusan sengketa membalik seluruh alokasi kapasitas. Pilih pihak yang akan menanggung hasil pembatalan (pembeli atau subkontraktor).</p>
                         </form>
                     ) : (
                         <div className="flex flex-wrap gap-2">

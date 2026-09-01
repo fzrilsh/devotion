@@ -209,7 +209,7 @@ export default function AdminMasterItems() {
                         </h2>
                     </div>
 
-                    <ul className="grid grid-cols-1 lg:grid-cols-2 divide-y divide-x divide-slate-100">
+                    <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 divide-y divide-x divide-slate-100">
                         {items.map((item) => (
                             <ItemRow key={item.item_id} item={item} />
                         ))}
