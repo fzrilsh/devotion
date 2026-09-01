@@ -4,6 +4,12 @@
 
 ### Diperbaiki
 
+* Menetapkan metadata SEO dan Open Graph di `index.html`, termasuk description, keywords, author, `og:type`, `og:site_name`, `og:title`, `og:description`, `og:image`, serta metadata Twitter Card. Atribut root HTML juga diubah menjadi `lang="id"`, sehingga bahasa halaman yang diumumkan pembaca layar dan yang digunakan mesin pencari sesuai dengan antarmuka Indonesia. Judul dokumen dan tema browser memakai branding Devotion.
+
+* Mengubah tipe body autentikasi di `src/api/auth.ts` agar diturunkan dari `paths` hasil generate OpenAPI untuk login, pemulihan kata sandi, konfirmasi pemulihan, pengiriman ulang kode, dan pembaruan peran. Dengan begitu request frontend mengikuti kontrak `openapi.yaml` dan tidak kembali memakai tipe payload auth tulis tangan yang dapat menyimpang dari backend.
+
+* Memusatkan penurunan pesan galat di `src/lib/problem.ts` dan mengganti 21 halaman agar memakai helper bersama. Helper ini menangani `detail`, `title`, error validasi berlapis, fallback per status, serta fallback per konteks tanpa menghilangkan pesan domain seperti sesi kedaluwarsa, kode OTP, konflik pendaftaran, kapasitas, dan unggahan berkas. Halaman tetap dapat memasok fallback khusus, sementara ekstraksi problem tidak lagi disalin di setiap halaman.
+
 * Membedakan judul halaman detail request berdasarkan sisi alurnya: `/requests/incoming/:requestId` memakai "Detail Permintaan Masuk", sedangkan `/quota-requests/:requestId` memakai "Detail Permintaan Terkirim". Dengan begitu judul tidak lagi menyebut dua jenis request sebagai "Detail Permintaan" yang sama.
 
 * Memindahkan judul halaman dari tabel pathname terpisah di `PageTitle.tsx` ke `handle` pada definisi route di `App.tsx`, lalu membacanya melalui `useMatches()` pada data router. Ini menghilangkan dua sumber kebenaran untuk path yang sama, menjaga route admin nested tetap sejajar dengan definisinya, dan memberi judul fallback yang benar untuk route dinamis. Judul yang masih berbahasa Inggris atau campur juga dinormalisasi menjadi "Beranda", "Lupa Kata Sandi", "Atur Ulang Kata Sandi", dan "Moderasi Ulasan".
@@ -202,7 +208,7 @@
 
 * Menghubungkan manifest aplikasi web ke index.html dan memperbaiki konfigurasinya: `site.webmanifest` sekarang dilintas dengan `<link rel="manifest">`, nama dan short_name diubah ke "Devotion", theme_color disesuaikan ke #0f172a (sesuai brand), icon diperkecil menjadi hanya favicon.svg yang benar-benar ada, dan menghapus referensi ke PNG icon yang sudah tidak digunakan dari public/. Bersamanya, aset ikon yang tidak dirujuk dari HTML (apple-touch-icon.png, favicon-96x96.png, favicon.ico, web-app-manifest-192x192.png, web-app-manifest-512x512.png) dihapus dari folder public/, mengurangi ukuran build.
 
-* Halaman Master Items mengubah dua perilaku visual: badge status Aktif/Nonaktif kini disembunyikan saat baris masuk mode edit sehingga status tidak muncul dua kali (sekali di input readonly, sekali di badge), dan grid daftar item berubah dari kolom tiga level tablet (`md:grid-cols-2 lg:grid-cols-3`) menjadi kolom dua level desktop saja (`lg:grid-cols-2`), mengurangi kolom di tablet dari 2 menjadi 1 kolom penuh dan di desktop dari 3 menjadi 2 kolom. Halaman ini juga memiliki banyak node teks spasi berlebihan (`{" "}`) yang tersisip di antara tombol dari hasil format ulang Prettier; node tersebut tidak berdampak visual (kontainer flex dengan gap), tetapi dapat dibersihkan pada penyentuhan berkas berikutnya.
+
 ### Dihapus
 
 * Menghapus komponen dead code `TrustStatsSection` dan `FinalCTASection`. Keduanya tidak pernah diimpor setelah commit yang diklaim mengekstraksi mereka, sehingga tetap disimpan di berkas dirinya sendiri tanpa digunakan dari `pages/Home.tsx`. Bagian tersebut digantikan oleh redesign Final CTA yang lebih sederhana.
