@@ -404,6 +404,7 @@ erDiagram
         boolean published
         timestamptz calendar_updated_at "dasar penanda kalender basi"
         date horizon_until "wajib hari Senin"
+        timestamptz stale_notified_at "penanda pengingat kalender basi, direset saat kalender diperbarui"
     }
     availability_period {
         uuid id PK
@@ -491,6 +492,7 @@ erDiagram
         boolean auto_confirmed
         timestamptz confirm_warn_sent_at "penanda pengingat sekali kirim"
         timestamptz late_notified_at "penanda pemberitahuan lewat tenggat"
+        timestamptz deadline_warn_sent_at "penanda peringatan tenggat pengiriman mendekat"
         uuid cancelled_by_id FK
         text cancellation_reason
         timestamptz cancelled_at
@@ -546,7 +548,7 @@ erDiagram
     }
 ```
 
-Tiga aturan di sini harus membaca tabel lain, jadi ditegakkan trigger, bukan `CHECK`: `trg_reject_self_request` menolak kandidat yang subkontraktornya sama dengan pembeli (FR-083), `trg_reject_allocation_before_readiness` menolak alokasi sebelum `readiness_week_start` (FR-087), `trg_reject_wrong_item_type` mengikat `listing_product` ke item `product` dan `listing_machine` ke `machine`.
+Tiga aturan di sini harus membaca tabel lain, jadi ditegakkan trigger, bukan `CHECK`: `trg_reject_self_request` menolak kandidat yang subkontraktornya sama dengan pembeli (FR-083), `trg_reject_allocation_before_readiness` menolak alokasi sebelum `readiness_week_start` (FR-087), `trg_reject_wrong_product_item` pada `listing_product` dan `trg_reject_wrong_machine_item` pada `listing_machine` mengikat setiap baris ke tipe item yang benar, keduanya memanggil fungsi `reject_wrong_item_type()` dengan argumen tipe yang berbeda.
 
 #### Notifikasi dan pembatasan laju
 
@@ -618,7 +620,8 @@ devotion/
 │   │   ├── order/          # work order, alokasi, pembatalan, pembayaran, sengketa
 │   │   ├── reputation/     # ulasan, nilai turunan, moderasi
 │   │   ├── notification/   # antrean, pengiriman, percobaan ulang
-│   │   └── admin/          # status dan penyambungan WhatsApp
+│   │   ├── admin/          # status dan penyambungan WhatsApp
+│   │   └── db/             # pool 15 koneksi, sqlcgen, testdb skema uji terpisah
 │   ├── db/migrations/      # 22 migrasi golang-migrate
 │   ├── db/queries/         # 15 berkas SQL sumber sqlc
 │   └── webdist/            # hasil build frontend, disematkan lewat embed.FS
@@ -629,7 +632,12 @@ devotion/
 │   ├── hooks/              # hook TanStack Query per domain
 │   ├── schemas/            # skema Zod
 │   ├── routes/             # GuestRoute, ProtectedRoute
-│   └── providers/          # QueryProvider
+│   ├── providers/          # QueryProvider
+│   ├── lib/                # helper murni, termasuk predikat penawaran di offers.ts
+│   ├── data/               # data statis bawaan antarmuka
+│   ├── test/               # setup dan utilitas Jest
+│   ├── styles/             # entri Tailwind dan gaya global
+│   └── assets/             # gambar dan ikon
 ├── docs/                   # spec, plan, data-model, contracts, tasks, panduan operasional
 ├── .github/workflows/ci.yml
 ├── docker-compose.yml
