@@ -99,7 +99,7 @@ export default function App() {
                         <Route path="/search" element={<Search />} handle={{ title: "Cari Jasa" }} />
                         <Route path="/quota-requests/new" element={<CreateQuotaRequest />} handle={{ title: "Buat Permintaan Kuota" }} />
                         <Route path="/quota-requests" element={<SentRequests />} handle={{ title: "Permintaan Saya" }} />
-                        <Route path="/quota-requests/:requestId" element={<SentRequestDetail />} handle={{ title: "Detail Permintaan" }} />
+                        <Route path="/quota-requests/:requestId" element={<SentRequestDetail />} handle={{ title: "Detail Permintaan Terkirim" }} />
                     </Route>
                 </Route>
 

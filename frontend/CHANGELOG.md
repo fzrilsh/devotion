@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Membedakan judul halaman detail request berdasarkan sisi alurnya: `/requests/incoming/:requestId` memakai "Detail Permintaan Masuk", sedangkan `/quota-requests/:requestId` memakai "Detail Permintaan Terkirim". Dengan begitu judul tidak lagi menyebut dua jenis request sebagai "Detail Permintaan" yang sama.
+
 * Memindahkan judul halaman dari tabel pathname terpisah di `PageTitle.tsx` ke `handle` pada definisi route di `App.tsx`, lalu membacanya melalui `useMatches()` pada data router. Ini menghilangkan dua sumber kebenaran untuk path yang sama, menjaga route admin nested tetap sejajar dengan definisinya, dan memberi judul fallback yang benar untuk route dinamis. Judul yang masih berbahasa Inggris atau campur juga dinormalisasi menjadi "Beranda", "Lupa Kata Sandi", "Atur Ulang Kata Sandi", dan "Moderasi Ulasan".
 
 * Menyatukan aturan tombol Terima Penawaran di halaman request terkirim dan masuk ke fungsi bersama `canAcceptOffer` di `lib/offers.ts`, sehingga buyer dan subcontractor memakai predikat yang sama dan tidak menilai ulang status negosiasi secara berbeda. Aturan ini membatasi aksi menerima hanya saat status `offered` dan `latest.offer_id` benar-benar ada, jadi tombol tidak lagi muncul untuk ronde yang tidak valid dan backend `FORBIDDEN` tetap menjadi satu-satunya sumber kebenaran untuk penolakan oleh pihak yang mengajukan ronde terakhir.
