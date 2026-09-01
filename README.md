@@ -625,7 +625,7 @@ devotion/
 ├── frontend/src/
 │   ├── api/                # klien fetch dan tipe hasil generate dari OpenAPI
 │   ├── components/         # layout, section, komponen bersama
-│   ├── pages/              # 37 halaman, dikelompokkan per user story
+│   ├── pages/              # 38 halaman, dikelompokkan per user story
 │   ├── hooks/              # hook TanStack Query per domain
 │   ├── schemas/            # skema Zod
 │   ├── routes/             # GuestRoute, ProtectedRoute
@@ -956,7 +956,7 @@ apidocs-sync           salinan openapi.yaml identik dengan sumber
 npm run lint           1 galat, react-refresh/only-export-components
                        pada src/components/common/VerificationGate.tsx:5:17
 npm run build          lolos (tsc -b + vite build, 723 modul)
-npm test               4 suite lulus, 19 uji lulus
+npm test               12 suite lulus, 82 uji lulus
 ```
 
 ### Cakupan
