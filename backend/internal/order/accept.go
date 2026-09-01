@@ -14,19 +14,23 @@ import (
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
 
-// Register wires the single buyer-only accept route. It is Gated behind
-// RoleBuyer, so it stays out of the router's uncovered set and a wrong role is
-// rejected before the handler runs. The Register(r, auth) shape mirrors the
+// Register wires the accept route. It is Gated behind both business roles
+// because either party may close the negotiation: whoever did not make the
+// standing offer accepts it (FR-033, spec skenario 4). The gate keeps the route
+// out of the router's uncovered set and rejects an admin or a session without a
+// business role before the handler runs. The Register(r, auth) shape mirrors the
 // other domain services, so Service holds no Authenticator.
 func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
-	gate := httpx.RequireRole(auth, httpx.RoleBuyer)
+	gate := httpx.RequireRole(auth, httpx.RoleBuyer, httpx.RoleSubcontractor)
 	r.Gated("POST /api/offers/{offerId}/accept", gate, s.handleAccept)
 	s.registerWorkOrder(r, auth)
 }
 
 // handleAccept forms the agreement from an accepted offer (FR-034, FR-036). The
-// route is buyer-gated; the service loads the offer under a buyer-account guard
-// so another buyer's offer is a 404, then runs the R-04 allocation transaction.
+// route admits both business roles; the service loads the offer under a party
+// guard so a caller who is neither party gets a 404, then rejects a caller
+// trying to accept their own standing offer before running the R-04 allocation
+// transaction.
 func (s *Service) handleAccept(w http.ResponseWriter, r *http.Request) {
 	acc, ok := principalAccount(w, r)
 	if !ok {
@@ -116,8 +120,9 @@ type workOrderView struct {
 }
 
 // accept forms the agreement for one accepted offer following research.md R-04.
-// It resolves the offer and its parties, guards on the buyer, rejects a request
-// that already reached agreement or an offer whose readiness week would fall past
+// It resolves the offer and its parties, guards that the caller is a party and
+// is not accepting their own standing offer (FR-033), rejects a request that
+// already reached agreement or an offer whose readiness week would fall past
 // the deadline, then in one transaction: locks the listing, grows the calendar to
 // the deadline week (FR-088), locks every candidate period ascending by
 // week_start, sums the remaining capacity across not-full periods and rejects a
@@ -137,11 +142,30 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 		return workOrderView{}, err
 	}
 
-	// The route is buyer-gated; this guards that the caller is the buyer of this
-	// particular request, so another buyer's offer id is a 404 rather than a
-	// leaked existence.
-	if row.BuyerAccount != accountID {
+	// The route admits both parties; this guards that the caller is a party to
+	// this particular negotiation, so an unrelated account's offer id is a 404
+	// rather than a leaked existence.
+	isBuyer := row.BuyerAccount == accountID
+	isSub := row.SubcontractorAccount == accountID
+	if !isBuyer && !isSub {
 		return workOrderView{}, &conflictError{code: httpx.CodeNotFound, detail: "Penawaran tidak ditemukan."}
+	}
+
+	// Closing the negotiation is the counterpart's approval of the standing
+	// offer, not the proposer's (FR-033, spec skenario 4). The party who made the
+	// standing offer cannot accept it themselves; they may only counter or wait.
+	// This mirrors the alternation the counter path enforces.
+	var caller sqlcgen.OfferParty
+	if isSub {
+		caller = sqlcgen.OfferPartySubcontractor
+	} else {
+		caller = sqlcgen.OfferPartyBuyer
+	}
+	if caller == row.ProposedBy {
+		return workOrderView{}, &conflictError{
+			code:   httpx.CodeForbidden,
+			detail: "Anda tidak bisa menyetujui penawaran Anda sendiri; menunggu pihak lain menyetujui atau menawar balik.",
+		}
 	}
 
 	// Only the standing (latest) offer of the chain can be accepted; accepting a
@@ -368,7 +392,7 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 		}
 
 		// Record the opening status transition (from nothing to accepted). The
-		// buyer is the actor; by_system is false.
+		// accepting party is the actor; by_system is false.
 		note := pgtype.Text{String: "Kesepakatan terbentuk.", Valid: true}
 		if err := q.InsertOrderStatusHistory(ctx, sqlcgen.InsertOrderStatusHistoryParams{
 			WorkOrderID: wo.ID,
@@ -382,21 +406,29 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			return err
 		}
 
-		// Notify the winning subcontractor and the buyer that the agreement formed
-		// (FR-034), then every losing candidate's subcontractor. A notification
-		// row is written in this transaction; delivery runs after commit.
+		// Notify both parties that the agreement formed (FR-034), then every losing
+		// candidate's subcontractor. Either party may be the one who accepted, so
+		// the wording follows the caller: the accepter reads that they approved,
+		// the counterpart reads that their offer was approved. A notification row
+		// is written in this transaction; delivery runs after commit.
 		link := "/work-orders/" + uuidString(wo.ID)
+		accepterMsg := "Anda menyetujui penawaran dan pesanan telah dibuat."
+		proposerMsg := "Penawaran Anda disetujui dan pesanan telah dibuat."
+		subMsg, buyerMsg := proposerMsg, accepterMsg
+		if isSub {
+			subMsg, buyerMsg = accepterMsg, proposerMsg
+		}
 		if err := s.notifier.Enqueue(ctx, tx, row.SubcontractorAccount,
 			sqlcgen.EventTypeAgreementFormed,
 			"Kesepakatan terbentuk",
-			"Penawaran Anda diterima dan pesanan telah dibuat.",
+			subMsg,
 			&link); err != nil {
 			return err
 		}
 		if err := s.notifier.Enqueue(ctx, tx, row.BuyerAccount,
 			sqlcgen.EventTypeAgreementFormed,
 			"Kesepakatan terbentuk",
-			"Anda menyepakati penawaran dan pesanan telah dibuat.",
+			buyerMsg,
 			&link); err != nil {
 			return err
 		}
@@ -425,11 +457,11 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
 			AllowedTransitions:     allowedTransitions(wo.Status),
 			SelfCancellable:        wo.Status == sqlcgen.WorkOrderStatusAccepted,
-			// The accepting caller is the buyer, a party, and a fresh order is
-			// 'accepted', a status that still takes payment statements, so the
-			// buyer may record one right away (FR-041). It is not yet confirmed
-			// received, so it is not reviewable, and with no statements there is
-			// no mismatch (FR-043, FR-047).
+			// The accepting caller is a party, and a fresh order is 'accepted', a
+			// status that still takes payment statements, so the caller may record
+			// one right away (FR-041). It is not yet confirmed received, so it is
+			// not reviewable, and with no statements there is no mismatch (FR-043,
+			// FR-047).
 			CanRecordPayment: true,
 			CanReview:        false,
 			AutoConfirmAt:    nil,

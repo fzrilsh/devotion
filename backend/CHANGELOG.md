@@ -7,6 +7,21 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- `POST /offers/{offerId}/accept` kini mengunci penutupan negosiasi ke pihak lawan
+  dari penawaran terakhir. Dua celah tertutup sekaligus. Pertama, rutenya tadinya
+  digerbang `RoleBuyer` saja, sehingga bila ronde terakhir adalah counter milik
+  pembeli, subkontraktor tidak punya endpoint untuk menyetujuinya dan hanya bisa
+  menawar balik terus, padahal spec skenario 4 menjanjikan kapabilitas itu. Gerbang
+  sekarang menerima kedua peran usaha, sejajar dengan pola rute counter. Kedua,
+  `accept()` tidak memeriksa `proposed_by`, jadi pembeli bisa menyetujui
+  counter-offer-nya sendiri dan mengikat subkontraktor pada harga yang tak pernah
+  disetujui pihak itu (tembus 201 saat pengujian). Sekarang penjaga pihak
+  memastikan pemanggil salah satu dari dua pihak, bukan pihak jadi 404 supaya
+  keberadaan penawaran tidak bocor, lalu pemanggil yang sama dengan `proposed_by`
+  penawaran standing ditolak `FORBIDDEN`, cermin alternasi yang sudah ditegakkan
+  jalur counter (FR-033). Notifikasi pembentukan kesepakatan mengikuti siapa yang
+  menyetujui, jadi kalimatnya tidak lagi mengasumsikan pembeli sebagai penyetuju.
+  `openapi.yaml` menyatakan aturan pihak lawan beserta respons 403-nya.
 - `GET /profile/{profileId}` kini mengisi `listing` dengan kartu Kapasitas Produksi
   profil, sebelumnya selalu `null` karena handler mengeset nilai itu secara
   hardcode. Akibatnya kartu kapasitas (kapasitas mingguan, lead time, produk, dan
