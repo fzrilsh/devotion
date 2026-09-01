@@ -50,7 +50,7 @@ yang disebut khusus konstitusi.
 | Endpoint | Yang diuji |
 |----------|------------|
 | `GET /search` | Urutan dapat diulang; stabil antar halaman; skor tidak terpengaruh verifikasi dan reputasi; kapasitas terjumlah lintas periode; listing sendiri dikecualikan |
-| `POST /offers/{offerId}/accept` | Dua kesepakatan berbarengan atas periode sama; alokasi mengisi minggu terawal; kegagalan sebagian membatalkan seluruhnya |
+| `POST /offers/{offerId}/accept` | Dua kesepakatan berbarengan atas periode sama; alokasi mengisi minggu terawal; kegagalan sebagian membatalkan seluruhnya; hanya pihak lawan yang bisa menyetujui, pengaju penawaran terakhir ditolak |
 | `POST /candidates/{candidateId}/offers` | Penolakan saat kapasitas kurang, dengan angka tersisa yang benar |
 | `POST /work-orders/{workOrderId}/cancel` | Seluruh alokasi dibalik; tertutup setelah produksi |
 | `POST /work-orders/{workOrderId}/status` | Transisi melompat ditolak beserta daftar transisi yang diizinkan |
