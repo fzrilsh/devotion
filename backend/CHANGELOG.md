@@ -7,6 +7,25 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Rujukan lokasi kredensial akun uji dibetulkan di seluruh dokumen (#23). Empat
+  berkas menunjuk pembaca ke `docs/skenario-uji-manual.md`, padahal berkas
+  itu tidak memuat satu pun dan hanya menunjuk ke tempat lain. Yang paling perlu
+  dibetulkan adalah baris Complexity Tracking `plan.md` dan judul bagian
+  `utang-teknis.md`, karena keduanya mencatat pengecualian konstitusi atas berkas
+  yang tidak berisi kredensial, sehingga pengecualiannya tidak menunjuk apa pun.
+  Semuanya kini menunjuk `quickstart.md` bagian E, tempat empat akun `.test` itu
+  betulan ada. `skenario-uji-manual.md` sendiri sekarang menyebutkan bagian E
+  supaya penguji yang membuka berkas itu lebih dulu tidak perlu menebak.
+- README bagian arsitektur dan skema disesuaikan dengan migrasi dan struktur
+  direktori yang sebenarnya (#24). Kolom `stale_notified_at` pada
+  `capacity_listing` dan `deadline_warn_sent_at` pada `work_order`, keduanya
+  penanda dedup dari dua migrasi terakhir, tidak tergambar di ERD. Nama trigger
+  yang tertulis adalah nama fungsinya, `trg_reject_wrong_item_type`, sedangkan
+  trigger sungguhan ada dua, `trg_reject_wrong_product_item` dan
+  `trg_reject_wrong_machine_item`, sehingga penguji yang mencarinya lewat
+  `pg_trigger` bisa menyimpulkan aturan FR-nya tidak ditegakkan. Folder structure
+  juga melewatkan `backend/internal/db/` beserta lima direktori di
+  `frontend/src/`.
 - `POST /offers/{offerId}/accept` kini mengunci penutupan negosiasi ke pihak lawan
   dari penawaran terakhir. Dua celah tertutup sekaligus. Pertama, rutenya tadinya
   digerbang `RoleBuyer` saja, sehingga bila ronde terakhir adalah counter milik
