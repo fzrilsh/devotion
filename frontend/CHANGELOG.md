@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Menyesuaikan form resolusi sengketa admin di `src/pages/Admin/Disputes.tsx` agar `POST /admin/disputes/{disputeId}/resolve` mengikuti kontrak OpenAPI: `result` memakai enum yang benar, `allocation_reversed` hanya dikirim saat keputusan membatalkan pesanan, dan `liable_profile_id` diisi ketika `result === "cancelled"` dengan memilih pihak pembeli atau subkontraktor yang menanggung. UI sekarang memvalidasi pilihan ini sebelum submit agar request yang dikirim tidak lagi melanggar skema backend.
+
 * Menetapkan metadata SEO dan Open Graph di `index.html`, termasuk description, keywords, author, `og:type`, `og:site_name`, `og:title`, `og:description`, `og:image`, serta metadata Twitter Card. Atribut root HTML juga diubah menjadi `lang="id"`, sehingga bahasa halaman yang diumumkan pembaca layar dan yang digunakan mesin pencari sesuai dengan antarmuka Indonesia. Judul dokumen dan tema browser memakai branding Devotion.
 
 * Mengubah tipe body autentikasi di `src/api/auth.ts` agar diturunkan dari `paths` hasil generate OpenAPI untuk login, pemulihan kata sandi, konfirmasi pemulihan, pengiriman ulang kode, dan pembaruan peran. Dengan begitu request frontend mengikuti kontrak `openapi.yaml` dan tidak kembali memakai tipe payload auth tulis tangan yang dapat menyimpang dari backend.
