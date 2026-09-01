@@ -1,5 +1,5 @@
 import type { Offer } from "@api/search";
-import { canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "./offers";
+import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "./offers";
 
 function offer(sequence: number, party: Offer["party"], offerId = `offer-${sequence}`): Offer {
     return {
@@ -83,6 +83,20 @@ describe("canSendFirstOffer", () => {
         expect(canSendFirstOffer("awaiting_reply", [])).toBe(true);
         expect(canSendFirstOffer("awaiting_reply", [offer(1, "subcontractor")])).toBe(false);
         expect(canSendFirstOffer("offered", [])).toBe(false);
+    });
+});
+
+describe("canAcceptOffer", () => {
+    it("FR-032: pihak yang bukan pemilik ronde terakhir dapat menerima", () => {
+        expect(canAcceptOffer("offered", offer(2, "buyer"), "subcontractor")).toBe(true);
+        expect(canAcceptOffer("offered", offer(2, "subcontractor"), "buyer")).toBe(true);
+        expect(canAcceptOffer("offered", offer(2, "buyer"), "buyer")).toBe(false);
+        expect(canAcceptOffer("offered", { ...offer(2, "buyer"), offer_id: "" }, "subcontractor")).toBe(false);
+    });
+
+    it("FR-032: status terminal atau tanpa offer_id tidak menerima", () => {
+        expect(canAcceptOffer("agreed", offer(2, "buyer"), "subcontractor")).toBe(false);
+        expect(canAcceptOffer("offered", undefined, "subcontractor")).toBe(false);
     });
 });
 

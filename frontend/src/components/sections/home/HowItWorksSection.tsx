@@ -53,7 +53,6 @@ export default function HowItWorksSection() {
             <div className="relative mx-auto w-full max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
                 <div className="mx-auto mb-14 max-w-2xl text-center">
                     <motion.div initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.5, ease: "easeOut" }}>
-                        {/* <span className="inline-flex items-center gap-2 rounded-full border border-industrial-blue-400/30 bg-industrial-blue-500/10 px-4 py-1.5 text-xs font-bold tracking-widest text-industrial-blue-300 uppercase">Cara Kerja</span> */}
                         <h2 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight text-white sm:text-4xl">Dari kebutuhan produksi ke kesepakatan, dalam empat langkah.</h2>
                         <p className="mt-4 text-sm leading-relaxed text-white/60 sm:text-base">Alur yang sama dipakai pemberi order dan pemilik kapasitas. Tidak ada perantara tersembunyi, semua tercatat di platform.</p>
                     </motion.div>

@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ApiError } from "@api/client";
+import type { components } from "@api/types";
 import { useAuth, useLogin } from "@hooks/useAuth";
 import { cn } from "@lib/utils";
 import { loginSchema, type LoginForm } from "@schemas/auth";
@@ -13,15 +14,9 @@ import { HiOutlineLockClosed } from "react-icons/hi2";
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
 
-type ProblemPayload = {
-    title?: string;
-    detail?: string;
-    code?: string;
-};
-
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {
-        const data = error.data as ProblemPayload | undefined;
+        const data = error.data as components["schemas"]["Problem"] | undefined;
         if (data?.detail) return data.detail;
         if (data?.title) return data.title;
         if (error.status === 401) return "Email atau kata sandi salah.";

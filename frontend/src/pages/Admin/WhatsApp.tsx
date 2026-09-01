@@ -6,11 +6,6 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { LuMessageCircle, LuPlug, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
 
-// Kontrak mengirim `connected` sebagai boolean, tetapi layar ini butuh tiga
-// keadaan: pada pairing admin cukup memindai kode QR yang sudah ada, sedangkan
-// pada disconnected ia harus menekan Sambungkan Ulang lebih dulu. Kalau keduanya
-// disatukan, kalimatnya menyuruh admin memulai siklus baru padahal kodenya sudah
-// terpampang, dan siklus yang sedang berjalan justru terbuang.
 type SessionState = "connected" | "pairing" | "disconnected";
 
 function sessionState(status: WhatsAppStatus): SessionState {

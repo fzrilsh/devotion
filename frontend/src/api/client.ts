@@ -1,8 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
 
-// Alamat penuh satu endpoint, untuk hal yang tidak lewat fetch: pratayang berkas
-// yang dibuka di tab baru. Jangan menulis prefiks "/api" di halaman, karena
-// VITE_API_URL bisa menunjuk host lain.
 export function apiUrl(path: string): string {
     return `${API_BASE_URL}${path}`;
 }
@@ -22,7 +19,6 @@ export class ApiError extends Error {
 export async function apiClient<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
 
-    // JSON bawaan; multipart dibiarkan tanpa Content-Type supaya fetch memasang boundary sendiri.
     if (!(options.body instanceof FormData)) {
         headers["Content-Type"] = "application/json";
     }
@@ -54,7 +50,6 @@ export async function apiClient<T>(path: string, options: RequestInit = {}): Pro
         return undefined as T;
     }
 
-    // Body sukses bisa kosong; jangan anggap itu kegagalan parse.
     const text = await response.text();
 
     return (text ? JSON.parse(text) : undefined) as T;

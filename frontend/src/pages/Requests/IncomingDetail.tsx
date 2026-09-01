@@ -1,12 +1,12 @@
 import { ApiError } from "@api/client";
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
-import { useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
-import { canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
+import { useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
+import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { cn } from "@lib/utils";
 import { useState } from "react";
-import { LuArrowLeft, LuCircleCheck, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { LuArrowLeft, LuCircleCheck, LuHandshake, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { candidateStatusMeta, formatDateShort, formatRupiah } from "./meta";
 import { formatDayTimeId as formatDateTimeId } from "@lib/datetime";
 
@@ -36,8 +36,6 @@ function getProblemMessage(error: unknown): string {
     return getProblem(error)?.detail ?? "Aksi tidak dapat diproses. Silakan coba lagi.";
 }
 
-// Penolakan kapasitas membawa meta terstruktur (FR-035) supaya pengguna bisa
-// melihat angka pastinya, bukan hanya kalimat penjelasan.
 function getCapacityInfo(error: unknown): CapacityInfo | null {
     const problem = getProblem(error);
 
@@ -72,10 +70,9 @@ function OfferHistory({ offers }: { offers: Offer[] }) {
 }
 
 export default function IncomingDetail() {
-    // Param rute ini adalah candidate_id, bukan request_id. Detail request utuh
-    // hanya bisa dibaca pemberi order; subkontraktor membaca kandidatnya sendiri.
     const { requestId: paramCandidateId = "" } = useParams();
     const location = useLocation();
+    const navigate = useNavigate();
     const stateCandidateId = (location.state as DetailLocationState | null)?.candidateId;
     const candidateId = stateCandidateId ?? paramCandidateId;
 
@@ -85,6 +82,7 @@ export default function IncomingDetail() {
     const sendOfferMutation = useSendOffer(candidateId);
     const rejectMutation = useRejectCandidate(candidateId);
     const counterMutation = useCounterOffer(candidateId);
+    const acceptMutation = useAcceptOffer();
 
     const [panel, setPanel] = useState<"none" | "offer" | "counter" | "reject">("none");
     const [totalPrice, setTotalPrice] = useState("");
@@ -115,19 +113,17 @@ export default function IncomingDetail() {
 
     const candidate = candidateQuery.data;
 
-    // offers dan latest_offer keduanya opsional pada respons incoming. Yang dikirim
-    // server dipakai lebih dulu; sessionOffers hanya menambal ronde yang dikirim
-    // backend sebagai respons mutasi di sesi ini.
     const offers = resolveOfferChain(candidate, sessionOffers);
     const latest = latestOffer(offers);
 
     const canOffer = canSendFirstOffer(candidate.status, offers);
     const canCounter = canCounterOffer(candidate.status, latest);
+    const canAccept = canAcceptOffer(candidate.status, latest, "subcontractor");
     const waitingBuyer = isWaitingBuyer(candidate.status, latest);
     const terminal = isTerminalCandidate(candidate.status);
     const offerChainMissing = isOfferChainMissing(candidate.status, offers);
     const chainFromSessionOnly = isChainFromSessionOnly(candidate, offers);
-    const busy = sendOfferMutation.isPending || rejectMutation.isPending || counterMutation.isPending;
+    const busy = sendOfferMutation.isPending || rejectMutation.isPending || counterMutation.isPending || acceptMutation.isPending;
 
     async function handleSendOffer(event: React.FormEvent) {
         event.preventDefault();
@@ -163,8 +159,6 @@ export default function IncomingDetail() {
         event.preventDefault();
         setError("");
 
-        // offer_id datang dari Offer yang benar-benar diterima backend, tidak pernah
-        // disusun sendiri dari status atau nomor ronde.
         if (!latest?.offer_id) return;
 
         const price = Number(counterPrice);
@@ -197,6 +191,18 @@ export default function IncomingDetail() {
             await rejectMutation.mutateAsync(reason);
             setPanel("none");
             setRejectReason("");
+        } catch (err) {
+            setError(getProblemMessage(err));
+        }
+    }
+
+    async function handleAccept() {
+        if (!latest?.offer_id) return;
+        setError("");
+
+        try {
+            const workOrder = await acceptMutation.mutateAsync(latest.offer_id);
+            navigate(`/orders/${workOrder.work_order_id}`);
         } catch (err) {
             setError(getProblemMessage(err));
         }
@@ -340,7 +346,7 @@ export default function IncomingDetail() {
                     </div>
                 ) : null}
 
-                {canOffer || canCounter || offerChainMissing ? (
+                {canOffer || canCounter || canAccept || offerChainMissing ? (
                     <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                         {panel === "offer" ? (
                             <form onSubmit={handleSendOffer} className="space-y-3">
@@ -425,7 +431,14 @@ export default function IncomingDetail() {
                             </form>
                         ) : (
                             <div className="flex flex-wrap gap-2">
-                                {canCounter ? (
+                                {canAccept ? (
+                                    <button type="button" onClick={handleAccept} disabled={busy} className="flex-1 cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                        <span className="inline-flex items-center justify-center gap-2">
+                                            <LuHandshake className="size-4" aria-hidden />
+                                            {acceptMutation.isPending ? "Memproses..." : "Terima Penawaran"}
+                                        </span>
+                                    </button>
+                                ) : canCounter ? (
                                     <button type="button" onClick={() => setPanel("counter")} className="flex-1 cursor-pointer rounded-xl bg-industrial-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-industrial-blue-600">
                                         Counter Penawaran
                                     </button>
@@ -435,7 +448,7 @@ export default function IncomingDetail() {
                                     </button>
                                 ) : null}
 
-                                <button type="button" onClick={() => setPanel("reject")} className={cn("cursor-pointer rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50", offerChainMissing && "flex-1")}>
+                                <button type="button" onClick={() => setPanel("reject")} className={cn("cursor-pointer rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50", (offerChainMissing || canAccept) && "flex-1")}>
                                     Tolak
                                 </button>
                             </div>

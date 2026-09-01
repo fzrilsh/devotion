@@ -1,14 +1,3 @@
-// Satu tempat untuk mengurai dan memformat waktu dari API.
-//
-// Backend mengirim timestamptz RFC 3339 ("2026-08-31T10:00:00Z"), tetapi beberapa
-// jalur pencatatan pernah mengeluarkan bentuk berspasi ("2026-08-31 10:00:00").
-// Bentuk berspasi bukan format yang dijamin ECMAScript, jadi Safari dan sebagian
-// mesin lain mengembalikan Invalid Date sementara Chrome menerimanya. Normalisasi
-// dilakukan sekali di sini supaya tidak ada halaman yang menampilkan "Invalid Date"
-// hanya karena peramban penguji berbeda.
-//
-// Semua keluaran dirender pada Asia/Jakarta (WIB), sesuai aturan waktu proyek.
-
 const jakarta = "Asia/Jakarta";
 
 export function parseApiDate(value?: string | null): Date | null {

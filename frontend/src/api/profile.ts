@@ -23,8 +23,6 @@ export async function getPublicProfile(profileId: string): Promise<PublicProfile
     return apiClient<PublicProfile>(`/profile/${profileId}`);
 }
 
-// Endpoint publik: ulasan tampil di profil publik tanpa sesi. Ulasan yang
-// disembunyikan admin tidak dikembalikan (FR-049, FR-050).
 export async function getProfileReviews(profileId: string, cursor?: string): Promise<ReviewList> {
     const searchParams = new URLSearchParams();
 

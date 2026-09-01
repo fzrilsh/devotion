@@ -34,8 +34,6 @@ export function usePublicProfile(profileId: string) {
     });
 }
 
-// Ulasan per transaksi beserta identitas pengulas dan tanggalnya (FR-049).
-// Kursor diteruskan apa adanya supaya urutan antar halaman tetap stabil.
 export function useProfileReviews(profileId: string) {
     return useInfiniteQuery({
         queryKey: profileKeys.reviews(profileId),

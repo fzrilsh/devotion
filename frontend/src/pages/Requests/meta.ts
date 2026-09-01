@@ -9,6 +9,4 @@ export const candidateStatusMeta: Record<CandidateStatus, { label: string; class
     agreed: { label: "Sepakat", className: "bg-emerald-500/10 text-emerald-600" },
 };
 
-// formatDateShort dipertahankan sebagai nama lokal karena dipakai empat halaman;
-// implementasinya sekarang pemformat bersama di @lib/datetime.
 export { formatDateId as formatDateShort, formatRupiah } from "@lib/datetime";

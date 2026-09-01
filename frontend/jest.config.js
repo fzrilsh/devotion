@@ -26,20 +26,12 @@ export default {
             {
                 tsconfig: {
                     jsx: "react-jsx",
-                    // Sejajar dengan tsconfig.app.json. Tanpa ini ts-jest memakai target
-                    // bawaannya yang lebih tua, jadi metode seperti Array.prototype.at
-                    // gagal typecheck di pengujian meski lolos di build aplikasi.
                     target: "es2023",
-                    // ts-jest mengetik tiap berkas uji sendiri-sendiri, jadi import
-                    // jest-dom di src/test/setup.ts tidak ikut terbaca. Tanpa entri
-                    // ini, matcher seperti toBeInTheDocument ditolak TS2339.
                     types: ["jest", "node", "@testing-library/jest-dom"],
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,
                     verbatimModuleSyntax: false,
                     noEmit: true,
-                    // jest-dom v7 meletakkan tipe di balik kondisi exports;
-                    // "bundler" yang membacanya, "node" (bawaan) tidak.
                     moduleResolution: "bundler",
                     baseUrl: ".",
                     paths: {

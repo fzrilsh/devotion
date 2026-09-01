@@ -54,9 +54,6 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
     const [error, setError] = useState("");
 
     const meta = candidateStatusMeta[candidate.status];
-    // Sisi pemberi order memang menerima rantainya, tetapi kedua field tetap
-    // opsional di kontrak, jadi ronde terakhir dibaca lewat penyelesai yang sama
-    // dengan sisi subkontraktor daripada bergantung pada latest_offer saja.
     const offers = resolveOfferChain(candidate);
     const latest = latestOffer(offers);
     const buyerTurn = candidate.status === "offered" && latest?.party === "subcontractor";
@@ -165,9 +162,6 @@ export default function SentDetail() {
     const navigate = useNavigate();
     const requestQuery = useQuotaRequest(requestId);
 
-    // Satu mutation untuk seluruh kandidat, dipegang induk. Kalau tiap kartu
-    // memegang instance sendiri, hasil kesepakatan tidak pernah terbaca di sini
-    // dan tautan ke pesanan baru tidak muncul.
     const acceptMutation = useAcceptOffer();
 
     if (requestQuery.isLoading) return <Loading />;

@@ -1,4 +1,5 @@
 import { ApiError } from "@api/client";
+import type { components } from "@api/types";
 import Loading from "@components/common/Loading";
 import LocationMap from "@components/common/LocationMap";
 import VerificationGate from "@components/common/VerificationGate";
@@ -10,7 +11,7 @@ import { useProfile } from "@hooks/useProfile";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
 import { profileSchema, type ProfileForm } from "@schemas/profile";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { LuCircleCheck, LuCircleX, LuClock3, LuMail, LuMapPin, LuPencil, LuPhone, LuSearch, LuShieldCheck, LuStar, LuStore, LuX } from "react-icons/lu";
 import { Link } from "react-router-dom";
@@ -18,15 +19,9 @@ import { Link } from "react-router-dom";
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "mb-2 block text-sm font-semibold text-slate-500";
 
-type ProblemPayload = {
-    title?: string;
-    detail?: string;
-    code?: string;
-};
-
 function getProblemMessage(error: unknown): string {
     if (error instanceof ApiError) {
-        const data = error.data as ProblemPayload | undefined;
+        const data = error.data as components["schemas"]["Problem"] | undefined;
         if (data?.detail) return data.detail;
         if (data?.title) return data.title;
         if (error.status === 401) return "Sesi Anda habis, silakan masuk kembali.";
@@ -111,9 +106,6 @@ function AccountCard({ admin }: { admin?: boolean }) {
     );
 }
 
-// Peran dapat ditambahkan sendiri, tetapi tidak dapat dicabut selama masih ada
-// pesanan aktif: backend menolak dengan ROLES_IN_USE (409) dan pesannya dikutip
-// apa adanya di sini.
 const roleOptions = [
     {
         key: "buyer" as const,
@@ -233,9 +225,7 @@ function AdminProfile() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
-                        <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-industrial-blue-500 to-deep-navy-500 text-xl font-extrabold text-white shadow-lg">
-                            {(user?.email?.charAt(0) ?? "A").toUpperCase()}
-                        </span>
+                        <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-linear-to-br from-industrial-blue-500 to-deep-navy-500 text-xl font-extrabold text-white shadow-lg">{(user?.email?.charAt(0) ?? "A").toUpperCase()}</span>
 
                         <div className="min-w-0">
                             <h2 className="truncate text-lg font-extrabold tracking-tight text-slate-900">{user?.email}</h2>
@@ -265,7 +255,6 @@ export default function MyProfile() {
     const { profile, isLoading, updateProfile, updatePending } = useProfile();
     const [editMode, setEditMode] = useState(false);
 
-    // `values` menyinkronkan form begitu profil tiba, tanpa reset() di dalam efek.
     const profileValues = useMemo<ProfileForm>(
         () => ({
             business_name: profile?.business_name || "",
@@ -291,7 +280,6 @@ export default function MyProfile() {
         values: profileValues,
     });
 
-    // Provinsi hanya penyaring kota di form, bukan kolom yang dikirim ke API.
     const provinceCode = useWatch({ control, name: "province_code" }) ?? "";
     const { provinces, cities } = useWilayah(provinceCode);
 
@@ -313,6 +301,39 @@ export default function MyProfile() {
     const watchedLatitude = useWatch({ control, name: "latitude" });
     const watchedLongitude = useWatch({ control, name: "longitude" });
 
+    const resolveLocationRegion = useMemo(
+        () => async (latitude: number, longitude: number) => {
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=10&accept-language=id`, {
+                    headers: { Accept: "application/json" },
+                });
+
+                if (!response.ok) return;
+
+                const payload = (await response.json()) as { address?: { city?: string; town?: string; village?: string; county?: string; state?: string; state_district?: string; country?: string; country_code?: string } };
+                const address = payload.address ?? {};
+                const cityName = address.city ?? address.town ?? address.village ?? address.county ?? "";
+                const provinceName = address.state ?? address.state_district ?? "";
+
+                if (!cityName && !provinceName) return;
+
+                const cityMatch = cities.find((city) => city.name.toLowerCase() === cityName.toLowerCase());
+                const provinceMatch = provinces.find((province) => province.name.toLowerCase() === provinceName.toLowerCase());
+
+                if (provinceMatch) {
+                    setValue("province_code", provinceMatch.code, { shouldDirty: true });
+                }
+
+                if (cityMatch) {
+                    setValue("city_code", cityMatch.code, { shouldDirty: true });
+                }
+            } catch {
+                // Ignore reverse-geocoding failures; the user can still keep the manually selected region.
+            }
+        },
+        [cities, provinces, setValue],
+    );
+
     function handleLocationChange(latitude: number, longitude: number) {
         setValue("latitude", latitude, { shouldDirty: true });
         setValue("longitude", longitude, { shouldDirty: true });
@@ -322,6 +343,12 @@ export default function MyProfile() {
         setValue("latitude", null, { shouldDirty: true });
         setValue("longitude", null, { shouldDirty: true });
     }
+
+    useEffect(() => {
+        if (watchedLatitude == null || watchedLongitude == null) return;
+
+        void resolveLocationRegion(watchedLatitude, watchedLongitude);
+    }, [resolveLocationRegion, watchedLatitude, watchedLongitude]);
 
     if (authLoading) return <Loading />;
 
@@ -346,7 +373,6 @@ export default function MyProfile() {
                 ) : null}
             </div>
 
-            {/* Kartu identitas */}
             <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <div className="relative flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-4">
@@ -451,7 +477,9 @@ export default function MyProfile() {
                                 ) : null}
                             </div>
 
-                            <LocationPicker latitude={watchedLatitude ?? null} longitude={watchedLongitude ?? null} onChange={handleLocationChange} disabled={updatePending} />
+                            <LocationPicker latitude={watchedLatitude ?? null} longitude={watchedLongitude ?? null} onChange={handleLocationChange} onLocationSelected={async (latitude, longitude) => {
+                                await resolveLocationRegion(latitude, longitude);
+                            }} disabled={updatePending} />
 
                             <p className="mt-1.5 text-xs leading-5 text-slate-400">
                                 {watchedLatitude != null && watchedLongitude != null ? `Koordinat terpilih: ${watchedLatitude}, ${watchedLongitude}. Klik peta untuk memindahkan titik.` : "Klik pada peta untuk menandai lokasi usaha Anda. Titik ini membantu pemberi order memperkirakan jarak."}

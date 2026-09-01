@@ -1,9 +1,6 @@
 import { MIN_QUERY_LENGTH, searchPlaces, type GeocodePlace } from "@lib/geocode";
 import { useEffect, useState } from "react";
 
-// Nominatim membatasi satu permintaan per detik per pemakai, jadi ketikan
-// ditahan dulu dan permintaan sebelumnya dibatalkan. Tanpa jeda ini, satu kata
-// yang diketik cepat akan mengirim selusin permintaan dan alamatnya diblokir.
 const DEBOUNCE_MS = 600;
 
 type PlaceSearchState = {
@@ -12,9 +9,6 @@ type PlaceSearchState = {
     error: string;
 };
 
-// Hasil dibawa bersama kata kunci yang menghasilkannya. Keadaan "sedang mencari"
-// lalu cukup dibaca dari perbandingan kata kunci, jadi tidak ada setState di
-// dalam badan efek yang memicu render berantai.
 type ResolvedSearch = { query: string; places: GeocodePlace[]; error: string };
 
 export function usePlaceSearch(query: string): PlaceSearchState {
@@ -47,8 +41,6 @@ export function usePlaceSearch(query: string): PlaceSearchState {
 
     if (!active) return { places: [], isSearching: false, error: "" };
 
-    // Hasil yang tersimpan masih milik kata kunci sebelumnya, jadi yang berlaku
-    // sekarang adalah menunggu, bukan menampilkan hasil lama sebagai hasil baru.
     if (resolved.query !== trimmed) return { places: [], isSearching: true, error: "" };
 
     return { places: resolved.places, isSearching: false, error: resolved.error };

@@ -11,7 +11,6 @@ export default function FinalCTASection() {
     return (
         <section className="relative mx-auto flex w-full max-w-7xl scroll-mt-24 items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
             <div className="relative w-full overflow-hidden rounded-3xl bg-linear-to-tl from-deep-navy-500 to-deep-navy-800">
-                {/* Bentuk abstrak */}
                 <div aria-hidden className="pointer-events-none absolute inset-0">
                     <div className="absolute -right-32 -top-32 size-112 rounded-full bg-industrial-blue-500/20 blur-3xl" />
                     <div className="absolute -bottom-40 -left-24 size-96 rounded-full bg-industrial-blue-500/15 blur-3xl" />
@@ -45,7 +44,6 @@ export default function FinalCTASection() {
                         </div>
                     </div>
 
-                    {/* Panel sorotan fitur */}
                     <div className="lg:justify-self-end">
                         <ul className="flex w-full max-w-sm flex-col gap-3">
                             {highlights.map((item) => {

@@ -1,10 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-// ── Route Guards ──
 import GuestRoute from "@routes/GuestRoute";
 import ProtectedRoute from "@routes/ProtectedRoute";
 
-// ── Public Pages ──
 import Home from "@pages/Home";
 import NotFound from "@pages/NotFound";
 import PublicProfile from "@pages/Profile/PublicProfile";
@@ -13,7 +11,6 @@ import Help from "@pages/Static/Help";
 import Privacy from "@pages/Static/Privacy";
 import Terms from "@pages/Static/Terms";
 
-// ── Auth Pages (Guest only) ──
 import Login from "@pages/Auth/Login";
 import Register from "@pages/Auth/Register";
 import ForgotPassword from "@pages/Auth/ForgotPassword";
@@ -21,30 +18,25 @@ import ResetPassword from "@pages/Auth/ResetPassword";
 import VerifyEmail from "@pages/Auth/VerifyEmail";
 import VerifyPhone from "@pages/Auth/VerifyPhone";
 
-// ── Protected: any authenticated user ──
 import AppLayout from "@components/layout/AppLayout";
 import MyProfile from "@pages/Profile/MyProfile";
 import Verification from "@pages/Verification";
 import Notifications from "@pages/Notifications";
 import NotificationPreferences from "@pages/Notifications/Preferences";
 
-// ── Protected: Buyer & Subcontractor ──
 import WorkOrderList from "@pages/WorkOrders/List";
 import WorkOrderDetail from "@pages/WorkOrders/Detail";
 
-// ── Protected: Subcontractor only ──
 import Listing from "@pages/Listing";
 import ListingCalendar from "@pages/Listing/Calendar";
 import IncomingRequests from "@pages/Requests/Incoming";
 import IncomingRequestDetail from "@pages/Requests/IncomingDetail";
 
-// ── Protected: Buyer only ──
 import Search from "@pages/Search";
 import CreateQuotaRequest from "@pages/Requests/Create";
 import SentRequests from "@pages/Requests/Sent";
 import SentRequestDetail from "@pages/Requests/SentDetail";
 
-// ── Protected: Admin only ──
 import AdminDashboard from "@pages/Admin/Dashboard";
 import AdminVerificationQueue from "@pages/Admin/VerificationQueue";
 import AdminMasterItems from "@pages/Admin/MasterItems";
@@ -55,23 +47,13 @@ import AdminReviewsModeration from "@pages/Admin/ReviewsModeration";
 import AdminWhatsApp from "@pages/Admin/WhatsApp";
 import AdminSystem from "@pages/Admin/System";
 import AdminOrderDetail from "@pages/Admin/OrderDetail";
-
-// ──────────────────────────────────────────────
-// LEGENDA KOMENTAR PER ROUTE
-//   [PUBLIC]    → dapat diakses tanpa login
-//   [GUEST]     → hanya untuk pengguna yang belum login (login/register/dll)
-//   [AUTH]      → wajib login, semua peran
-//   [BUYER+SUBCON] → salah satu peran usaha (buyer atau subcontractor)
-//   [SUBCON]    → hanya akun dengan peran subcontractor
-//   [BUYER]     → hanya akun dengan peran buyer
-//   [ADMIN]     → hanya akun admin (is_admin = true)
-// ──────────────────────────────────────────────
+import PageTitle from "@components/common/PageTitle";
 
 export default function App() {
     return (
         <BrowserRouter>
+            <PageTitle />
             <Routes>
-                {/* ===== PUBLIC ===== */}
                 <Route path="/" element={<Home />} />
                 <Route path="/profile/:profileId" element={<PublicProfile />} />
                 <Route path="/tentang" element={<About />} />
@@ -79,7 +61,6 @@ export default function App() {
                 <Route path="/syarat-ketentuan" element={<Terms />} />
                 <Route path="/kebijakan-privasi" element={<Privacy />} />
 
-                {/* ===== GUEST-ONLY AUTH FLOW ===== */}
                 <Route path="/auth" element={<GuestRoute />}>
                     <Route path="register" element={<Register />} />
                     <Route path="login" element={<Login />} />
@@ -89,7 +70,6 @@ export default function App() {
                     <Route path="reset-password" element={<ResetPassword />} />
                 </Route>
 
-                {/* ===== AUTH (any logged-in user) ===== */}
                 <Route element={<ProtectedRoute />}>
                     <Route element={<AppLayout />}>
                         <Route path="/profile/me" element={<MyProfile />} />
@@ -99,7 +79,6 @@ export default function App() {
                     </Route>
                 </Route>
 
-                {/* ===== BUYER + SUBCONTRACTOR ===== */}
                 <Route element={<ProtectedRoute allowedRoles={["buyer", "subcontractor", "is_admin"]} />}>
                     <Route element={<AppLayout />}>
                         <Route path="/orders" element={<WorkOrderList />} />
@@ -107,7 +86,6 @@ export default function App() {
                     </Route>
                 </Route>
 
-                {/* ===== SUBCONTRACTOR ONLY ===== */}
                 <Route element={<ProtectedRoute allowedRoles={["subcontractor", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
                         <Route path="/listing" element={<Listing />} />
@@ -117,7 +95,6 @@ export default function App() {
                     </Route>
                 </Route>
 
-                {/* ===== BUYER ONLY ===== */}
                 <Route element={<ProtectedRoute allowedRoles={["buyer", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
                         <Route path="/search" element={<Search />} />
@@ -127,7 +104,6 @@ export default function App() {
                     </Route>
                 </Route>
 
-                {/* ===== ADMIN ONLY ===== */}
                 <Route element={<ProtectedRoute adminOnly />}>
                     <Route path="/admin" element={<AppLayout />}>
                         <Route index element={<AdminDashboard />} />
@@ -142,8 +118,7 @@ export default function App() {
                         <Route path="system" element={<AdminSystem />} />
                     </Route>
                 </Route>
-
-                {/* ===== 404 ===== */}
+                
                 <Route path="*" element={<NotFound />} />
             </Routes>
         </BrowserRouter>

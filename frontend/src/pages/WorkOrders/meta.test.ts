@@ -18,9 +18,6 @@ describe("getWorkOrderSide", () => {
     });
 });
 
-// FR-039: tombol aksi dirender dari allowed_transitions. Penyaring per pihak di
-// bawah hanya membuang transisi yang bukan urusan pihak yang melihat halaman, dan
-// tidak pernah menambah transisi yang tidak dikirim backend.
 describe("transitionsForSide_FR039_FR044", () => {
     const all: WorkOrderStatus[] = ["production", "completed", "shipped", "confirmed", "cancelled", "in_mediation"];
 
@@ -43,7 +40,6 @@ describe("transitionsForSide_FR039_FR044", () => {
     });
 });
 
-// FR-041: kedua pihak mencatat pernyataan pembayaran, masing-masing dari sisinya.
 describe("paymentDirectionForSide_FR041", () => {
     it("pemberi order menyatakan sudah membayar, subkontraktor sudah menerima", () => {
         expect(paymentDirectionForSide.buyer).toBe("sent");

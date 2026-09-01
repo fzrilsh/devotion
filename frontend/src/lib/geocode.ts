@@ -1,23 +1,12 @@
 import { toCoordinate, type Coordinate } from "./geo";
 
-// Pencarian nama tempat memakai Nominatim milik OpenStreetMap, sumber yang sama
-// dengan tile petanya, jadi tidak ada kunci API dan tidak ada dependency baru.
-// Hasilnya hanya membantu menggeser peta; titik yang tersimpan tetap yang
-// ditandai pengguna (FR-057).
 const NOMINATIM_SEARCH_URL = "https://nominatim.openstreetmap.org/search";
 
-// Pasar yang dilayani hanya Indonesia, jadi hasil dibatasi ke satu negara supaya
-// nama kota yang sama di negara lain tidak ikut muncul.
 const COUNTRY_CODES = "id";
 const RESULT_LIMIT = 6;
 
-// Nominatim meminta paling banyak satu permintaan per detik. Jeda ketik di
-// pemanggil menjaga batas itu; ini hanya batas panjang kueri yang layak dikirim.
 export const MIN_QUERY_LENGTH = 3;
 
-// Kotak batas hasil: selatan, barat, utara, timur. Dipakai untuk mengepaskan
-// pandangan peta ke wilayah hasil, supaya kota tampil sebagai kota dan alamat
-// tampil sebagai alamat tanpa menebak tingkat zoom.
 export type GeocodeBounds = [[number, number], [number, number]];
 
 export type GeocodePlace = {
@@ -49,8 +38,6 @@ function parseBounds(raw: unknown): GeocodeBounds | null {
     ];
 }
 
-// parsePlaces menyaring baris yang koordinatnya tidak sah, bukan hanya memetakan
-// bentuknya, karena respons layanan luar tidak dijamin lengkap.
 export function parsePlaces(payload: unknown): GeocodePlace[] {
     if (!Array.isArray(payload)) return [];
 

@@ -1,30 +1,24 @@
 import { apiClient, ApiError } from "./client";
-import type { components } from "./types";
+import type { components, paths } from "./types";
 
 export type MyAccount = components["schemas"]["MyAccount"];
 export type RegisterRequest = components["schemas"]["RegisterRequest"];
 export type RegisterResponse = components["schemas"]["RegisterResponse"];
 export type VerificationCodeRequest = components["schemas"]["VerificationCodeRequest"];
 
-export type LoginRequest = {
-    email: string;
-    password: string;
-};
+type LoginBody = NonNullable<paths["/auth/login"]["post"]>["requestBody"];
+type RecoverBody = NonNullable<paths["/auth/recover/request"]["post"]>["requestBody"];
+type RecoverConfirmBody = NonNullable<paths["/auth/recover/confirm"]["post"]>["requestBody"];
+type ResendCodeBody = NonNullable<paths["/auth/resend-code"]["post"]>["requestBody"];
+type RolesUpdateBody = NonNullable<paths["/me/roles"]["patch"]>["requestBody"];
 
-export type RecoverRequest = {
-    email: string;
-};
+type JsonBody<T> = T extends { content: { "application/json": infer Body } } ? Body : never;
 
-export type RecoverConfirmRequest = {
-    email: string;
-    code: string;
-    new_password: string;
-};
-
-export type ResendCodeRequest = {
-    target: string;
-    channel: "email" | "whatsapp";
-};
+export type LoginRequest = JsonBody<LoginBody>;
+export type RecoverRequest = JsonBody<RecoverBody>;
+export type RecoverConfirmRequest = JsonBody<RecoverConfirmBody>;
+export type ResendCodeRequest = JsonBody<ResendCodeBody>;
+export type RolesUpdateRequest = JsonBody<RolesUpdateBody>;
 
 export async function register(data: RegisterRequest): Promise<RegisterResponse> {
     return apiClient<RegisterResponse>("/auth/register", {
@@ -32,11 +26,6 @@ export async function register(data: RegisterRequest): Promise<RegisterResponse>
         body: JSON.stringify(data),
     });
 }
-
-export type RolesUpdateRequest = {
-    subcontractor?: boolean;
-    buyer?: boolean;
-};
 
 export async function getMe(): Promise<MyAccount | null> {
     try {

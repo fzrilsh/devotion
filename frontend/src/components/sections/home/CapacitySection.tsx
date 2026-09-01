@@ -2,8 +2,6 @@ import { motion } from "motion/react";
 import { LuArrowRight, LuBadgeCheck, LuCalendarClock, LuCog, LuMapPin, LuPackage, LuShirt, LuStar } from "react-icons/lu";
 import { Link } from "react-router-dom";
 
-// Data demo untuk keperluan presentasi. Backend belum menyediakan endpoint
-// "listing populer", jadi bagian ini tidak mengambil data asli.
 const demoCapacities = [
     {
         id: "demo-1",
@@ -74,7 +72,6 @@ export default function CapacitySection() {
                             className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-industrial-blue-300 hover:shadow-xl hover:shadow-slate-200"
                         >
                             <div className="flex flex-1 flex-col p-6">
-                                {/* Nama dan rating */}
                                 <div className="mb-1 flex items-start justify-between gap-3">
                                     <h3 className="text-base font-bold leading-snug text-deep-navy-900">{capacity.businessName}</h3>
                                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
@@ -96,7 +93,6 @@ export default function CapacitySection() {
                                     )}
                                 </div>
 
-                                {/* Detail listing */}
                                 <dl className="mb-5 space-y-3 border-t border-slate-100 pt-4 text-sm">
                                     <div className="flex items-start gap-2.5">
                                         <LuShirt className="mt-0.5 size-4 shrink-0 text-industrial-blue-500" aria-hidden />
@@ -132,7 +128,6 @@ export default function CapacitySection() {
                                     </div>
                                 </dl>
 
-                                {/* Reputasi dan aksi */}
                                 <div className="mt-auto flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
                                     <p className="text-xs text-slate-500">
                                         <span className="font-semibold text-slate-700">{capacity.reviewCount} ulasan</span>
