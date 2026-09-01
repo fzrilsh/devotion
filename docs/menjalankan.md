@@ -60,7 +60,7 @@ Prasyarat: Go 1.25+, Docker, Node 20+ (untuk frontend), dan salinan `.env` dari
    ```
 
    `seed:test-data` menolak berjalan saat `APP_ENV=production`. Kredensial akun uji
-   ada di `docs/skenario-uji-manual.md`.
+   ada di `docs/001-capacity-exchange-marketplace/quickstart.md` bagian E.
 5. **Jalankan frontend.** Lihat bagian Frontend di bawah.
 6. **Uji.** Lihat `docs/pengujian.md`. Ringkasnya:
 

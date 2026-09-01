@@ -54,7 +54,7 @@ ini, dan menambah layanan cron ke compose melanggar batas dua layanan.
 dari sana. Keberadaannya harus didokumentasikan agar tidak terlupakan saat setup
 server.
 
-## Kredensial akun uji di `docs/skenario-uji-manual.md`
+## Kredensial akun uji di `quickstart.md` bagian E
 
 Batasan Keamanan melarang kredensial di dokumentasi, sementara gerbang Pengujian
 End-to-End mewajibkan kredensial akun uji tersedia bagi penguji eksternal yang
