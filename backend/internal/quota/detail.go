@@ -106,23 +106,29 @@ type detailView struct {
 
 // incomingCandidateView is one candidate on the subcontractor's incoming list:
 // the shared candidate fields plus what the subcontractor needs to judge the
-// request before replying (FR-031, FR-035, FR-090). quantity and deadline are
-// the request's own; capacity_in_range is the subcontractor's remaining capacity
-// summed across the readiness..deadline week range, and can_fulfill is whether
-// that covers the requested quantity. The readiness lead is the listing's own
+// request before replying (FR-031, FR-035, FR-090), and the offer chain so a
+// pending negotiation is answerable. quantity and deadline are the request's own;
+// capacity_in_range is the subcontractor's remaining capacity summed across the
+// readiness..deadline week range, and can_fulfill is whether that covers the
+// requested quantity. The readiness lead is the listing's own
 // (readiness_lead_days), so the marker reflects the earliest the subcontractor
-// could start without an offer being sent yet.
+// could start without an offer being sent yet. offers is the full sequence-asc
+// chain and latest_offer its last element, so after the buyer counters the
+// subcontractor sees the buyer's round on reload and can counter back (FR-032,
+// FR-033); both are omitted when the candidate has no offer yet.
 type incomingCandidateView struct {
-	CandidateID     string  `json:"candidate_id"`
-	ListingID       string  `json:"listing_id"`
-	ProfileID       string  `json:"profile_id"`
-	BusinessName    string  `json:"business_name"`
-	Status          string  `json:"status"`
-	RejectionReason *string `json:"rejection_reason"`
-	Quantity        int32   `json:"quantity"`
-	Deadline        string  `json:"deadline"`
-	CapacityInRange int64   `json:"capacity_in_range"`
-	CanFulfill      bool    `json:"can_fulfill"`
+	CandidateID     string      `json:"candidate_id"`
+	ListingID       string      `json:"listing_id"`
+	ProfileID       string      `json:"profile_id"`
+	BusinessName    string      `json:"business_name"`
+	Status          string      `json:"status"`
+	RejectionReason *string     `json:"rejection_reason"`
+	Quantity        int32       `json:"quantity"`
+	Deadline        string      `json:"deadline"`
+	CapacityInRange int64       `json:"capacity_in_range"`
+	CanFulfill      bool        `json:"can_fulfill"`
+	Offers          []offerView `json:"offers,omitempty"`
+	LatestOffer     *offerView  `json:"latest_offer,omitempty"`
 }
 
 // incomingView is the IncomingCandidateList response: one keyset page of the
@@ -234,6 +240,7 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 
 	now := s.clock.Now()
 	items := make([]incomingCandidateView, 0, len(rows))
+	candidateIDs := make([]pgtype.UUID, 0, len(rows))
 	for _, c := range rows {
 		item := incomingCandidateView{
 			CandidateID:     uuidString(c.CandidateID),
@@ -269,6 +276,30 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 		}
 
 		items = append(items, item)
+		candidateIDs = append(candidateIDs, c.CandidateID)
+	}
+
+	// Attach each candidate's offer chain so a subcontractor who reloads after the
+	// buyer counters sees the buyer's round as latest_offer and can counter back
+	// (FR-032, FR-033). Offers arrive ordered by candidate then sequence ascending;
+	// the last row of each chain is that candidate's latest round.
+	if len(candidateIDs) > 0 {
+		offers, err := s.queries().ListOffersByCandidates(ctx, candidateIDs)
+		if err != nil {
+			return incomingView{}, err
+		}
+		chainByCandidate := map[string][]offerView{}
+		for _, o := range offers {
+			key := uuidString(o.CandidateID)
+			chainByCandidate[key] = append(chainByCandidate[key], offerViewOf(o))
+		}
+		for i := range items {
+			if chain, ok := chainByCandidate[items[i].CandidateID]; ok && len(chain) > 0 {
+				items[i].Offers = chain
+				last := chain[len(chain)-1]
+				items[i].LatestOffer = &last
+			}
+		}
 	}
 
 	view := incomingView{Items: items, Pagination: pagination{HasNext: hasNext}}

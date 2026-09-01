@@ -2,6 +2,7 @@ package listing
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -303,6 +304,34 @@ func (s *Service) checkCatalogItems(ctx context.Context, q *sqlcgen.Queries, in 
 		return &validationError{fields: fields}
 	}
 	return nil
+}
+
+// PublicListingView renders the profile's listing as the contract Listing shape
+// for the public profile card (FR-016), or nil JSON when the profile has no
+// listing or the listing is hidden. It reuses newListingView so the public card
+// matches the owner view field for field: the account package cannot build the
+// unexported listingView itself, so this is the single seam it calls through.
+// A hidden listing is treated as absent so a subcontractor who turned visibility
+// off (FR-015) is not exposed publicly. Any read failure returns the error so
+// the caller decides whether to degrade; the account handler logs and shows the
+// profile without the card rather than failing the whole page.
+func (s *Service) PublicListingView(ctx context.Context, profileID pgtype.UUID) (json.RawMessage, error) {
+	q := s.queries()
+	l, err := q.GetListingByProfile(ctx, profileID)
+	if err != nil {
+		if isNoRows(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if !l.Published {
+		return nil, nil
+	}
+	view, err := s.loadView(ctx, q, l)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(view)
 }
 
 // loadView assembles the full listing response from the row plus its product

@@ -459,6 +459,11 @@ type Querier interface {
 	// rows arrive. unread_only filters to still-unread rows (FR-051 list). A null
 	// before_created is the first page; later pages pass the last row's cursor.
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	// ListOffersByCandidates returns every offer for the given candidates so the
+	// incoming list attaches each candidate's chain in one query (FR-032, FR-033).
+	// The subcontractor needs the buyer's latest counter round to reply, which lives
+	// only in the offer chain, not on the candidate row.
+	ListOffersByCandidates(ctx context.Context, dollar_1 []pgtype.UUID) ([]Offer, error)
 	// ListOffersByRequest returns every offer across all candidates of a request so
 	// the detail view attaches each candidate's chain in one query (FR-032).
 	ListOffersByRequest(ctx context.Context, requestID pgtype.UUID) ([]Offer, error)

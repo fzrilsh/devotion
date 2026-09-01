@@ -9,6 +9,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"time"
 
@@ -52,6 +53,17 @@ type CodeDelivery interface {
 	SendRecoveryCode(ctx context.Context, email, code string) error
 }
 
+// ListingViewer renders a profile's public listing as the contract Listing
+// shape, or nil when the profile has no visible listing. account depends on this
+// narrow interface rather than importing the listing package so the public
+// profile handler can attach the capacity card (FR-016) without a package cycle;
+// listing.Service satisfies it. It is optional: a nil viewer leaves listing null,
+// which the frontend renders as "no card", so early wiring and tests that do not
+// exercise the card stay simple.
+type ListingViewer interface {
+	PublicListingView(ctx context.Context, profileID pgtype.UUID) (json.RawMessage, error)
+}
+
 // Service carries the dependencies every handler needs. It holds no per-request
 // state, so one instance is shared across the server.
 type Service struct {
@@ -61,11 +73,20 @@ type Service struct {
 	limiter  *ratelimit.Limiter
 	delivery CodeDelivery
 	log      *slog.Logger
+	// listings renders the public profile's capacity listing (FR-016). It is set
+	// after construction with SetListingViewer because listing.Service is built
+	// after account in serve.go; a nil viewer leaves the listing field null.
+	listings ListingViewer
 	// devMode logs the plaintext verification code to slog so local development
 	// can read a code that is otherwise only stored as a hash. It must never be
 	// true in production: the code would leak into the log stream.
 	devMode bool
 }
+
+// SetListingViewer injects the listing renderer after construction. serve.go
+// builds account before listing (account gates the listing routes), so the
+// viewer cannot be passed to New; this setter closes the loop once both exist.
+func (s *Service) SetListingViewer(v ListingViewer) { s.listings = v }
 
 // New builds a Service. delivery may be nil, in which case issued codes are
 // stored but not sent anywhere (useful before the notification channels exist

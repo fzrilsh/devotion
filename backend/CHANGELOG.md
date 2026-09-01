@@ -6,6 +6,29 @@ perubahannya.
 
 ## [Belum dirilis]
 
+### Diperbaiki
+- `GET /profile/{profileId}` kini mengisi `listing` dengan kartu Kapasitas Produksi
+  profil, sebelumnya selalu `null` karena handler mengeset nilai itu secara
+  hardcode. Akibatnya kartu kapasitas (kapasitas mingguan, lead time, produk, dan
+  mesin) tak pernah muncul di profil publik, padahal setiap hasil pencarian
+  menautkan ke profil itu, jadi pencari kehilangan justru data yang menjadi dasar
+  keputusan subkontrak. `account` merender kartu lewat antarmuka sempit
+  `ListingViewer` yang dipenuhi `listing.Service` (disuntik di `serve.go` setelah
+  kedua service dibangun), memakai ulang `newListingView` agar bentuk kartu publik
+  sama persis dengan tampilan pemilik. Listing yang disembunyikan (FR-015)
+  diperlakukan absen sehingga tidak bocor publik, dan kegagalan baca merosot ke
+  `null` yang dicatat, bukan menggagalkan seluruh halaman profil (FR-016).
+- `GET /quota-requests/incoming` kini mengirim rantai penawaran per kandidat
+  (`offers` dan `latest_offer`), sebelumnya kosong. Akibatnya subkontraktor yang
+  memuat ulang setelah pembeli mengirim counter ronde berikutnya tidak pernah
+  melihat ronde itu dan mentok hanya bisa menolak; ronde counter hanya ada di
+  basis data, tak pernah sampai ke respons incoming. Handler `listIncoming`
+  sekarang mengambil offer untuk kandidat di halaman lewat query baru
+  `ListOffersByCandidates`, mengelompokkannya per kandidat, dan mengisi
+  `latest_offer` dari elemen terakhir chain, sejajar dengan sisi pembeli
+  `requestDetail` (FR-032, FR-033). Skema `IncomingCandidate` di `openapi.yaml`
+  ikut menyatakan kedua field yang tadinya dijanjikan tapi tak pernah diisi.
+
 ### Ditambahkan
 - Dua kejadian notifikasi FR-051 yang selama ini terdefinisi di enum `event_type`
   tapi tak pernah di-enqueue kini tersambung. `verification_decision` dikirim ke
