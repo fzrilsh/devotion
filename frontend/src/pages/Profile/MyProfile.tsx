@@ -1,9 +1,10 @@
 import { ApiError } from "@api/client";
 import Loading from "@components/common/Loading";
 import LocationMap from "@components/common/LocationMap";
-import VerificationGate, { useAccountVerification } from "@components/common/VerificationGate";
+import VerificationGate from "@components/common/VerificationGate";
 import LocationPicker from "@components/common/LocationPicker";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useAccountVerification } from "@hooks/useAccountVerification";
 import { useAuth, useUpdateMyRoles } from "@hooks/useAuth";
 import { useProfile } from "@hooks/useProfile";
 import { useWilayah } from "@hooks/useWilayah";
@@ -77,7 +78,7 @@ function AccountCard({ admin }: { admin?: boolean }) {
 
             <div className="mt-4 space-y-3">
                 {channels.map((channel) => (
-                    <div key={channel.key} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div key={channel.key} className="rounded-xl border border-slate-200 bg-white p-4">
                         <div className="flex items-center gap-3">
                             <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
                                 <channel.icon className="size-4.5" aria-hidden />
@@ -89,16 +90,18 @@ function AccountCard({ admin }: { admin?: boolean }) {
                             </div>
                         </div>
 
-                        {channel.verified ? (
-                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                                <LuCircleCheck className="size-3.5" aria-hidden />
-                                Terverifikasi
-                            </span>
-                        ) : (
-                            <Link to={channel.to} state={channel.state} className="shrink-0 rounded-lg bg-industrial-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-industrial-blue-600">
-                                Verifikasi
-                            </Link>
-                        )}
+                        <div className="mt-3 border-t border-slate-100 pt-3">
+                            {channel.verified ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                                    <LuCircleCheck className="size-3.5 shrink-0" aria-hidden />
+                                    Terverifikasi
+                                </span>
+                            ) : (
+                                <Link to={channel.to} state={channel.state} className="inline-flex w-full items-center justify-center rounded-lg bg-industrial-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-industrial-blue-600">
+                                    Verifikasi
+                                </Link>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>
@@ -179,18 +182,18 @@ function RolesCard() {
 
                     return (
                         <div key={option.key} className={cn("rounded-xl border p-4", active ? "border-industrial-blue-500/30 bg-industrial-blue-500/5" : "border-slate-200 bg-white")}>
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="flex min-w-0 items-start gap-3">
-                                    <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", active ? "bg-industrial-blue-500/10 text-industrial-blue-600" : "bg-slate-100 text-slate-400")}>
-                                        <option.icon className="size-4.5" aria-hidden />
-                                    </span>
+                            <div className="flex items-start gap-3">
+                                <span className={cn("grid size-10 shrink-0 place-items-center rounded-lg", active ? "bg-industrial-blue-500/10 text-industrial-blue-600" : "bg-slate-100 text-slate-400")}>
+                                    <option.icon className="size-4.5" aria-hidden />
+                                </span>
 
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-slate-800">{option.title}</p>
-                                        <p className="mt-0.5 text-xs leading-5 text-slate-500">{option.description}</p>
-                                    </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-slate-800">{option.title}</p>
+                                    <p className="mt-0.5 text-xs leading-5 text-slate-500">{option.description}</p>
                                 </div>
+                            </div>
 
+                            <div className={cn("mt-3 border-t pt-3", active ? "border-industrial-blue-500/15" : "border-slate-100")}>
                                 <button
                                     type="button"
                                     onClick={() => toggleRole(option.key)}
@@ -198,12 +201,14 @@ function RolesCard() {
                                     aria-pressed={active}
                                     title={lastRole ? "Peran terakhir tidak dapat dicabut." : undefined}
                                     className={cn(
-                                        "shrink-0 cursor-pointer rounded-lg px-4 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
+                                        "inline-flex w-full cursor-pointer items-center justify-center rounded-lg px-4 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60",
                                         active ? "border border-slate-300 bg-white text-slate-600 hover:bg-slate-50" : "bg-industrial-blue-500 text-white hover:bg-industrial-blue-600",
                                     )}
                                 >
                                     {updateRoles.isPending ? "Memproses..." : active ? "Cabut" : "Aktifkan"}
                                 </button>
+
+                                {lastRole ? <p className="mt-2 text-xs leading-5 text-slate-400">Peran terakhir tidak dapat dicabut.</p> : null}
                             </div>
                         </div>
                     );

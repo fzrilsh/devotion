@@ -3609,7 +3609,7 @@ export interface components {
             /** @description Benar bila capacity_in_range menutup quantity yang diminta, sehingga subkontraktor bisa menilai permintaan sebelum membalas (FR-035, FR-090). */
             can_fulfill: boolean;
             latest_offer?: components["schemas"]["Offer"];
-            /** @description Rantai penawaran kandidat terurut sequence naik, supaya subkontraktor melihat ronde sebelumnya saat membalas atau meng-counter (FR-032). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini. */
+            /** @description Seluruh rantai penawaran kandidat terurut sequence naik, sehingga subkontraktor melihat ronde buyer terbaru setelah counter-offer dan bisa membalas menawar (FR-032, FR-033). latest_offer adalah elemen terakhir; klien tidak menghitung ulang yang terakhir dari array ini. */
             offers?: components["schemas"]["Offer"][];
         };
         IncomingCandidateList: {
@@ -3818,14 +3818,7 @@ export interface components {
             };
         };
         WhatsAppStatus: {
-            /**
-             * @description connected: tautan terpasang dan kanal WhatsApp jalan. pairing: siklus
-             *     pemasangan berjalan dan kode QR menunggu dipindai. disconnected: tautan
-             *     terputus dan tidak ada siklus pemasangan yang berjalan. Bendera boolean
-             *     tidak dipakai karena tidak dapat membedakan pairing dari disconnected.
-             * @enum {string}
-             */
-            status: "connected" | "pairing" | "disconnected";
+            connected: boolean;
             /** @description Muatan kode QR untuk penautan ulang, bila perlu. Tanpa nomor layanan. */
             qr_code?: string | null;
             last_error?: string | null;

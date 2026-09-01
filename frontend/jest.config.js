@@ -30,6 +30,10 @@ export default {
                     // bawaannya yang lebih tua, jadi metode seperti Array.prototype.at
                     // gagal typecheck di pengujian meski lolos di build aplikasi.
                     target: "es2023",
+                    // ts-jest mengetik tiap berkas uji sendiri-sendiri, jadi import
+                    // jest-dom di src/test/setup.ts tidak ikut terbaca. Tanpa entri
+                    // ini, matcher seperti toBeInTheDocument ditolak TS2339.
+                    types: ["jest", "node", "@testing-library/jest-dom"],
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,
                     verbatimModuleSyntax: false,

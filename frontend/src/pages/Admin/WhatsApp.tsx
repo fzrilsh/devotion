@@ -6,9 +6,20 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { LuMessageCircle, LuPlug, LuQrCode, LuRefreshCw, LuTriangleAlert } from "react-icons/lu";
 
-// Tiga keadaan, bukan boolean: pairing dan disconnected menuntut kalimat berbeda,
-// karena pada pairing admin cukup memindai kode QR yang sudah tersedia.
-const statusMeta: Record<WhatsAppStatus["status"], { title: string; body: string; card: string; icon: string; titleColor: string; bodyColor: string }> = {
+// Kontrak mengirim `connected` sebagai boolean, tetapi layar ini butuh tiga
+// keadaan: pada pairing admin cukup memindai kode QR yang sudah ada, sedangkan
+// pada disconnected ia harus menekan Sambungkan Ulang lebih dulu. Kalau keduanya
+// disatukan, kalimatnya menyuruh admin memulai siklus baru padahal kodenya sudah
+// terpampang, dan siklus yang sedang berjalan justru terbuang.
+type SessionState = "connected" | "pairing" | "disconnected";
+
+function sessionState(status: WhatsAppStatus): SessionState {
+    if (status.connected) return "connected";
+
+    return status.qr_code?.trim() ? "pairing" : "disconnected";
+}
+
+const statusMeta: Record<SessionState, { title: string; body: string; card: string; icon: string; titleColor: string; bodyColor: string }> = {
     connected: {
         title: "Sesi terhubung",
         body: "Kode verifikasi dan notifikasi WhatsApp terkirim normal.",
@@ -81,7 +92,8 @@ export default function AdminWhatsApp() {
     const qrValue = status?.qr_code?.trim();
     const qrImage = qrValue?.startsWith("data:image/") ? qrValue : qrResult?.value === qrValue ? qrResult?.image : null;
     const qrError = qrResult?.value === qrValue && Boolean(qrResult?.error);
-    const meta = status ? statusMeta[status.status] : null;
+    const state = status ? sessionState(status) : null;
+    const meta = state ? statusMeta[state] : null;
 
     async function handleReconnect() {
         setReconnectError("");
@@ -164,7 +176,7 @@ export default function AdminWhatsApp() {
 
                             <p className="mt-3 text-[11px] text-slate-400">Halaman ini memuat ulang status tiap 30 detik. Bila kode QR-nya kedaluwarsa, tekan Sambungkan Ulang.</p>
                         </div>
-                    ) : status.status === "disconnected" ? (
+                    ) : state === "disconnected" ? (
                         <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center">
                             <LuQrCode className="mx-auto size-8 text-slate-300" aria-hidden />
                             <p className="mt-2 text-sm text-slate-500">Belum ada kode QR. Tekan Sambungkan Ulang untuk memulai siklus pemasangan.</p>

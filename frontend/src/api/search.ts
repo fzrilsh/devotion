@@ -9,6 +9,7 @@ export type QuotaRequestList = components["schemas"]["QuotaRequestList"];
 export type RequestCandidate = components["schemas"]["RequestCandidate"];
 export type CandidateStatus = components["schemas"]["CandidateStatus"];
 export type Offer = components["schemas"]["Offer"];
+export type IncomingCandidate = components["schemas"]["IncomingCandidate"];
 export type IncomingCandidateList = components["schemas"]["IncomingCandidateList"];
 
 export type SearchParams = {

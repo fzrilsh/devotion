@@ -2590,16 +2590,9 @@ components:
 
     WhatsAppStatus:
       type: object
-      required: [status]
+      required: [connected]
       properties:
-        status:
-          type: string
-          enum: [connected, pairing, disconnected]
-          description: |
-            connected: tautan terpasang dan kanal WhatsApp jalan. pairing: siklus
-            pemasangan berjalan dan kode QR menunggu dipindai. disconnected: tautan
-            terputus dan tidak ada siklus pemasangan yang berjalan. Bendera boolean
-            tidak dipakai karena tidak dapat membedakan pairing dari disconnected.
+        connected: { type: boolean }
         qr_code:
           type: string
           nullable: true
