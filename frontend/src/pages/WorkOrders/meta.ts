@@ -26,6 +26,11 @@ export const workOrderSideMeta: Record<Exclude<WorkOrderSide, null>, { label: st
     subcontractor: { label: "Anda subkontraktor", className: "bg-sky-500/10 text-sky-600" },
 };
 
+// Ini penyaring tampilan di atas allowed_transitions, bukan mesin keadaan kedua:
+// daftar transisi tetap datang dari backend, di sini hanya dibuang yang bukan
+// urusan pihak yang sedang melihat halaman. Kalau backend mempersempit lebih
+// jauh, hasil penyaringan menyempit ikut, dan tidak ada tombol yang muncul
+// hanya karena tabel ini menyebutnya.
 const sideTransitions: Record<Exclude<WorkOrderSide, null>, readonly WorkOrderStatus[]> = {
     buyer: ["confirmed", "cancelled", "in_mediation"],
     subcontractor: ["production", "completed", "shipped", "cancelled", "in_mediation"],

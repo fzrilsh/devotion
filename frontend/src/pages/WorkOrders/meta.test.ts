@@ -18,6 +18,7 @@ describe("getWorkOrderSide", () => {
     });
 });
 
+// FR-039: sisi yang melihat halaman hanya boleh melihat transisi yang relevan.
 describe("transitionsForSide_FR039_FR044", () => {
     const all: WorkOrderStatus[] = ["production", "completed", "shipped", "confirmed", "cancelled", "in_mediation"];
 
@@ -40,6 +41,7 @@ describe("transitionsForSide_FR039_FR044", () => {
     });
 });
 
+// FR-041: arah pernyataan pembayaran ditentukan dari sisi akun yang melihat order.
 describe("paymentDirectionForSide_FR041", () => {
     it("pemberi order menyatakan sudah membayar, subkontraktor sudah menerima", () => {
         expect(paymentDirectionForSide.buyer).toBe("sent");

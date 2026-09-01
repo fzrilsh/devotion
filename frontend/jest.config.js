@@ -3,6 +3,9 @@ export default {
     preset: "ts-jest",
     testEnvironment: "jsdom",
     roots: ["<rootDir>/src"],
+    // Ini bukan konfigurasi acak: test di Vite memakai TypeScript modern, dan
+    // konfigurasi ini menghindari kegagalan runtime saat Jest membaca fitur ES2023
+    // dan path alias yang sama seperti aplikasi utama.
     setupFiles: ["<rootDir>/src/test/polyfills.ts"],
     setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
     moduleNameMapper: {
@@ -26,7 +29,12 @@ export default {
             {
                 tsconfig: {
                     jsx: "react-jsx",
+                    // Jest dan Vite harus menilai project dengan target ES2023 yang sama,
+                    // supaya Array.prototype.at dan fitur modern lain tidak gagal saat test.
                     target: "es2023",
+                    // types dan moduleResolution eksplisit menutup masalah lint/resolve
+                    // yang muncul di setup ts-jest; tanpa ini, test bisa lewat di editor
+                    // namun pecah saat Jest menjalankan transform.
                     types: ["jest", "node", "@testing-library/jest-dom"],
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,

@@ -9,6 +9,8 @@ export function isTerminalCandidate(status: CandidateStatus): boolean {
 }
 
 export function resolveOfferChain(candidate: OfferCarrier, sessionOffers: Offer[] = []): Offer[] {
+    // Server selalu benar untuk urutan asli; ronde sesi hanya menambah yang lebih
+    // baru dan belum pernah hadir dari server, sehingga rantai tetap konsisten.
     const fromServer = candidate.offers?.length ? candidate.offers : candidate.latest_offer ? [candidate.latest_offer] : [];
 
     if (fromServer.length === 0) return sessionOffers;
@@ -27,11 +29,13 @@ export function latestOffer(offers: Offer[]): Offer | undefined {
 }
 
 export function canCounterOffer(status: CandidateStatus, latest: Offer | undefined): boolean {
+    // Counter hanya valid saat server sudah mengirim ronde asli; tanpa offer_id,
+    // frontend tidak punya target yang aman untuk aksi berikutnya.
     return status === "offered" && latest?.party === "buyer" && Boolean(latest.offer_id);
 }
 
 export function canAcceptOffer(status: CandidateStatus, latest: Offer | undefined, side: Offer["party"]): boolean {
-    return !isTerminalCandidate(status) && Boolean(latest?.offer_id) && latest?.party !== side;
+    return status === "offered" && Boolean(latest?.offer_id) && latest?.party !== side;
 }
 
 export function canSendFirstOffer(status: CandidateStatus, offers: Offer[]): boolean {
@@ -43,6 +47,8 @@ export function isWaitingBuyer(status: CandidateStatus, latest: Offer | undefine
 }
 
 export function isChainFromSessionOnly(candidate: OfferCarrier, offers: Offer[]): boolean {
+    // Saat server belum mengirim riwayat, kita menandai rantai yang hanya berasal
+    // dari mutasi sesi agar UI tidak mengira data itu sudah benar-benar ada.
     return offers.length > 0 && !candidate.offers?.length && !candidate.latest_offer;
 }
 

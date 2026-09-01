@@ -2,7 +2,7 @@ import { ApiError } from "@api/client";
 import type { Offer, RequestCandidate } from "@api/search";
 import Loading from "@components/common/Loading";
 import { useAcceptOffer, useCounterOffer, useQuotaRequest } from "@hooks/useQuota";
-import { latestOffer, resolveOfferChain } from "@lib/offers";
+import { canAcceptOffer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { cn } from "@lib/utils";
 import { useState } from "react";
 import { LuArrowLeft, LuCircleCheck, LuClock, LuHandshake, LuHourglass, LuSend } from "react-icons/lu";
@@ -56,7 +56,6 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
     const meta = candidateStatusMeta[candidate.status];
     const offers = resolveOfferChain(candidate);
     const latest = latestOffer(offers);
-    const buyerTurn = candidate.status === "offered" && latest?.party === "subcontractor";
 
     async function handleAccept() {
         if (!latest) return;
@@ -113,7 +112,7 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
                 </div>
             ) : null}
 
-            {buyerTurn && !agreed ? (
+            {canAcceptOffer(candidate.status, latest, "buyer") && !agreed ? (
                 <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
                     {counterOpen ? (
                         <div className="space-y-3">

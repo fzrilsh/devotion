@@ -96,6 +96,7 @@ describe("canAcceptOffer", () => {
 
     it("FR-032: status terminal atau tanpa offer_id tidak menerima", () => {
         expect(canAcceptOffer("agreed", offer(2, "buyer"), "subcontractor")).toBe(false);
+        expect(canAcceptOffer("awaiting_reply", offer(2, "subcontractor"), "buyer")).toBe(false);
         expect(canAcceptOffer("offered", undefined, "subcontractor")).toBe(false);
     });
 });
