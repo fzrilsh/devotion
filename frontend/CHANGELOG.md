@@ -1,31 +1,6 @@
 # Changelog
 
-Engineering changelogs are written in English. User-facing product copy remains in Indonesian; this file records implementation and contract work, not screen text.
-
 ## [Unreleased]
-
-### Fixed
-
-* Added the subcontractor accept path for buyer counter-offers by using the shared `canAcceptOffer` predicate in `lib/offers.ts`, exposing the "Terima Penawaran" action in `pages/Requests/IncomingDetail.tsx`, and navigating to the created work order at `/orders/{id}` after a successful accept. This restores the missing US3 acceptance path that was previously blocked by the UI.
-
-* Added the missing `PageTitle` component in `components/common/PageTitle.tsx` so each routed page can set document title metadata without hardcoding it in the page component.
-
-* Added the SEO and Open Graph metadata updates in `index.html`, including `lang="id"` replacing the default English document language and the new metadata fields used by browser and social previews.
-
-* Added the missing icon assets and `site.webmanifest` updates under `public/`, covering the final set of platform assets and app metadata used by the landing page and install prompt.
-
-* Normalized the generated auth request types to use the typed `paths[...]` structures instead of handwritten request payloads in `api/auth.ts`, and replaced the local `ProblemPayload` definitions with the generated `components["schemas"]["Problem"]` contracts in `Login.tsx` and `MyProfile.tsx`.
-
-### Changed
-
-* Extracted `TrustStatsSection` and `FinalCTASection` out of `Home.tsx` and left the imported component files as the source of truth for the landing page structure. This is a behavior change in the home page because those sections are no longer rendered inline in the page component itself.
-
-### Added
-
-* Added the missing work-order action filter and frontend-side invariants in `pages/WorkOrders/meta.ts`, so the UI keeps using a view-layer filter over backend `allowed_transitions` instead of inventing a second state machine.
-
-* Added release notes for the UI acceptance fix, metadata work, auth type cleanup, and landing-page component extraction in the same changelog stream so the rationale for the shipped behavior remains discoverable.
-
 
 ### Diperbaiki
 
@@ -155,11 +130,13 @@ Engineering changelogs are written in English. User-facing product copy remains 
 
 * Menata ulang halaman My Profile agar sesuai dengan layout dashboard: bagian berbasis kartu, dan tombol simpan sekarang mencerminkan status pending dari mutation update.
 
-* Mendesain ulang bagian Final CTA pada halaman utama: kartu dua kolom dengan bentuk abstrak yang sesuai dengan halaman autentikasi, panel sorotan fitur, tombol rounded dengan tautan `react-router-dom`, serta panah hover pada aksi sekunder.
+* Mendesain ulang Final CTA pada halaman utama: kartu dua kolom dengan bentuk abstrak yang sesuai dengan halaman autentikasi, panel sorotan fitur, tombol rounded dengan tautan `react-router-dom`, serta panah hover pada aksi sekunder.
 
 * Menata ulang `DashboardLayout` menjadi sidebar terang dan blur: item aktif dengan warna aksen, submenu yang dapat diciutkan, dan tombol logout yang dipasang di footer sidebar. Area akun pada header disederhanakan menjadi blok identitas statis. Navigasi admin sekarang mengelompokkan master data dan supervisi order ke dalam submenu.
 
 * Mendesain ulang footer publik: layout empat kolom (brand dengan deskripsi pertukaran kapasitas dan catatan bahwa dana tidak ditahan, navigasi dalam halaman, tautan platform, tautan perusahaan) dengan bottom bar untuk copyright dan tautan legal.
+
+* Halaman Master Items admin diperbarui: badge Aktif/Nonaktif sekarang disembunyikan saat baris masuk mode edit (`{!editing && <span ...>}`), grid diubah dari `md:grid-cols-2 lg:grid-cols-3` menjadi `lg:grid-cols-2` agar jumlah kolom lebih konsisten di tablet dan desktop, dan node spasi yang tidak perlu di antara tombol aksi dihapus (`{\" \"}` hasil format ulang yang menciptakan text node di DOM tanpa dampak visual).
 
 ### Diperbaiki
 
@@ -217,7 +194,12 @@ Engineering changelogs are written in English. User-facing product copy remains 
 
 * Registrasi sekarang melanjutkan ke halaman Verify Email dengan email yang didaftarkan alih-alih mengembalikan pengguna ke login, dan verifikasi email yang berhasil melanjutkan ke Verify Phone.
 
+* Menghubungkan manifest aplikasi web ke index.html dan memperbaiki konfigurasinya: `site.webmanifest` sekarang dilintas dengan `<link rel="manifest">`, nama dan short_name diubah ke "Devotion", theme_color disesuaikan ke #0f172a (sesuai brand), icon diperkecil menjadi hanya favicon.svg yang benar-benar ada, dan menghapus referensi ke PNG icon yang sudah tidak digunakan dari public/. Bersamanya, aset ikon yang tidak dirujuk dari HTML (apple-touch-icon.png, favicon-96x96.png, favicon.ico, web-app-manifest-192x192.png, web-app-manifest-512x512.png) dihapus dari folder public/, mengurangi ukuran build.
+
+* Halaman Master Items mengubah dua perilaku visual: badge status Aktif/Nonaktif kini disembunyikan saat baris masuk mode edit sehingga status tidak muncul dua kali (sekali di input readonly, sekali di badge), dan grid daftar item berubah dari kolom tiga level tablet (`md:grid-cols-2 lg:grid-cols-3`) menjadi kolom dua level desktop saja (`lg:grid-cols-2`), mengurangi kolom di tablet dari 2 menjadi 1 kolom penuh dan di desktop dari 3 menjadi 2 kolom. Halaman ini juga memiliki banyak node teks spasi berlebihan (`{" "}`) yang tersisip di antara tombol dari hasil format ulang Prettier; node tersebut tidak berdampak visual (kontainer flex dengan gap), tetapi dapat dibersihkan pada penyentuhan berkas berikutnya.
 ### Dihapus
+
+* Menghapus komponen dead code `TrustStatsSection` dan `FinalCTASection`. Keduanya tidak pernah diimpor setelah commit yang diklaim mengekstraksi mereka, sehingga tetap disimpan di berkas dirinya sendiri tanpa digunakan dari `pages/Home.tsx`. Bagian tersebut digantikan oleh redesign Final CTA yang lebih sederhana.
 
 * Menghapus dependensi `axios`. Tidak ada kode yang mengimpornya: setiap request berjalan melalui wrapper `fetch` di `api/client.ts`, yang membutuhkan `credentials: "include"` untuk session cookie.
 
