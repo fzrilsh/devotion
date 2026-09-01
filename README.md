@@ -709,7 +709,7 @@ go run ./cmd/devotion admin:create
 go run ./cmd/devotion seed:test-data      # menolak jalan bila APP_ENV=production
 ```
 
-Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar. Kredensial akun uji bisa dilihat pada section Testing atau bisa cek [disini](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d#file-creedentials-txt) 
+Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar. Kredensial akun uji bisa dilihat pada bagian Testing atau [creedentials.txt](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d#file-creedentials-txt) di gist data dummy.
 
 #### 6. Jalankan frontend
 
@@ -721,7 +721,7 @@ npm run dev
 
 Vite jalan di `http://localhost:5173` dan memproksikan `/api` ke port 8080. Proxy ini wajib: tanpanya frontend dan backend terlihat sebagai origin berbeda, cookie `SameSite=Lax` tidak terkirim, dan setiap permintaan tampak belum login meski login berhasil.
 
-> `npm run build` lolos di TypeScript 5.8.3 — `tsconfig.app.json` dan `tsconfig.node.json` memakai `erasableSyntaxOnly` yang didukung sejak TypeScript 5.8.
+> `npm run build` lolos di TypeScript 5.8.3, `tsconfig.app.json` dan `tsconfig.node.json` memakai `erasableSyntaxOnly` yang didukung sejak TypeScript 5.8.
 
 ---
 
@@ -964,7 +964,7 @@ Bukan persentase, tapi keterlacakan: **70 berkas uji Go**, **388 kasus uji**, se
 
 Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus: urutan hasil pencarian dapat diulang termasuk antar halaman; skor bebas dari pengaruh reputasi, verifikasi, kebaruan kalender, dan jarak; kapasitas terjumlah lintas periode sampai tenggat; dua kesepakatan berbarengan atas periode yang sama hanya satu berhasil; pembatalan pra-produksi membalik seluruh baris alokasi; request kuota ke listing sendiri ditolak; konfirmasi otomatis 7 hari dan penghentiannya oleh sengketa; tingkat penyelesaian membebani hanya pihak yang membatalkan; dokumen identitas tertutup selain bagi pemilik dan admin; validasi berkas dari magic bytes beserta batas ukuran, kuota storage, dan pembuangan metadata gambar; idempotensi horizon kalender; migrasi dan constraint PostgreSQL.
 
-Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/skenario-uji-manual.md`, karena itu label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
+Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/001-capacity-exchange-marketplace/quickstart.md` bagian F, karena itu label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
 
 ---
 
