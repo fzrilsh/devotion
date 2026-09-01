@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from "react-router-dom";
 
 import GuestRoute from "@routes/GuestRoute";
 import ProtectedRoute from "@routes/ProtectedRoute";
@@ -50,77 +50,78 @@ import AdminOrderDetail from "@pages/Admin/OrderDetail";
 import PageTitle from "@components/common/PageTitle";
 
 export default function App() {
-    return (
-        <BrowserRouter>
-            <PageTitle />
-            <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/profile/:profileId" element={<PublicProfile />} />
-                <Route path="/tentang" element={<About />} />
-                <Route path="/bantuan" element={<Help />} />
-                <Route path="/syarat-ketentuan" element={<Terms />} />
-                <Route path="/kebijakan-privasi" element={<Privacy />} />
+    const router = createBrowserRouter(
+        createRoutesFromElements(
+            <Route element={<PageTitle />}>
+                <Route path="/" element={<Home />} handle={{ title: "Beranda" }} />
+                <Route path="/profile/:profileId" element={<PublicProfile />} handle={{ title: "Profil Pengguna" }} />
+                <Route path="/tentang" element={<About />} handle={{ title: "Tentang Kami" }} />
+                <Route path="/bantuan" element={<Help />} handle={{ title: "Bantuan" }} />
+                <Route path="/syarat-ketentuan" element={<Terms />} handle={{ title: "Syarat & Ketentuan" }} />
+                <Route path="/kebijakan-privasi" element={<Privacy />} handle={{ title: "Kebijakan Privasi" }} />
 
                 <Route path="/auth" element={<GuestRoute />}>
-                    <Route path="register" element={<Register />} />
-                    <Route path="login" element={<Login />} />
-                    <Route path="verify-email" element={<VerifyEmail />} />
-                    <Route path="verify-phone" element={<VerifyPhone />} />
-                    <Route path="forgot-password" element={<ForgotPassword />} />
-                    <Route path="reset-password" element={<ResetPassword />} />
+                    <Route path="register" element={<Register />} handle={{ title: "Daftar" }} />
+                    <Route path="login" element={<Login />} handle={{ title: "Masuk" }} />
+                    <Route path="verify-email" element={<VerifyEmail />} handle={{ title: "Verifikasi Email" }} />
+                    <Route path="verify-phone" element={<VerifyPhone />} handle={{ title: "Verifikasi Nomor Telepon" }} />
+                    <Route path="forgot-password" element={<ForgotPassword />} handle={{ title: "Lupa Kata Sandi" }} />
+                    <Route path="reset-password" element={<ResetPassword />} handle={{ title: "Atur Ulang Kata Sandi" }} />
                 </Route>
 
                 <Route element={<ProtectedRoute />}>
                     <Route element={<AppLayout />}>
-                        <Route path="/profile/me" element={<MyProfile />} />
-                        <Route path="/verification" element={<Verification />} />
-                        <Route path="/notifications" element={<Notifications />} />
-                        <Route path="/notifications/preferences" element={<NotificationPreferences />} />
+                        <Route path="/profile/me" element={<MyProfile />} handle={{ title: "Profil Saya" }} />
+                        <Route path="/verification" element={<Verification />} handle={{ title: "Verifikasi Akun" }} />
+                        <Route path="/notifications" element={<Notifications />} handle={{ title: "Notifikasi" }} />
+                        <Route path="/notifications/preferences" element={<NotificationPreferences />} handle={{ title: "Preferensi Notifikasi" }} />
                     </Route>
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={["buyer", "subcontractor", "is_admin"]} />}>
                     <Route element={<AppLayout />}>
-                        <Route path="/orders" element={<WorkOrderList />} />
-                        <Route path="/orders/:workOrderId" element={<WorkOrderDetail />} />
+                        <Route path="/orders" element={<WorkOrderList />} handle={{ title: "Pesanan" }} />
+                        <Route path="/orders/:workOrderId" element={<WorkOrderDetail />} handle={{ title: "Detail Pesanan" }} />
                     </Route>
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={["subcontractor", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
-                        <Route path="/listing" element={<Listing />} />
-                        <Route path="/listing/calendar" element={<ListingCalendar />} />
-                        <Route path="/requests/incoming" element={<IncomingRequests />} />
-                        <Route path="/requests/incoming/:requestId" element={<IncomingRequestDetail />} />
+                        <Route path="/listing" element={<Listing />} handle={{ title: "Listing Jasa" }} />
+                        <Route path="/listing/calendar" element={<ListingCalendar />} handle={{ title: "Kalender Listing" }} />
+                        <Route path="/requests/incoming" element={<IncomingRequests />} handle={{ title: "Permintaan Masuk" }} />
+                        <Route path="/requests/incoming/:requestId" element={<IncomingRequestDetail />} handle={{ title: "Detail Permintaan Masuk" }} />
                     </Route>
                 </Route>
 
                 <Route element={<ProtectedRoute allowedRoles={["buyer", "is_admin"]} redirectTo="/profile/me" />}>
                     <Route element={<AppLayout />}>
-                        <Route path="/search" element={<Search />} />
-                        <Route path="/quota-requests/new" element={<CreateQuotaRequest />} />
-                        <Route path="/quota-requests" element={<SentRequests />} />
-                        <Route path="/quota-requests/:requestId" element={<SentRequestDetail />} />
+                        <Route path="/search" element={<Search />} handle={{ title: "Cari Jasa" }} />
+                        <Route path="/quota-requests/new" element={<CreateQuotaRequest />} handle={{ title: "Buat Permintaan Kuota" }} />
+                        <Route path="/quota-requests" element={<SentRequests />} handle={{ title: "Permintaan Saya" }} />
+                        <Route path="/quota-requests/:requestId" element={<SentRequestDetail />} handle={{ title: "Detail Permintaan" }} />
                     </Route>
                 </Route>
 
                 <Route element={<ProtectedRoute adminOnly />}>
                     <Route path="/admin" element={<AppLayout />}>
-                        <Route index element={<AdminDashboard />} />
-                        <Route path="verification" element={<AdminVerificationQueue />} />
-                        <Route path="master/items" element={<AdminMasterItems />} />
-                        <Route path="proposals" element={<AdminProposals />} />
-                        <Route path="late-orders" element={<AdminLateOrders />} />
-                        <Route path="orders/:workOrderId" element={<AdminOrderDetail />} />
-                        <Route path="disputes" element={<AdminDisputes />} />
-                        <Route path="reviews" element={<AdminReviewsModeration />} />
-                        <Route path="whatsapp" element={<AdminWhatsApp />} />
-                        <Route path="system" element={<AdminSystem />} />
+                        <Route index element={<AdminDashboard />} handle={{ title: "Dashboard Admin" }} />
+                        <Route path="verification" element={<AdminVerificationQueue />} handle={{ title: "Verifikasi Pengguna" }} />
+                        <Route path="master/items" element={<AdminMasterItems />} handle={{ title: "Master Item" }} />
+                        <Route path="proposals" element={<AdminProposals />} handle={{ title: "Proposal" }} />
+                        <Route path="late-orders" element={<AdminLateOrders />} handle={{ title: "Pesanan Terlambat" }} />
+                        <Route path="orders/:workOrderId" element={<AdminOrderDetail />} handle={{ title: "Detail Pesanan Admin" }} />
+                        <Route path="disputes" element={<AdminDisputes />} handle={{ title: "Sengketa" }} />
+                        <Route path="reviews" element={<AdminReviewsModeration />} handle={{ title: "Moderasi Ulasan" }} />
+                        <Route path="whatsapp" element={<AdminWhatsApp />} handle={{ title: "WhatsApp" }} />
+                        <Route path="system" element={<AdminSystem />} handle={{ title: "Pengaturan Sistem" }} />
                     </Route>
                 </Route>
                 
                 <Route path="*" element={<NotFound />} />
-            </Routes>
-        </BrowserRouter>
+            </Route>,
+        ),
     );
+
+    return <RouterProvider router={router} />;
 }
