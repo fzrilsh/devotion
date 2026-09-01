@@ -58,13 +58,15 @@ func decodeAcceptProblem(t *testing.T, rec *httptest.ResponseRecorder) struct {
 	return p
 }
 
-// TestAccept_RejectsNonBuyer_FR005 proves the accept route's role gate turns a
-// caller without the buyer role away with 403 before the handler runs, so a
-// subcontractor can never form an agreement on the buyer's behalf. The offer id
-// is a syntactically valid UUID so the gate, not the id parse, is what rejects.
-func TestAccept_RejectsNonBuyer_FR005(t *testing.T) {
+// TestAccept_RejectsNonBusinessRole_FR005 proves the accept route's role gate
+// turns away a caller holding no business role with 403 before the handler runs,
+// so an admin session can never form an agreement on a party's behalf. Both
+// business roles are admitted now (either party may close the negotiation,
+// FR-033), so the gate is proven with a role outside that pair. The offer id is a
+// syntactically valid UUID so the gate, not the id parse, is what rejects.
+func TestAccept_RejectsNonBusinessRole_FR005(t *testing.T) {
 	handler := newAcceptHTTPHandler(&mockAuth{principal: &httpx.Principal{
-		Roles:   httpx.RoleSubcontractor,
+		Roles:   httpx.RoleAdmin,
 		Account: sqlcgen.UserAccount{},
 	}})
 
@@ -78,6 +80,32 @@ func TestAccept_RejectsNonBuyer_FR005(t *testing.T) {
 	}
 	if p := decodeAcceptProblem(t, rec); p.Code != string(httpx.CodeForbidden) {
 		t.Fatalf("code %q, mau %q", p.Code, httpx.CodeForbidden)
+	}
+}
+
+// TestAccept_AdmitsSubcontractorRole_FR033 proves the route no longer locks the
+// accept capability to the buyer. A subcontractor-only caller must clear the role
+// gate and reach the service, where the offer id (a valid UUID pointing at no
+// row) turns into a 404. Anything but 404 here means the gate rejected the role,
+// which would leave the subcontractor unable to approve a buyer's counter (spec
+// skenario 4).
+func TestAccept_AdmitsSubcontractorRole_FR033(t *testing.T) {
+	h := newAcceptHarness(t, "accept_admits_sub")
+
+	r := httpx.NewRouter(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h.svc.Register(r, &mockAuth{principal: &httpx.Principal{
+		Roles:   httpx.RoleSubcontractor,
+		Account: sqlcgen.UserAccount{},
+	}})
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/api/offers/11111111-1111-1111-1111-111111111111/accept", nil)
+	rec := httptest.NewRecorder()
+	r.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status %d, mau 404 (peran lolos gate, penawaran tidak ada); body %s",
+			rec.Code, rec.Body.String())
 	}
 }
 

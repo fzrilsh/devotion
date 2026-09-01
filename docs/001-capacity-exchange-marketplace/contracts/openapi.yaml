@@ -968,6 +968,11 @@ paths:
       tags: [request]
       summary: Terima penawaran dan bentuk pesanan
       description: |
+        Dipanggil oleh pihak lawan dari penawaran terakhir: bila ronde terakhir milik
+        subkontraktor maka buyer yang menyetujui, bila milik buyer maka subkontraktor yang
+        menyetujui (FR-033). Pihak yang mengajukan penawaran terakhir tidak bisa menyetujui
+        penawarannya sendiri.
+
         Membentuk pesanan beserta seluruh baris alokasi kapasitas dalam satu tindakan utuh:
         bila salah satu periode gagal dialokasikan, seluruh pembentukan dibatalkan dan tidak
         ada kapasitas yang tersisa terpakai (FR-084).
@@ -981,7 +986,7 @@ paths:
         Kandidat lain pada request yang sama otomatis berstatus "Tidak Dilanjutkan" dan
         mendapat notifikasi (FR-034). Bila dua kesepakatan atas periode yang sama terjadi
         berbarengan, hanya satu yang berhasil (FR-036).
-      x-fr: [FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087, FR-088]
+      x-fr: [FR-033, FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087, FR-088]
       parameters:
         - { name: offerId, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -989,6 +994,20 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkOrderDetail' }
+        '403':
+          description: |
+            Pemanggil mengajukan penawaran terakhir, jadi masih menunggu persetujuan pihak
+            lawan (FR-033).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                own_offer:
+                  value:
+                    code: FORBIDDEN
+                    detail: >-
+                      Anda tidak bisa menyetujui penawaran Anda sendiri; menunggu pihak lain
+                      menyetujui atau menawar balik.
         '409':
           description: |
             Kapasitas sudah diambil kesepakatan lain, atau sudah ada kesepakatan pada
