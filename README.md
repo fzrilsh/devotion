@@ -709,7 +709,7 @@ go run ./cmd/devotion admin:create
 go run ./cmd/devotion seed:test-data      # menolak jalan bila APP_ENV=production
 ```
 
-Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar. Kredensial akun uji ada di `docs/skenario-uji-manual.md`.
+Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar. Kredensial akun uji bisa dilihat pada section Testing atau bisa cek [disini](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d#file-creedentials-txt) 
 
 #### 6. Jalankan frontend
 
