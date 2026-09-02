@@ -215,9 +215,9 @@ export default function PublicProfile() {
                                     <p className="text-sm font-semibold text-slate-700">Mesin</p>
                                     <ul className="mt-2 space-y-1.5">
                                         {listing.machines.map(({ item, machine_count }) => (
-                                            <li key={item.item_id} className="inline-flex items-center gap-2 text-sm text-slate-600">
+                                            <li key={item.item_id} className="inline-flex items-center gap-2 ml-2 text-sm text-slate-600">
                                                 <LuWrench className="size-4 text-slate-400" aria-hidden />
-                                                {item.name} ({machine_count} unit)
+                                                {item.name} [{machine_count} unit]
                                             </li>
                                         ))}
                                     </ul>
