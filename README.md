@@ -120,27 +120,91 @@ Yang di bawah ini tidak terlihat di alur utama, tapi ikut menentukan apakah apli
 
 **[https://devotion.web.id/](https://devotion.web.id/)**
 
-Perlu diketahui apa adanya: saat README ini ditulis, domain itu masih membalas `521` dari Cloudflare. Artinya DNS dan sertifikat sudah beres, tapi origin belum menyala atau belum tersambung. Begitu origin dijalankan, cek ulang dengan perintah ini dan pastikan balasannya `200`:
-
-```bash
-curl -i https://devotion.web.id/api/health
-```
-
 ### Screenshot aplikasi
 
-Screenshot belum ikut disimpan di repository. Setelah deployment jalan, taruh berkasnya di `docs/screenshots/` lalu tautkan di sini. Layar yang paling layak ditampilkan:
+link gist : [devotion-screenshots](https://gist.github.com/TrygerZ/f6601f096885e7307b7210a750f92f7e)
 
-- Landing page
-- Registrasi dan verifikasi
-- Listing kapasitas dan kalender mingguan
-- Hasil pencarian dengan skor kriteria
-- Request kuota dan perbandingan penawaran
-- Detail work order
-- Panel admin
+| | |
+|---|---|
+| **Beranda**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/01-home.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-01-home.jpg" alt="Beranda" width="420" height="263"></a> | **Hasil pencarian dengan skor kecocokan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/40b-buyer-hasil-pencarian.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-40b-buyer-hasil-pencarian.jpg" alt="Hasil pencarian dengan skor kecocokan" width="420" height="263"></a> |
+| **Kalender kapasitas mingguan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/25-sub-kalender-kapasitas.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-25-sub-kalender-kapasitas.jpg" alt="Kalender kapasitas mingguan" width="420" height="263"></a> | **Dasbor admin**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/60-admin-dasbor.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-60-admin-dasbor.jpg" alt="Dasbor admin" width="420" height="263"></a> |
+
+
+<details>
+<summary><b>Halaman publik</b> (6 page)</summary>
+
+Bisa dibuka tanpa login. Beranda tidak diulang di sini karena sudah tampil di sorotan atas.
+
+| | |
+|---|---|
+| **Tentang**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/02-tentang.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-02-tentang.jpg" alt="Tentang" width="420" height="263"></a> | **Profil usaha publik**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/06-profil-publik.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-06-profil-publik.jpg" alt="Profil usaha publik" width="420" height="263"></a> |
+| **Bantuan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/03-bantuan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-03-bantuan.jpg" alt="Bantuan" width="420" height="263"></a> | **Syarat dan ketentuan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/04-syarat-ketentuan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-04-syarat-ketentuan.jpg" alt="Syarat dan ketentuan" width="420" height="263"></a> |
+| **Kebijakan privasi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/05-kebijakan-privasi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-05-kebijakan-privasi.jpg" alt="Kebijakan privasi" width="420" height="263"></a> | **Halaman tidak ditemukan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/13-404.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-13-404.jpg" alt="Halaman tidak ditemukan" width="420" height="263"></a> |
+
+</details>
+
+<details>
+<summary><b>Autentikasi dan verifikasi</b> (6 page)</summary>
+
+Registrasi sampai pemulihan kata sandi.
+
+| | |
+|---|---|
+| **Registrasi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/07-register.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-07-register.jpg" alt="Registrasi" width="420" height="263"></a> | **Login**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/08-login.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-08-login.jpg" alt="Login" width="420" height="263"></a> |
+| **Verifikasi email**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/09-verifikasi-email.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-09-verifikasi-email.jpg" alt="Verifikasi email" width="420" height="263"></a> | **Verifikasi nomor HP**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/10-verifikasi-telepon.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-10-verifikasi-telepon.jpg" alt="Verifikasi nomor HP" width="420" height="263"></a> |
+| **Lupa kata sandi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/11-lupa-sandi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-11-lupa-sandi.jpg" alt="Lupa kata sandi" width="420" height="263"></a> | **Atur ulang kata sandi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/12-reset-sandi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-12-reset-sandi.jpg" alt="Atur ulang kata sandi" width="420" height="263"></a> |
+
+</details>
+
+<details>
+<summary><b>Subkontraktor</b> (10 page)</summary>
+
+Sisi pemilik kapasitas: memasang listing, mengatur kalender, menjawab permintaan.
+
+| | |
+|---|---|
+| **Profil usaha saya**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/20-sub-profil-saya.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-20-sub-profil-saya.jpg" alt="Profil usaha saya" width="420" height="263"></a> | **Verifikasi identitas usaha**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/21-sub-verifikasi-identitas.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-21-sub-verifikasi-identitas.jpg" alt="Verifikasi identitas usaha" width="420" height="263"></a> |
+| **Listing kapasitas**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/24-sub-listing.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-24-sub-listing.jpg" alt="Listing kapasitas" width="420" height="263"></a> | **Kalender kapasitas mingguan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/25-sub-kalender-kapasitas.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-25-sub-kalender-kapasitas.jpg" alt="Kalender kapasitas mingguan" width="420" height="263"></a> |
+| **Permintaan kuota masuk**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/26-sub-permintaan-masuk.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-26-sub-permintaan-masuk.jpg" alt="Permintaan kuota masuk" width="420" height="263"></a> | **Detail permintaan dan penawaran**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/27-sub-permintaan-masuk-detail.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-27-sub-permintaan-masuk-detail.jpg" alt="Detail permintaan dan penawaran" width="420" height="263"></a> |
+| **Daftar pesanan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/28-sub-pesanan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-28-sub-pesanan.jpg" alt="Daftar pesanan" width="420" height="263"></a> | **Detail pesanan, sisi subkontraktor**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/29-sub-pesanan-detail.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-29-sub-pesanan-detail.jpg" alt="Detail pesanan, sisi subkontraktor" width="420" height="263"></a> |
+| **Notifikasi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/22-sub-notifikasi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-22-sub-notifikasi.jpg" alt="Notifikasi" width="420" height="263"></a> | **Preferensi notifikasi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/23-sub-preferensi-notifikasi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-23-sub-preferensi-notifikasi.jpg" alt="Preferensi notifikasi" width="420" height="263"></a> |
+
+</details>
+
+<details>
+<summary><b>Pemberi order</b> (8 page)</summary>
+
+Sisi pencari kapasitas: mencari, meminta kuota, memantau pesanan.
+
+| | |
+|---|---|
+| **Form pencarian kapasitas**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/40-buyer-pencarian.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-40-buyer-pencarian.jpg" alt="Form pencarian kapasitas" width="420" height="263"></a> | **Hasil pencarian dengan skor kecocokan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/40b-buyer-hasil-pencarian.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-40b-buyer-hasil-pencarian.jpg" alt="Hasil pencarian dengan skor kecocokan" width="420" height="263"></a> |
+| **Buat permintaan kuota multi-kandidat**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/41-buyer-buat-permintaan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-41-buyer-buat-permintaan.jpg" alt="Buat permintaan kuota multi-kandidat" width="420" height="263"></a> | **Permintaan terkirim**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/42-buyer-permintaan-terkirim.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-42-buyer-permintaan-terkirim.jpg" alt="Permintaan terkirim" width="420" height="263"></a> |
+| **Detail permintaan dan perbandingan penawaran**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/43-buyer-permintaan-detail.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-43-buyer-permintaan-detail.jpg" alt="Detail permintaan dan perbandingan penawaran" width="420" height="263"></a> | **Daftar pesanan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/44-buyer-pesanan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-44-buyer-pesanan.jpg" alt="Daftar pesanan" width="420" height="263"></a> |
+| **Detail pesanan, sisi pemberi order**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/45-buyer-pesanan-detail.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-45-buyer-pesanan-detail.jpg" alt="Detail pesanan, sisi pemberi order" width="420" height="263"></a> | **Profil usaha saya**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/46-buyer-profil-saya.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-46-buyer-profil-saya.jpg" alt="Profil usaha saya" width="420" height="263"></a> |
+
+</details>
+
+<details>
+<summary><b>Panel admin</b> (10 page)</summary>
+
+Operasional platform, seluruhnya lewat antarmuka tanpa menyentuh database.
+
+| | |
+|---|---|
+| **Dasbor admin**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/60-admin-dasbor.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-60-admin-dasbor.jpg" alt="Dasbor admin" width="420" height="263"></a> | **Antrean verifikasi identitas**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/61-admin-antrean-verifikasi.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-61-admin-antrean-verifikasi.jpg" alt="Antrean verifikasi identitas" width="420" height="263"></a> |
+| **Daftar baku produk dan mesin**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/62-admin-master-item.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-62-admin-master-item.jpg" alt="Daftar baku produk dan mesin" width="420" height="263"></a> | **Usulan item baru**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/63-admin-usulan-item.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-63-admin-usulan-item.jpg" alt="Usulan item baru" width="420" height="263"></a> |
+| **Pesanan telat**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/64-admin-pesanan-telat.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-64-admin-pesanan-telat.jpg" alt="Pesanan telat" width="420" height="263"></a> | **Detail pesanan, sisi admin**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/65-admin-pesanan-detail.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-65-admin-pesanan-detail.jpg" alt="Detail pesanan, sisi admin" width="420" height="263"></a> |
+| **Sengketa dan mediasi**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/66-admin-sengketa.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-66-admin-sengketa.jpg" alt="Sengketa dan mediasi" width="420" height="263"></a> | **Moderasi ulasan**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/67-admin-moderasi-ulasan.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-67-admin-moderasi-ulasan.jpg" alt="Moderasi ulasan" width="420" height="263"></a> |
+| **Status sambungan WhatsApp**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/68-admin-whatsapp.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-68-admin-whatsapp.jpg" alt="Status sambungan WhatsApp" width="420" height="263"></a> | **Kesehatan sistem**<br><a href="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/69-admin-sistem.png"><img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/t-69-admin-sistem.jpg" alt="Kesehatan sistem" width="420" height="263"></a> |
+
+</details>
+
 
 ### Video demo
 
 **Link video demo: belum tersedia.**
+
 ---
 
 ## Teknologi
