@@ -22,6 +22,30 @@ perubahannya.
   frontend pernah melabel catatan "opsional" karena kontrak pun membiarkannya
   begitu, dan generator tipe tidak pernah punya dasar untuk menyimpulkan
   lainnya.
+- Kontrak diselaraskan dengan perilaku Go yang sudah benar sejak awal, dua
+  ketidakcocokan dari audit frontend (#35, #31). Pertama, `VALIDATION_FAILED`
+  ditulis 400 pada tiga endpoint (`/auth/recover/confirm`, `/files`,
+  `/quota-requests`) padahal seluruh endpoint lain 422; satu kode galat mesin
+  harus membawa satu status karena klien memutuskan penanganan dari kode itu.
+  Penulisan 400 itu salah di kontrak, bukan di kode: `httpx/codes.go` memetakan
+  `VALIDATION_FAILED` ke 422 di satu tempat dan setiap handler, termasuk
+  `WriteValidation`, mengambil status dari sana, jadi tidak ada jalur yang
+  betulan membalas 400. Ketiganya kini 422 dan tidak ada lagi ref `400` di
+  seluruh kontrak. Kedua, parameter `kind` pada `GET /admin/master/items`
+  ditandai opsional padahal handler menolak ketiadaannya dengan 422
+  (`admin.go` memeriksa kind kosong maupun tak dikenal sebelum query); kini
+  `required: true` beserta respons 422 yang memang dibalas. Ketiga, dua
+  endpoint keputusan admin (`/admin/verification/{requestId}/decision`,
+  `/admin/proposals/{proposalId}/decision`) tidak menyatakan syarat yang
+  ditegakkan handler-nya: `reason` wajib saat `decision` bernilai `rejected`,
+  boleh kosong saat `approved`, pola yang sama dengan penyelesaian #27. Syarat
+  itu ditulis di `description` tanpa mengubah `required` maupun bentuk skema,
+  jadi tipe hasil generate frontend tidak bergerak. Salinan tertanam
+  `backend/apidocs/openapi.yaml` ikut disinkronkan; uji
+  `TestDocs_ServedSpecIdenticalToSource` membuktikan byte-identik. Tipe
+  frontend belum bisa digenerate ulang dari repo ini karena sumber
+  `frontend/src` belum masuk repository, jadi penyesuaian tipe mengikuti
+  saat sumbernya masuk.
 - Field JSON yang kontraknya `format: date` kini diserialisasi ISO `YYYY-MM-DD`,
   sebelumnya bentuk panjang Indonesia (#28). Lima belas baris di tiga paket
   memanggil `platform.FormatDateID` pada jalur wire, padahal jalur masuk field
