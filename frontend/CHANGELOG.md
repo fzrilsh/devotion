@@ -4,7 +4,9 @@
 
 ### Diperbaiki
 
-* Menyesuaikan form resolusi sengketa admin di `src/pages/Admin/Disputes.tsx` agar `POST /admin/disputes/{disputeId}/resolve` mengikuti kontrak OpenAPI: `result` memakai enum yang benar, `allocation_reversed` hanya dikirim saat keputusan membatalkan pesanan, dan `liable_profile_id` diisi ketika `result === "cancelled"` dengan memilih pihak pembeli atau subkontraktor yang menanggung. UI sekarang memvalidasi pilihan ini sebelum submit agar request yang dikirim tidak lagi melanggar skema backend.
+* Menyesuaikan form resolusi sengketa admin di `src/pages/Admin/Disputes.tsx` agar `POST /admin/disputes/{disputeId}/resolve` mengikuti kontrak OpenAPI: `result` memakai enum yang benar, `allocation_reversed` hanya dikirim saat keputusan membatalkan pesanan, dan `liable_profile_id` diisi ketika `result === "cancelled"` dengan memilih pihak pembeli atau subkontraktor yang menanggung. UI sekarang memvalidasi pilihan ini sebelum submit agar request yang dikirim tidak lagi melanggar skema backend. Catatan keputusan juga berubah menjadi wajib saat `result === "cancelled"` dan tetap opsional pada hasil lain, sesuai deskripsi kontrak yang kini menyatakan syarat kondisional secara eksplisit.
+
+* Memperbarui kontrak `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` agar menjelaskan secara eksplisit bahwa `liable_profile_id` dan `note` wajib saat `result === "cancelled"`, sementara `allocation_reversed` diabaikan pada hasil `continued` dan `confirmed`. Deskripsi bersyarat ini memberi sinyal yang jelas ke generator tipe dan tim frontend sehingga syarat ini tidak lagi luput seperti pada versi lama.
 
 * Menetapkan metadata SEO dan Open Graph di `index.html`, termasuk description, keywords, author, `og:type`, `og:site_name`, `og:title`, `og:description`, `og:image`, serta metadata Twitter Card. Atribut root HTML juga diubah menjadi `lang="id"`, sehingga bahasa halaman yang diumumkan pembaca layar dan yang digunakan mesin pencari sesuai dengan antarmuka Indonesia. Judul dokumen dan tema browser memakai branding Devotion.
 

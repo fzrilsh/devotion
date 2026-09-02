@@ -11,6 +11,7 @@ import { LuArrowRight, LuGavel, LuHandshake, LuInbox, LuMessagesSquare } from "r
 import { Link } from "react-router-dom";
 import { disputeStatusMeta } from "./meta";
 import { formatDateTimeId } from "@lib/datetime";
+import { validateDisputeResolution } from "./disputeValidation";
 
 const inputClassName = "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 
@@ -52,8 +53,11 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
         event.preventDefault();
         setError("");
 
-        if (result === "cancelled" && !liableProfileId) {
-            setError("Pilih pihak yang menanggung pembatalan.");
+        const trimmedNote = note.trim();
+        const validationError = validateDisputeResolution({ result, liableProfileId, note: trimmedNote });
+
+        if (validationError) {
+            setError(validationError);
             return;
         }
 
@@ -64,7 +68,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                     result,
                     allocation_reversed: result === "cancelled",
                     liable_profile_id: result === "cancelled" ? liableProfileId : undefined,
-                    note: note.trim() || undefined,
+                    note: trimmedNote || undefined,
                 },
             });
             setResolveOpen(false);
@@ -145,13 +149,22 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
 
                             <div>
                                 <label htmlFor={`note-${dispute.dispute_id}`} className="mb-2 block text-sm font-semibold text-slate-500">
-                                    Catatan Keputusan (opsional)
+                                    Catatan Keputusan {result === "cancelled" ? <span className="text-red-500"> (wajib)</span> : "(opsional)"}
                                 </label>
-                                <textarea id={`note-${dispute.dispute_id}`} rows={2} value={note} onChange={(event) => setNote(event.target.value)} className={inputClassName} placeholder="Ringkasan hasil mediasi" maxLength={2000} />
+                                <textarea
+                                    id={`note-${dispute.dispute_id}`}
+                                    rows={2}
+                                    value={note}
+                                    onChange={(event) => setNote(event.target.value)}
+                                    className={inputClassName}
+                                    placeholder={result === "cancelled" ? "Jelaskan alasan pembatalan dan pihak yang menanggung." : "Ringkasan hasil mediasi"}
+                                    maxLength={2000}
+                                    required={result === "cancelled"}
+                                />
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="submit" disabled={busy || (result === "cancelled" && !liableProfileId)} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
+                                <button type="submit" disabled={busy || (result === "cancelled" && (!liableProfileId || !note.trim()))} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
                                     {resolveMutation.isPending ? "Menyimpan..." : "Putuskan Sengketa"}
                                 </button>
                                 <button type="button" onClick={() => {
