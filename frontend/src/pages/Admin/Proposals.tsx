@@ -29,11 +29,6 @@ function ProposalCard({ proposal }: { proposal: ItemProposal }) {
     async function decide(decision: "approved" | "rejected") {
         setError("");
 
-        if (decision === "rejected" && reason.trim().length < 5) {
-            setError("Tuliskan alasan penolakan minimal 5 karakter dan maksimal 1000 karakter.");
-            return;
-        }
-
         if (decision === "rejected" && reason.trim().length > 1000) {
             setError("Alasan penolakan maksimal 1000 karakter.");
             return;
@@ -83,7 +78,7 @@ function ProposalCard({ proposal }: { proposal: ItemProposal }) {
                             <label htmlFor={`reason-${proposal.proposal_id}`} className="block text-sm font-semibold text-slate-500">
                                 Alasan Penolakan <span className="text-red-500">*</span>
                             </label>
-                            <textarea id={`reason-${proposal.proposal_id}`} rows={2} value={reason} onChange={(event) => setReason(event.target.value)} className={inputClassName} placeholder="Misalnya: item sudah ada di daftar baku" minLength={5} maxLength={1000} />
+                            <textarea id={`reason-${proposal.proposal_id}`} rows={2} value={reason} onChange={(event) => setReason(event.target.value)} className={inputClassName} placeholder="Misalnya: item sudah ada di daftar baku" maxLength={1000} />
 
                             <div className="flex gap-2">
                                 <button type="button" onClick={() => decide("rejected")} disabled={decideMutation.isPending} className="flex-1 cursor-pointer rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">
