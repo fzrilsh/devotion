@@ -397,7 +397,6 @@ export interface paths {
                     };
                     content?: never;
                 };
-                400: components["responses"]["ValidationFailed"];
                 /** @description Kode kedaluwarsa atau sudah dipakai */
                 410: {
                     headers: {
@@ -405,6 +404,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                422: components["responses"]["ValidationFailed"];
             };
         };
         delete?: never;
@@ -878,7 +878,6 @@ export interface paths {
                         "application/json": components["schemas"]["UploadedFile"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
                 /** @description Berkas melampaui 5MB */
                 413: {
                     headers: {
@@ -904,6 +903,7 @@ export interface paths {
                     };
                     content?: never;
                 };
+                422: components["responses"]["ValidationFailed"];
                 /** @description Kuota penyimpanan sistem sudah penuh */
                 507: {
                     headers: {
@@ -1440,7 +1440,6 @@ export interface paths {
                         "application/json": components["schemas"]["QuotaRequestDetail"];
                     };
                 };
-                400: components["responses"]["ValidationFailed"];
                 403: components["responses"]["Forbidden"];
                 /** @description Ada listing milik sendiri di antara kandidat */
                 409: {
@@ -1460,6 +1459,7 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                422: components["responses"]["ValidationFailed"];
                 429: components["responses"]["RateLimitExceeded"];
             };
         };
@@ -2576,6 +2576,10 @@ export interface paths {
         /**
          * Setujui atau tolak pengajuan verifikasi
          * @description Penolakan menyertakan alasan yang tampil ke pemohon (FR-008).
+         *     Syarat per nilai decision:
+         *     - rejected: reason wajib terisi. Backend menolak permintaan 422 bila kosong,
+         *       karena penolakan membawa alasan yang dibaca pemohon (FR-007).
+         *     - approved: reason boleh dikosongkan.
          */
         post: {
             parameters: {
@@ -2623,8 +2627,8 @@ export interface paths {
         /** Kelola daftar baku produk dan mesin */
         get: {
             parameters: {
-                query?: {
-                    kind?: "product" | "machine";
+                query: {
+                    kind: "product" | "machine";
                 };
                 header?: never;
                 path?: never;
@@ -2641,6 +2645,7 @@ export interface paths {
                     };
                 };
                 403: components["responses"]["Forbidden"];
+                422: components["responses"]["ValidationFailed"];
             };
         };
         put?: never;
@@ -2780,6 +2785,10 @@ export interface paths {
         /**
          * Setujui atau tolak usulan item
          * @description Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
+         *     Syarat per nilai decision:
+         *     - rejected: reason wajib terisi. Backend menolak permintaan 422 bila kosong,
+         *       karena penolakan membawa alasan yang dibaca pengusul (FR-061).
+         *     - approved: reason boleh dikosongkan.
          */
         post: {
             parameters: {
@@ -3003,6 +3012,12 @@ export interface paths {
          * @description Hasil menentukan nasib pesanan dan alokasi kapasitasnya. Bila dibatalkan, seluruh
          *     alokasi dibalik. Admin menetapkan pihak yang menanggung agar tingkat penyelesaian
          *     adil (FR-067, FR-072).
+         *     Syarat per nilai result:
+         *     - cancelled: liable_profile_id dan note wajib terisi. Backend menolak
+         *       permintaan bila salah satunya kosong, karena pembatalan satu-satunya
+         *       hasil yang membebani tingkat penyelesaian salah satu pihak (FR-072).
+         *     - continued, confirmed: liable_profile_id dan note boleh dikosongkan,
+         *       allocation_reversed diabaikan.
          */
         post: {
             parameters: {
