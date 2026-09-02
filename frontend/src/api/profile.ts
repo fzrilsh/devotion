@@ -20,7 +20,7 @@ export async function updateMyProfile(data: ProfileUpdateRequest): Promise<Profi
 }
 
 export async function getPublicProfile(profileId: string): Promise<PublicProfile> {
-    return apiClient<PublicProfile>(`/profile/${profileId}`);
+    return apiClient<PublicProfile>(`/profile/${encodeURIComponent(profileId)}`);
 }
 
 export async function getProfileReviews(profileId: string, cursor?: string): Promise<ReviewList> {

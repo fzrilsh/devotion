@@ -185,7 +185,7 @@ export default function AdminDashboard() {
                         <li key={order.work_order_id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
-                                <p className="text-xs text-slate-400">Tenggat kesiapan {formatDate(order.readiness_deadline ?? order.deadline)}</p>
+                                <p className="text-xs text-slate-400">Tenggat kesiapan {formatDate(order.readiness_deadline)}</p>
                             </div>
 
                             <Link to={`/admin/orders/${order.work_order_id}`} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">

@@ -46,7 +46,7 @@ export default function AdminLateOrders() {
                                             </div>
 
                                             <p className="mt-1 text-sm text-slate-400">
-                                                Tenggat kesiapan {formatDateId(order.readiness_deadline ?? order.deadline)}
+                                                Tenggat kesiapan {formatDateId(order.readiness_deadline)}
                                                 <br />
                                                 {order.total_price != null ? `Nilai ${formatRupiah(order.total_price)}` : ""}
                                             </p>
