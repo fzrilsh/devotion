@@ -78,11 +78,13 @@ export default function IncomingDetail() {
     if (candidateQuery.isLoading) return <Loading />;
 
     if (candidateQuery.isError || !candidateQuery.data) {
+        const directLinkMessage = !stateCandidateId && !paramCandidateId.startsWith("candidate_") ? "Kandidat belum dibuka dari daftar request masuk. Buka daftar dulu, lalu pilih kandidat yang ingin Anda lihat." : "Kandidat tidak ditemukan atau sudah tidak tersedia untuk listing Anda.";
+
         return (
             <div className="space-y-6">
                 <h1 className="text-xl font-bold text-slate-900">Detail Request Masuk</h1>
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-red-700">Request tidak ditemukan atau sudah tidak tersedia untuk listing Anda.</p>
+                    <p className="text-sm font-semibold text-red-700">{directLinkMessage}</p>
                     <Link to="/requests/incoming" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-red-800 underline underline-offset-2">
                         <LuArrowLeft className="size-4" aria-hidden />
                         Kembali ke request masuk

@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Menetapkan keputusan yang jelas untuk detail kandidat request kuota: kontrak aktif tidak menyediakan `GET /candidates/{candidateId}`. Karena itu, halaman detail tidak lagi menyapu daftar paginasi sampai 200 halaman. `src/hooks/useQuota.ts` kini hanya membaca kandidat dari cache daftar request masuk yang sudah terbuka pengguna, sedangkan tautan langsung yang melewati cache menampilkan pesan jujur dalam bahasa Indonesia: "Buka daftar dulu" bila kandidat belum di-load, dan "tidak ditemukan" bila kandidat memang tidak ada. Pola ini menghindari biaya HTTP berurutan yang tidak masuk akal dan tetap selaras dengan sumber kebenaran dari `openapi.yaml`.
+
 * Memperbaiki root cause antrean admin yang membuang metadata paginasi: `src/api/admin.ts` tidak lagi menurunkan `pagination` ke array kosong atau membaca cabang `response.data` yang tidak ada di kontrak. Keempat sandaran admin masih memakai `useInfiniteQuery`, dan `next_cursor` diteruskan apa adanya pada permintaan berikutnya tanpa parsing ke nomor halaman.
 
 * Menghapus kesimpulan palsu di `src/pages/Admin/OrderDetail.tsx`: halaman detail pesanan tidak lagi menilai ada atau tidaknya sengketa dari halaman pertama daftar admin, karena filter daftar berhalaman itu bukan sumber kebenaran untuk satu pesanan. Detail sekarang membimbing admin ke antrean sengketa yang berdiri sendiri.
