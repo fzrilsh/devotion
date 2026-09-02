@@ -240,7 +240,7 @@ paths:
                 new_password: { type: string, format: password, minLength: 8 }
       responses:
         '204': { description: Kata sandi diganti; seluruh sesi lain dihapus }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '410': { description: Kode kedaluwarsa atau sudah dipakai }
 
   /me:
@@ -465,7 +465,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UploadedFile' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '413':
           description: Berkas melampaui 5MB
           content:
@@ -807,7 +807,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotaRequestDetail' }
-        '400': { $ref: '#/components/responses/ValidationFailed' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: Ada listing milik sendiri di antara kandidat
@@ -1401,7 +1401,12 @@ paths:
     post:
       tags: [admin]
       summary: Setujui atau tolak pengajuan verifikasi
-      description: Penolakan menyertakan alasan yang tampil ke pemohon (FR-008).
+      description: |
+        Penolakan menyertakan alasan yang tampil ke pemohon (FR-008).
+        Syarat per nilai decision:
+        - rejected: reason wajib terisi. Backend menolak permintaan 422 bila kosong,
+          karena penolakan membawa alasan yang dibaca pemohon (FR-007).
+        - approved: reason boleh dikosongkan.
       x-fr: [FR-007, FR-008]
       parameters:
         - { name: requestId, in: path, required: true, schema: { type: string, format: uuid } }
@@ -1430,6 +1435,7 @@ paths:
       parameters:
         - name: kind
           in: query
+          required: true
           schema: { type: string, enum: [product, machine] }
       responses:
         '200':
@@ -1439,6 +1445,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/CatalogItem' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
     post:
       tags: [admin]
       summary: Tambah item daftar baku
@@ -1509,7 +1516,12 @@ paths:
     post:
       tags: [admin]
       summary: Setujui atau tolak usulan item
-      description: Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
+      description: |
+        Persetujuan memasukkan item ke daftar baku, dan pengusul diberi tahu hasilnya (FR-061, FR-074).
+        Syarat per nilai decision:
+        - rejected: reason wajib terisi. Backend menolak permintaan 422 bila kosong,
+          karena penolakan membawa alasan yang dibaca pengusul (FR-061).
+        - approved: reason boleh dikosongkan.
       x-fr: [FR-061, FR-074]
       parameters:
         - { name: proposalId, in: path, required: true, schema: { type: string, format: uuid } }
