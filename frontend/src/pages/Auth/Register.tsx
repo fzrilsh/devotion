@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRegister } from "@hooks/useAuth";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
+import { normalizePhone } from "@lib/phone";
 import { getProblemMessage } from "@lib/problem";
 import { registerSchema, type RegisterForm } from "@schemas/auth";
 import { forwardRef, useState, type ReactNode } from "react";
@@ -33,20 +34,6 @@ const roles = [
 
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
-
-function normalizePhone(value: string): string {
-    const digits = value.replace(/\D/g, "");
-
-    if (digits.startsWith("0")) {
-        return `62${digits.slice(1)}`;
-    }
-
-    if (digits.startsWith("62")) {
-        return digits;
-    }
-
-    return digits;
-}
 
 const Field = forwardRef<
     HTMLInputElement,

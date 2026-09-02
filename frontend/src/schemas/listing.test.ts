@@ -39,9 +39,9 @@ describe("listingSchema", () => {
         expect(result.success).toBe(false);
     });
 
-    it("menerima alasan penolakan dengan 5 karakter", () => {
-        const reason = "Palsu";
-        expect(reason.trim().length).toBeGreaterThanOrEqual(5);
+    it("menerima jumlah mesin sampai batas atas 999", () => {
+        const result = listingSchema.safeParse({ ...validListing, machines: [{ item_id: "machine-1", machine_count: 999 }] });
+        expect(result.success).toBe(true);
     });
 
     it("menolak tanpa jenis produk", () => {

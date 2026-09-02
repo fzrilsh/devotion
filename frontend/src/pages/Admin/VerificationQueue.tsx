@@ -30,11 +30,6 @@ function RequestCard({ request }: { request: VerificationRequest }) {
     async function decide(decision: "approved" | "rejected") {
         setError("");
 
-        if (decision === "rejected" && reason.trim().length < 5) {
-            setError("Tuliskan alasan penolakan minimal 5 karakter dan maksimal 1000 karakter. Alasan ini tampil ke pemohon.");
-            return;
-        }
-
         if (decision === "rejected" && reason.trim().length > 1000) {
             setError("Alasan penolakan maksimal 1000 karakter.");
             return;
@@ -98,7 +93,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
                             <label htmlFor={`reason-${request.request_id}`} className="block text-sm font-semibold text-slate-500">
                                 Alasan Penolakan <span className="text-red-500">*</span>
                             </label>
-                            <textarea id={`reason-${request.request_id}`} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} className={inputClassName} placeholder="Misalnya: dokumen identitas tidak terbaca" minLength={5} maxLength={1000} />
+                            <textarea id={`reason-${request.request_id}`} rows={3} value={reason} onChange={(event) => setReason(event.target.value)} className={inputClassName} placeholder="Misalnya: dokumen identitas tidak terbaca" maxLength={1000} />
 
                             <div className="flex gap-2">
                                 <button

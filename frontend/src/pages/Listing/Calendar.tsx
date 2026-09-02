@@ -3,36 +3,41 @@ import Loading from "@components/common/Loading";
 import { useListingPeriods, useMyListing, useUpdateListingPeriods } from "@hooks/useListing";
 import { cn } from "@lib/utils";
 import { getProblemMessage } from "@lib/problem";
+import { addDays, addWeeks, currentWeekStart, isMonday } from "@lib/week";
 import { useMemo, useState } from "react";
 import { LuArrowLeft, LuCalendarX, LuChevronLeft, LuChevronRight, LuInfo } from "react-icons/lu";
 import { Link } from "react-router-dom";
 
 const WEEKS_PER_PAGE = 12;
 
-function formatWeekStart(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+// The backend refuses a week_start more than 26 weeks past the current week
+// (MaxPeriodBatch in internal/listing/listing.go), so the calendar stops at the
+// same boundary instead of offering cells whose save can only fail.
+const HORIZON_WEEKS = 26;
+const TOTAL_WEEKS = HORIZON_WEEKS + 1;
+const LAST_PAGE = Math.ceil(TOTAL_WEEKS / WEEKS_PER_PAGE) - 1;
 
-    return `${year}-${month}-${day}`;
-}
-
-function addIsoDays(isoDate: string, days: number): string {
-    const [year, month, day] = isoDate.split("-").map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day));
-    date.setUTCDate(date.getUTCDate() + days);
-    return formatWeekStart(date);
-}
+// One PUT carries at most 26 periods (MaxPeriodBatch), and the draft survives
+// page changes, so the limit is enforced here rather than discovered as a 422.
+const MAX_PERIOD_BATCH = 26;
 
 const weekFormatter = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
 const weekYearFormatter = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jakarta" });
 
-function formatWeekRange(weekStartIso: string): string {
-    const [year, month, day] = weekStartIso.split("-").map(Number);
-    const start = new Date(Date.UTC(year, month - 1, day));
-    const end = new Date(Date.UTC(year, month - 1, day + 6));
+function isoToUtc(isoDate: string): Date {
+    const [year, month, day] = isoDate.split("-").map(Number);
 
-    return `${weekFormatter.format(start)} - ${weekYearFormatter.format(end)}`;
+    return new Date(Date.UTC(year, month - 1, day));
+}
+
+/** "31 Agu - 6 Sep 2026" for the Monday to Sunday span of one week. */
+function formatWeekRange(weekStartIso: string): string {
+    return `${weekFormatter.format(isoToUtc(weekStartIso))} - ${weekYearFormatter.format(isoToUtc(addDays(weekStartIso, 6)))}`;
+}
+
+/** The span a whole page covers, from the first Monday to the last Sunday. */
+function formatPageRange(firstWeekStart: string, lastWeekStart: string): string {
+    return `${weekFormatter.format(isoToUtc(firstWeekStart))} - ${weekYearFormatter.format(isoToUtc(addDays(lastWeekStart, 6)))}`;
 }
 
 type DraftPeriod = {
@@ -45,10 +50,13 @@ export default function Calendar() {
     const listingQuery = useMyListing();
     const [page, setPage] = useState(0);
     const today = useMemo(() => new Date(), []);
-    const anchorWeekStart = useMemo(() => formatWeekStart(today), [today]);
+    const anchorWeekStart = useMemo(() => currentWeekStart(today), [today]);
 
-    const from = useMemo(() => addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE), [anchorWeekStart, page]);
-    const to = useMemo(() => addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE + WEEKS_PER_PAGE - 1), [anchorWeekStart, page]);
+    const pageStartWeek = page * WEEKS_PER_PAGE;
+    const pageWeekCount = Math.max(0, Math.min(WEEKS_PER_PAGE, TOTAL_WEEKS - pageStartWeek));
+
+    const from = useMemo(() => addWeeks(anchorWeekStart, pageStartWeek), [anchorWeekStart, pageStartWeek]);
+    const to = useMemo(() => addWeeks(anchorWeekStart, pageStartWeek + Math.max(0, pageWeekCount - 1)), [anchorWeekStart, pageStartWeek, pageWeekCount]);
 
     const periodsQuery = useListingPeriods(listingQuery.data ? from : undefined, listingQuery.data ? to : undefined);
     const updateMutation = useUpdateListingPeriods();
@@ -83,17 +91,20 @@ export default function Calendar() {
 
     const weeks: { week_start: string; server?: AvailabilityPeriod; current: DraftPeriod; dirty: boolean }[] = [];
 
-    for (let index = 0; index < WEEKS_PER_PAGE; index++) {
-        const weekStart = addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE + index);
+    for (let index = 0; index < pageWeekCount; index++) {
+        const weekStart = addWeeks(anchorWeekStart, pageStartWeek + index);
         const server = serverByWeek.get(weekStart);
         const base: DraftPeriod = server ? { week_start: server.week_start, capacity: server.capacity, marked_full: server.marked_full } : { week_start: weekStart, capacity: listing.weekly_capacity, marked_full: false };
         const current = draft[weekStart] ?? base;
-        const dirty = Boolean(draft[weekStart]) && (draft[weekStart].capacity !== base.capacity || draft[weekStart].marked_full !== base.marked_full);
+        const dirty = Boolean(draft[weekStart]);
 
         weeks.push({ week_start: weekStart, server, current, dirty });
     }
 
-    const dirtyWeeks = weeks.filter((week) => week.dirty);
+    // updateDraft removes an entry as soon as it matches its base again, so every
+    // surviving entry is a real change. Reading the whole draft here, not just the
+    // current page, keeps edits made on another page from being dropped silently.
+    const dirtyPeriods = Object.values(draft).sort((a, b) => a.week_start.localeCompare(b.week_start));
 
     function updateDraft(weekStart: string, patch: Partial<DraftPeriod>) {
         setErrorMessage("");
@@ -118,19 +129,24 @@ export default function Calendar() {
     async function handleSave() {
         setErrorMessage("");
 
-        const periods: PeriodUpdateItem[] = dirtyWeeks.map((week) => ({
-            week_start: week.week_start,
-            capacity: week.current.capacity,
-            marked_full: week.current.marked_full,
+        const periods: PeriodUpdateItem[] = dirtyPeriods.map((period) => ({
+            week_start: period.week_start,
+            capacity: period.capacity,
+            marked_full: period.marked_full,
         }));
 
-        const invalid = periods.some((period) => {
-            const [year, month, day] = period.week_start.split("-").map(Number);
-            return new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== 1;
-        });
-
-        if (invalid) {
+        if (periods.some((period) => !isMonday(period.week_start))) {
             setErrorMessage("Ada minggu yang awalnya bukan hari Senin. Muat ulang halaman lalu coba lagi.");
+            return;
+        }
+
+        if (periods.some((period) => !Number.isInteger(period.capacity) || period.capacity < 0)) {
+            setErrorMessage("Kapasitas harus bilangan bulat dan tidak boleh negatif.");
+            return;
+        }
+
+        if (periods.length > MAX_PERIOD_BATCH) {
+            setErrorMessage(`Maksimal ${MAX_PERIOD_BATCH} minggu per penyimpanan. Simpan sebagian lebih dulu.`);
             return;
         }
 
@@ -138,7 +154,7 @@ export default function Calendar() {
             await updateMutation.mutateAsync(periods);
             setDraft({});
         } catch (error) {
-            setErrorMessage(getProblemMessage(error, "Perubahan tidak dapat disimpan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali.", 422: "Data periode tidak sah. Awal minggu harus jatuh pada hari Senin." }));
+            setErrorMessage(getProblemMessage(error, "Perubahan tidak dapat disimpan. Silakan coba lagi.", { 401: "Sesi Anda habis, silakan masuk kembali." }));
         }
     }
 
@@ -164,9 +180,9 @@ export default function Calendar() {
                     Sebelumnya
                 </button>
 
-                <p className="text-sm font-bold text-slate-800">{formatWeekRange(from)}</p>
+                <p className="text-sm font-bold text-slate-800">{formatPageRange(from, to)}</p>
 
-                <button type="button" onClick={() => setPage((value) => value + 1)} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100">
+                <button type="button" onClick={() => setPage((value) => Math.min(LAST_PAGE, value + 1))} disabled={page >= LAST_PAGE} className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
                     Berikutnya
                     <LuChevronRight className="size-4" aria-hidden />
                 </button>
@@ -237,10 +253,10 @@ export default function Calendar() {
                 </div>
             )}
 
-            {dirtyWeeks.length > 0 ? (
+            {dirtyPeriods.length > 0 ? (
                 <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-2xl border border-industrial-blue-500/30 bg-white p-4 shadow-lg shadow-slate-200">
                     <p className="text-sm font-semibold text-slate-700">
-                        {dirtyWeeks.length} minggu berubah
+                        {dirtyPeriods.length} minggu berubah
                     </p>
 
                     <div className="flex gap-2">
