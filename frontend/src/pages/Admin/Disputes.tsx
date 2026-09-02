@@ -38,6 +38,8 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
 
     const meta = disputeStatusMeta[dispute.status];
     const busy = mediateMutation.isPending || resolveMutation.isPending;
+    const orderReady = orderQuery.status === "success" && Boolean(orderQuery.data);
+    const canDecide = !busy && !orderQuery.isLoading && !orderQuery.isError && orderReady;
 
     async function handleMediate() {
         setError("");
@@ -129,7 +131,19 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                                 ))}
                             </div>
 
-                            {result === "cancelled" && orderQuery.data ? (
+                            {orderQuery.isLoading ? (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                                    Memuat data pesanan untuk keputusan sengketa...
+                                </div>
+                            ) : null}
+
+                            {orderQuery.isError ? (
+                                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+                                    Data pesanan tidak dapat dimuat. Tunggu beberapa saat lalu coba lagi.
+                                </div>
+                            ) : null}
+
+                            {result === "cancelled" && orderReady ? (
                                 <div>
                                     <label htmlFor={`liable-${dispute.dispute_id}`} className="mb-2 block text-sm font-semibold text-slate-500">
                                         Pihak yang Menanggung <span className="text-red-500">*</span>
@@ -141,8 +155,8 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                                         className={inputClassName}
                                     >
                                         <option value="">-- Pilih pihak --</option>
-                                        <option value={orderQuery.data.buyer_profile_id}>Pembeli</option>
-                                        <option value={orderQuery.data.subcontractor_profile_id}>Subkontraktor</option>
+                                        <option value={orderQuery.data!.buyer_profile_id}>Pembeli</option>
+                                        <option value={orderQuery.data!.subcontractor_profile_id}>Subkontraktor</option>
                                     </select>
                                 </div>
                             ) : null}
@@ -164,7 +178,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                             </div>
 
                             <div className="flex gap-2">
-                                <button type="submit" disabled={busy || (result === "cancelled" && (!liableProfileId || !note.trim()))} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
+                                <button type="submit" disabled={busy || !canDecide || (result === "cancelled" && (!liableProfileId || !note.trim()))} className="flex-1 cursor-pointer rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
                                     {resolveMutation.isPending ? "Menyimpan..." : "Putuskan Sengketa"}
                                 </button>
                                 <button type="button" onClick={() => {
@@ -186,7 +200,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
                                 </button>
                             ) : null}
 
-                            <button type="button" onClick={() => setResolveOpen(true)} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600">
+                            <button type="button" onClick={() => setResolveOpen(true)} disabled={orderQuery.isLoading || orderQuery.isError} className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl bg-deep-navy-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-deep-navy-600 disabled:cursor-not-allowed disabled:opacity-60">
                                 <LuGavel className="size-4" aria-hidden />
                                 Putuskan
                             </button>
