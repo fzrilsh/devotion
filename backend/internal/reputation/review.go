@@ -233,7 +233,7 @@ func responseView(row sqlcgen.GetReviewForResponseRow) reviewView {
 		Rating:             int(row.Rating),
 		Text:               textOrNil(row.Text),
 		Hidden:             row.Hidden,
-		TransactionDate:    platform.FormatDateID(row.TransactionDate.Time),
+		TransactionDate:    platform.FormatDate(row.TransactionDate.Time),
 		CreatedAt:          row.CreatedAt.Time,
 	}
 }
@@ -251,7 +251,7 @@ func listView(row sqlcgen.ListReviewsForProfileRow) reviewView {
 		Rating:             int(row.Rating),
 		Text:               textOrNil(row.Text),
 		Hidden:             row.Hidden,
-		TransactionDate:    platform.FormatDateID(row.TransactionDate.Time),
+		TransactionDate:    platform.FormatDate(row.TransactionDate.Time),
 		CreatedAt:          row.CreatedAt.Time,
 	}
 }

@@ -3,6 +3,8 @@ package reputation
 import (
 	"net/http"
 	"testing"
+
+	"github.com/fzrilsh/devotion/backend/internal/platform"
 )
 
 // TestCreateReview_ConfirmedOrderAcceptsRating_FR047 is the happy path: on an
@@ -31,6 +33,40 @@ func TestCreateReview_ConfirmedOrderAcceptsRating_FR047(t *testing.T) {
 	}
 	if v.AuthorBusinessName == "" {
 		t.Fatal("author_business_name kosong, ulasan tidak boleh anonim")
+	}
+}
+
+// TestCreateReview_TransactionDateIsISO_FR047_FR048 pins the wire format of
+// transaction_date on both bodies that carry it. The contract declares it
+// `format: date`, and responseView and listView are two separate literals, so the
+// 201 body and the public list entry for the same review must agree: the long
+// Indonesian form left the date blank on every profile page that renders it.
+// transaction_date is coalesce(confirmed_at, created_at)::date, and the seeded
+// order confirms at baseTime, so both name that day.
+func TestCreateReview_TransactionDateIsISO_FR047_FR048(t *testing.T) {
+	h := newHarness(t, "review_iso_date")
+	orderID := seedConfirmedOrder(t, h)
+
+	rec := h.postReview(orderID, reviewBody{Rating: 5})
+	mustStatus(t, rec, http.StatusCreated)
+
+	want := platform.FormatDate(baseTime)
+	created := decodeReview(t, rec)
+	if created.TransactionDate != want {
+		t.Fatalf("transaction_date pada 201 = %q, mau %q; kontrak menyatakan format: date", created.TransactionDate, want)
+	}
+	if _, err := platform.ParseDate(created.TransactionDate); err != nil {
+		t.Fatalf("transaction_date %q tidak lolos ParseDate: %v", created.TransactionDate, err)
+	}
+
+	// The public list is the shape a profile page reads, and it is built by a
+	// second function, so it can drift from the 201 body.
+	items := h.listProfile(t)
+	if len(items) != 1 {
+		t.Fatalf("daftar ulasan = %d entri, mau 1", len(items))
+	}
+	if items[0].TransactionDate != want {
+		t.Fatalf("transaction_date pada daftar = %q, mau %q; entri daftar dan bodi 201 harus sama", items[0].TransactionDate, want)
 	}
 }
 

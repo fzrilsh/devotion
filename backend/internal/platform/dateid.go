@@ -13,6 +13,20 @@ func ParseDate(s string) (time.Time, error) {
 	return time.ParseInLocation(dateLayout, s, jakarta)
 }
 
+// FormatDate renders t as a bare YYYY-MM-DD, the inverse of ParseDate and the
+// only correct serializer for a JSON field the contract declares as
+// `format: date`. It localizes to Asia/Jakarta first, so a date column decoded
+// as UTC midnight still names its own day, and a timestamptz names the day a
+// reader in WIB would see.
+//
+// Use this on the wire and FormatDateID only in text a person reads (the
+// `detail` string of an error, the body of a notification). A field that takes
+// ParseDate on the way in must give FormatDate back on the way out, or the same
+// field is two different formats depending on direction.
+func FormatDate(t time.Time) string {
+	return t.In(jakarta).Format(dateLayout)
+}
+
 // monthsID maps a month to its Indonesian name, indexed by time.Month (January
 // == 1). Index 0 is unused so the lookup needs no offset.
 var monthsID = [...]string{

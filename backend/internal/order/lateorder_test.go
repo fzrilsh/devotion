@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fzrilsh/devotion/backend/internal/db/sqlcgen"
+	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
 
@@ -176,6 +177,43 @@ func TestLateOrders_SummaryCarriesNoHistory_FR045(t *testing.T) {
 		if _, ok := out.Items[0][want]; !ok {
 			t.Fatalf("ringkasan telat kehilangan %q", want)
 		}
+	}
+}
+
+// TestLateOrders_DatesAreISO_FR045 pins the wire format on the admin summary.
+// lateItemView is a third literal beside the detail and list views, so it drifts
+// on its own: an admin triaging a late order reads deadline and readiness_deadline
+// straight off this row, and a long Indonesian date leaves both cells blank in the
+// queue. Advancing the clock makes the order late without moving its stored
+// deadline, so both fields still name the accepted Monday.
+func TestLateOrders_DatesAreISO_FR045(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_late_iso")
+	admin := seedAcceptAccount(t, h.pool, "admin_late_iso@contoh.test", false)
+	handler := woRouter(h, httpx.RoleAdmin, admin)
+
+	h.clock.Advance(2 * 24 * time.Hour)
+	req := httptest.NewRequest(http.MethodGet, "/api/admin/late-orders", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200; body %s", rec.Code, rec.Body.String())
+	}
+	var out lateOrderList
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode LateOrderList %q: %v", rec.Body.String(), err)
+	}
+	if len(out.Items) == 0 {
+		t.Fatal("daftar telat kosong; pesanan lewat tenggat seharusnya muncul (FR-045)")
+	}
+
+	want := platform.FormatDate(platform.WeekStart(acceptBaseTime))
+	it := out.Items[0]
+	if it.Deadline != want {
+		t.Fatalf("deadline = %q, mau %q; kontrak menyatakan format: date", it.Deadline, want)
+	}
+	if it.ReadinessDeadline != want {
+		t.Fatalf("readiness_deadline = %q, mau %q; kontrak menyatakan format: date", it.ReadinessDeadline, want)
 	}
 }
 

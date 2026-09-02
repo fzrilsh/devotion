@@ -100,6 +100,56 @@ func TestWorkOrderDetail_PartySeesOrder_FR038(t *testing.T) {
 	}
 }
 
+// TestWorkOrderDetail_DatesAreISO_FR038_FR039 pins the wire format of every date
+// field on the detail body. deadline, readiness_deadline, and each allocation's
+// week_start are `format: date` in the contract, and week_start is the same value
+// the availability calendar takes back as YYYY-MM-DD, so the long Indonesian form
+// made the field unparseable by any client that reads it. The seeded order is
+// accepted at acceptBaseTime, a Monday, with readiness_lead_days 0 and its
+// request deadline on that same week, so all three name that Monday.
+func TestWorkOrderDetail_DatesAreISO_FR038_FR039(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_detail_iso")
+	handler := woRouter(h, httpx.RoleBuyer, h.buyerAcc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/work-orders/"+uuidString(h.workOrderID), nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200; body %s", rec.Code, rec.Body.String())
+	}
+	var body workOrderView
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode WorkOrderDetail %q: %v", rec.Body.String(), err)
+	}
+
+	want := platform.FormatDate(platform.WeekStart(acceptBaseTime))
+	if body.Deadline != want {
+		t.Fatalf("deadline = %q, mau %q; kontrak menyatakan format: date", body.Deadline, want)
+	}
+	if body.ReadinessDeadline != want {
+		t.Fatalf("readiness_deadline = %q, mau %q; kontrak menyatakan format: date", body.ReadinessDeadline, want)
+	}
+	if len(body.Allocations) == 0 {
+		t.Fatal("allocations kosong; pesanan yang disepakati punya minimal satu baris alokasi")
+	}
+	for i, a := range body.Allocations {
+		if _, err := platform.ParseDate(a.WeekStart); err != nil {
+			t.Fatalf("allocations[%d].week_start = %q, tidak lolos ParseDate: %v; kalender ketersediaan menerima kembali nilai ini", i, a.WeekStart, err)
+		}
+		if a.WeekStart != want {
+			t.Fatalf("allocations[%d].week_start = %q, mau %q", i, a.WeekStart, want)
+		}
+	}
+	// A date the response gives must be a date the API takes back, or the same
+	// field is two formats depending on direction.
+	for name, got := range map[string]string{"deadline": body.Deadline, "readiness_deadline": body.ReadinessDeadline} {
+		if _, err := platform.ParseDate(got); err != nil {
+			t.Fatalf("%s = %q tidak lolos ParseDate: %v", name, got, err)
+		}
+	}
+}
+
 // TestWorkOrderDetail_NonPartyGets404_FR038 proves a caller who is on neither
 // side of the order gets the same 404 as a missing order, so the endpoint never
 // confirms an order exists to someone not party to it.
@@ -291,6 +341,42 @@ func TestWorkOrderList_PartyListsOwnOrders_FR038(t *testing.T) {
 	}
 	if len(body.Items) != 1 || body.Items[0].WorkOrderID != uuidString(h.workOrderID) {
 		t.Fatalf("items = %+v, mau satu pesanan milik pemanggil", body.Items)
+	}
+}
+
+// TestWorkOrderList_DatesAreISO_FR038 pins the wire format on the list shape.
+// listItemView builds its own literal, separate from the detail view, so the two
+// can drift: the list is what the orders index renders, and a date it cannot parse
+// shows as an empty cell there even when the detail page is right. Both date
+// fields must carry the same ISO form the detail body does.
+func TestWorkOrderList_DatesAreISO_FR038(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_list_iso")
+	handler := woRouter(h, httpx.RoleBuyer, h.buyerAcc)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/work-orders", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d, mau 200; body %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Items []workOrderView `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode WorkOrderList %q: %v", rec.Body.String(), err)
+	}
+	if len(body.Items) != 1 {
+		t.Fatalf("items = %d, mau 1 pesanan milik pemanggil", len(body.Items))
+	}
+
+	want := platform.FormatDate(platform.WeekStart(acceptBaseTime))
+	it := body.Items[0]
+	if it.Deadline != want {
+		t.Fatalf("items[0].deadline = %q, mau %q; kontrak menyatakan format: date", it.Deadline, want)
+	}
+	if it.ReadinessDeadline != want {
+		t.Fatalf("items[0].readiness_deadline = %q, mau %q; kontrak menyatakan format: date", it.ReadinessDeadline, want)
 	}
 }
 

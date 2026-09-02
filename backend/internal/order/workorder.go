@@ -116,7 +116,7 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 	allocations := make([]allocationView, 0, len(allocs))
 	for _, a := range allocs {
 		allocations = append(allocations, allocationView{
-			WeekStart:  platform.FormatDateID(a.WeekStart.Time),
+			WeekStart:  platform.FormatDate(a.WeekStart.Time),
 			Capacity:   a.TotalCapacity,
 			Allocated:  a.UsedCapacity,
 			Remaining:  allocationRemaining(a),
@@ -134,7 +134,7 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		payments = append(payments, paymentView{
 			PaymentID:           uuidString(p.ID),
 			Direction:           string(p.Direction),
-			Date:                platform.FormatDateID(p.Date.Time),
+			Date:                platform.FormatDate(p.Date.Time),
 			DeclaredByProfileID: uuidString(p.ProfileID),
 			Note:                note,
 			CreatedAt:           p.CreatedAt.Time,
@@ -206,10 +206,10 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		SubcontractorProfileID: uuidString(row.SubcontractorID),
 		ProductItemID:          uuidString(row.ProductItemID),
 		Quantity:               row.Quantity,
-		Deadline:               platform.FormatDateID(row.Deadline.Time),
+		Deadline:               platform.FormatDate(row.Deadline.Time),
 		TotalPrice:             row.TotalPrice,
 		ReadinessLeadDays:      row.ReadinessLeadDays,
-		ReadinessDeadline:      platform.FormatDateID(row.ReadinessWeekStart.Time),
+		ReadinessDeadline:      platform.FormatDate(row.ReadinessWeekStart.Time),
 		AllowedTransitions:     allowedTransitions(effStatus),
 		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
 		CanRecordPayment:       canRecordPayment,
@@ -564,9 +564,9 @@ func (s *Service) listItemView(wo sqlcgen.ListWorkOrdersForPartyRow) workOrderVi
 		BuyerProfileID:         uuidString(wo.BuyerID),
 		SubcontractorProfileID: uuidString(wo.SubcontractorID),
 		Quantity:               wo.Quantity,
-		Deadline:               platform.FormatDateID(wo.Deadline.Time),
+		Deadline:               platform.FormatDate(wo.Deadline.Time),
 		TotalPrice:             wo.TotalPrice,
-		ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
+		ReadinessDeadline:      platform.FormatDate(wo.ReadinessWeekStart.Time),
 		AllowedTransitions:     allowedTransitions(effStatus),
 		SelfCancellable:        effStatus == sqlcgen.WorkOrderStatusAccepted,
 		// The list row carries the summary shape only. can_record_payment,
