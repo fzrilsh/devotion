@@ -31,7 +31,12 @@ function RequestCard({ request }: { request: VerificationRequest }) {
         setError("");
 
         if (decision === "rejected" && reason.trim().length < 5) {
-            setError("Tuliskan alasan penolakan, minimal 5 karakter. Alasan ini tampil ke pemohon.");
+            setError("Tuliskan alasan penolakan minimal 5 karakter dan maksimal 1000 karakter. Alasan ini tampil ke pemohon.");
+            return;
+        }
+
+        if (decision === "rejected" && reason.trim().length > 1000) {
+            setError("Alasan penolakan maksimal 1000 karakter.");
             return;
         }
 

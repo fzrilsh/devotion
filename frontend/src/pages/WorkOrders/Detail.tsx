@@ -333,12 +333,12 @@ export default function Detail() {
 
                     <label className="mt-3 block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-500">Alasan pembatalan</span>
-                        <textarea rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} className={inputClassName} placeholder="Jelaskan mengapa pesanan dibatalkan" />
+                        <textarea rows={3} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} className={inputClassName} placeholder="Jelaskan mengapa pesanan dibatalkan" minLength={5} maxLength={500} />
                     </label>
 
                     <button
                         type="button"
-                        disabled={cancelOrder.isPending || cancelReason.trim().length < 3}
+                        disabled={cancelOrder.isPending || cancelReason.trim().length < 5 || cancelReason.trim().length > 500}
                         onClick={() => runAction(() => cancelOrder.mutateAsync(cancelReason.trim()), "Pesanan dibatalkan dan kapasitas dikembalikan.")}
                         className="mt-3 w-full cursor-pointer rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >

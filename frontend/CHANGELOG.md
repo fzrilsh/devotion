@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Menyelaraskan semua validasi form frontend dengan kontrak dan backend: jeda kesiapan sekarang mengikuti `readiness_lead_days` maksimal 365 hari; `material` mengikuti `minLength: 1`; `proposed_name` mengikuti `minLength: 2`; alasan pembatalan pesanan mengikuti `minLength: 5` dan `maxLength: 500`; dan alasan penolakan/penyembunyian mengikuti `minLength: 5` serta `maxLength: 1000` sesuai OpenAPI. Pesan galat di UI kini menyebut batas yang benar dalam bahasa Indonesia, dan atribut HTML `minLength`/`maxLength` serta `min`/`max` diinput disamakan agar bantuan browser dan pembaca layar konsisten dengan validasi runtime.
+
 * Menetapkan keputusan yang jelas untuk detail kandidat request kuota: kontrak aktif tidak menyediakan `GET /candidates/{candidateId}`. Karena itu, halaman detail tidak lagi menyapu daftar paginasi sampai 200 halaman. `src/hooks/useQuota.ts` kini hanya membaca kandidat dari cache daftar request masuk yang sudah terbuka pengguna, sedangkan tautan langsung yang melewati cache menampilkan pesan jujur dalam bahasa Indonesia: "Buka daftar dulu" bila kandidat belum di-load, dan "tidak ditemukan" bila kandidat memang tidak ada. Pola ini menghindari biaya HTTP berurutan yang tidak masuk akal dan tetap selaras dengan sumber kebenaran dari `openapi.yaml`.
 
 * Memperbaiki root cause antrean admin yang membuang metadata paginasi: `src/api/admin.ts` tidak lagi menurunkan `pagination` ke array kosong atau membaca cabang `response.data` yang tidak ada di kontrak. Keempat sandaran admin masih memakai `useInfiniteQuery`, dan `next_cursor` diteruskan apa adanya pada permintaan berikutnya tanpa parsing ke nomor halaman.

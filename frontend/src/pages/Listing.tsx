@@ -25,8 +25,8 @@ function ProposalBox({ kind, title }: { kind: "product" | "machine"; title: stri
         setMessage(null);
 
         const trimmed = name.trim();
-        if (trimmed.length < 3) {
-            setMessage({ tone: "error", text: "Nama usulan minimal 3 karakter." });
+        if (trimmed.length < 2) {
+            setMessage({ tone: "error", text: "Nama usulan minimal 2 karakter." });
             return;
         }
 
@@ -47,6 +47,8 @@ function ProposalBox({ kind, title }: { kind: "product" | "machine"; title: stri
                 <input
                     type="text"
                     value={name}
+                    minLength={2}
+                    maxLength={80}
                     onChange={(event) => setName(event.target.value)}
                     onKeyDown={(event) => {
                         if (event.key === "Enter") {
@@ -153,7 +155,7 @@ function ListingFormCard({ products, machines, defaultValues, isEdit, onCancel, 
                         <label htmlFor="readiness_lead_days" className={labelClassName}>
                             Jeda Kesiapan (hari) <span className="text-red-500">*</span>
                         </label>
-                        <input id="readiness_lead_days" type="number" min={0} max={90} inputMode="numeric" className={cn(inputClassName, errors.readiness_lead_days && "border-red-400 focus:border-red-500")} {...register("readiness_lead_days", { valueAsNumber: true })} />
+                        <input id="readiness_lead_days" type="number" min={0} max={365} inputMode="numeric" className={cn(inputClassName, errors.readiness_lead_days && "border-red-400 focus:border-red-500")} {...register("readiness_lead_days", { valueAsNumber: true })} />
                         <p className="mt-1 text-xs text-slate-400">Berapa hari Anda butuh sebelum produksi bisa mulai setelah kesepakatan.</p>
                         {errors.readiness_lead_days && <p className="mt-1 text-sm text-red-600">{errors.readiness_lead_days.message}</p>}
                     </div>

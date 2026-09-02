@@ -9,7 +9,7 @@ export const listingSchema = z.object({
         .number("Jeda kesiapan wajib diisi.")
         .int("Jeda kesiapan harus bilangan bulat.")
         .min(0, "Jeda kesiapan minimal 0 hari.")
-        .max(90, "Jeda kesiapan maksimal 90 hari."),
+        .max(365, "Jeda kesiapan maksimal 365 hari."),
     product_item_ids: z.array(z.string()).min(1, "Pilih minimal satu jenis produk."),
     machines: z.array(
         z.object({

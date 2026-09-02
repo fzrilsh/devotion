@@ -30,7 +30,12 @@ function ProposalCard({ proposal }: { proposal: ItemProposal }) {
         setError("");
 
         if (decision === "rejected" && reason.trim().length < 5) {
-            setError("Tuliskan alasan penolakan, minimal 5 karakter.");
+            setError("Tuliskan alasan penolakan minimal 5 karakter dan maksimal 1000 karakter.");
+            return;
+        }
+
+        if (decision === "rejected" && reason.trim().length > 1000) {
+            setError("Alasan penolakan maksimal 1000 karakter.");
             return;
         }
 

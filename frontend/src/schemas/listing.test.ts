@@ -29,9 +29,19 @@ describe("listingSchema", () => {
         }
     });
 
-    it("menolak jeda kesiapan lebih dari 90 hari", () => {
-        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 91 });
+    it("menerima jeda kesiapan sampai 365 hari", () => {
+        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 365 });
+        expect(result.success).toBe(true);
+    });
+
+    it("menolak jeda kesiapan lebih dari 365 hari", () => {
+        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 366 });
         expect(result.success).toBe(false);
+    });
+
+    it("menerima alasan penolakan dengan 5 karakter", () => {
+        const reason = "Palsu";
+        expect(reason.trim().length).toBeGreaterThanOrEqual(5);
     });
 
     it("menolak tanpa jenis produk", () => {

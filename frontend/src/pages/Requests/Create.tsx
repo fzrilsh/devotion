@@ -64,8 +64,8 @@ export default function Create() {
             return;
         }
 
-        if (material.trim().length < 3) {
-            setErrorMessage("Sebutkan bahan yang diminta, minimal 3 karakter.");
+        if (material.trim().length < 1) {
+            setErrorMessage("Sebutkan bahan yang diminta, minimal 1 karakter.");
             return;
         }
 
@@ -165,7 +165,7 @@ export default function Create() {
                     <label htmlFor="material" className={labelClassName}>
                         Bahan <span className="text-red-500">*</span>
                     </label>
-                    <input id="material" type="text" value={material} onChange={(event) => setMaterial(event.target.value)} className={inputClassName} placeholder="Misalnya: katun combed 30s" />
+                    <input id="material" type="text" value={material} onChange={(event) => setMaterial(event.target.value)} className={inputClassName} placeholder="Misalnya: katun combed 30s" minLength={1} maxLength={200} />
                 </div>
 
                 <div>
