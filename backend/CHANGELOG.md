@@ -7,6 +7,21 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- `openapi.yaml` pada `POST /admin/disputes/{disputeId}/resolve` kini menyatakan
+  syarat bersyarat yang selama ini hanya hidup di `mediation.go:301-319`:
+  `liable_profile_id` dan `note` wajib saat `result` bernilai `cancelled`,
+  keduanya boleh kosong dan `allocation_reversed` diabaikan pada `continued`
+  dan `confirmed` (#27). Prosa itu ditaruh di `description` tanpa mengubah
+  `required` maupun bentuk skema, jadi tipe hasil generate frontend tidak
+  bergerak. Penegakan sebenarnya tetap di backend: cabang `cancelled` menolak
+  422 bila pihak penanggung atau catatan kosong, dan nilai `allocation_reversed`
+  yang dikirim pada dua hasil lain tidak pernah sampai basis data karena
+  `storedReversed` hanya pernah true pada cabang `cancelled`. Salinan tertanam
+  `backend/apidocs/openapi.yaml` ikut disinkronkan agar Swagger UI `/docs`
+  menampilkan hal yang sama. Kelalaian ini terbaca dari riwayatnya: form
+  frontend pernah melabel catatan "opsional" karena kontrak pun membiarkannya
+  begitu, dan generator tipe tidak pernah punya dasar untuk menyimpulkan
+  lainnya.
 - Field JSON yang kontraknya `format: date` kini diserialisasi ISO `YYYY-MM-DD`,
   sebelumnya bentuk panjang Indonesia (#28). Lima belas baris di tiga paket
   memanggil `platform.FormatDateID` pada jalur wire, padahal jalur masuk field

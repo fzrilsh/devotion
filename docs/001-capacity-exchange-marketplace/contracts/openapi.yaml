@@ -1616,6 +1616,12 @@ paths:
         Hasil menentukan nasib pesanan dan alokasi kapasitasnya. Bila dibatalkan, seluruh
         alokasi dibalik. Admin menetapkan pihak yang menanggung agar tingkat penyelesaian
         adil (FR-067, FR-072).
+        Syarat per nilai result:
+        - cancelled: liable_profile_id dan note wajib terisi. Backend menolak
+          permintaan bila salah satunya kosong, karena pembatalan satu-satunya
+          hasil yang membebani tingkat penyelesaian salah satu pihak (FR-072).
+        - continued, confirmed: liable_profile_id dan note boleh dikosongkan,
+          allocation_reversed diabaikan.
       x-fr: [FR-067, FR-072]
       parameters:
         - { name: disputeId, in: path, required: true, schema: { type: string, format: uuid } }
