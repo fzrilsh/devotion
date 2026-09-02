@@ -7,6 +7,28 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Field JSON yang kontraknya `format: date` kini diserialisasi ISO `YYYY-MM-DD`,
+  sebelumnya bentuk panjang Indonesia (#28). Lima belas baris di tiga paket
+  memanggil `platform.FormatDateID` pada jalur wire, padahal jalur masuk field
+  yang sama menuntut ISO lewat `platform.ParseDate`. Buktinya paling tajam di
+  satu handler: `POST /work-orders/{id}/payments` menerima `2026-08-20`, menolak
+  bentuk lain, lalu mengembalikan `20 Agustus 2026` untuk field yang sama.
+  Frontend memanggil `new Date()` atas nilai itu, mendapat `Invalid Date`, dan
+  merender `-` di dua belas titik tampilan; tidak ada pengurai nama bulan
+  Indonesia di mana pun, jadi tanggal tenggat, tanggal pembayaran, dan tanggal
+  transaksi ulasan hilang dari layar. Yang berubah: `deadline`,
+  `readiness_deadline`, dan `allocations[].week_start` pada detail dan daftar
+  pesanan, `payments[].date`, antrean pesanan terlambat admin,
+  `transaction_date` pada bodi 201 ulasan serta entri daftar publiknya, dan
+  `meta.until_week` pada galat kapasitas, yang memang bagian problem body untuk
+  dibaca mesin dan sudah dicontohkan ISO di `openapi.yaml`. `FormatDateID`
+  dibiarkan utuh pada `detail` galat dan isi notifikasi, satu-satunya tempat
+  tanggal dibaca orang. Helper `platform.FormatDate` dipakai bersama supaya
+  layout tanggal tidak disalin untuk kali keempat. Alasannya lolos tanpa
+  ketahuan: tidak ada satu pun uji yang memeriksa nilai tanggal, hanya
+  keberadaan kuncinya, jadi kini ada uji yang memaku bentuk ISO pada keempat
+  respons tersebut plus uji bolak-balik pembayaran (FR-035, FR-038, FR-039,
+  FR-041, FR-045, FR-047, FR-048).
 - Rujukan lokasi kredensial akun uji dibetulkan di seluruh dokumen (#23). Empat
   berkas menunjuk pembaca ke `docs/skenario-uji-manual.md`, padahal berkas
   itu tidak memuat satu pun dan hanya menunjuk ke tempat lain. Yang paling perlu

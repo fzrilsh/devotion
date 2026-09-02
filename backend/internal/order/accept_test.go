@@ -229,6 +229,59 @@ func usedCapacity(t *testing.T, h *acceptHarness, listingID pgtype.UUID) int64 {
 	return sum
 }
 
+// errMeta pulls the meta map out of a metaError, the machine-readable half of a
+// problem body. errCode exposes only the code, but the capacity errors carry the
+// deadline week there and a client reads it as a date, not as prose.
+func errMeta(t *testing.T, err error) map[string]any {
+	t.Helper()
+	var m *metaError
+	if !errors.As(err, &m) {
+		t.Fatalf("galat %v bukan *metaError, tidak punya meta", err)
+	}
+	return m.meta
+}
+
+// TestAccept_InsufficientCapacityMetaWeekIsISO_FR035 pins the wire format of
+// meta.until_week on the shortfall problem body. The prose in detail stays
+// Indonesian because a person reads it, but meta is the machine half: the contract
+// example gives until_week as an ISO date, and the client turns it into a link to
+// that week of the calendar, which takes YYYY-MM-DD. The long Indonesian form left
+// the two halves of one problem body disagreeing about the same week.
+func TestAccept_InsufficientCapacityMetaWeekIsISO_FR035(t *testing.T) {
+	h := newAcceptHarness(t, "accept_meta_iso")
+	week := platform.WeekStart(acceptBaseTime)
+
+	// Capacity 10 for the single week up to the deadline, against an order of 50:
+	// the pre-lock estimate is short, so accept rejects with INSUFFICIENT_CAPACITY.
+	listingID, subAcc := seedListing(t, h, "alfa", 10, week, week)
+	subProf := subProfileID(t, h, subAcc)
+
+	buyer := seedAcceptProfile(t, h.pool, seedAcceptAccount(t, h.pool, "buyer@contoh.test", false), "Pembeli")
+	req := seedRequest(t, h, buyer, 50, week)
+	offer := seedOfferedCandidate(t, h, req, listingID, subProf, 1_000_000)
+
+	_, err := h.svc.accept(context.Background(), buyerAccountOf(t, h, buyer), offer)
+	if err == nil {
+		t.Fatal("accept berhasil, mau ditolak karena kapasitas kurang (FR-035)")
+	}
+	if code := errCode(err); code != httpx.CodeInsufficientCapacity {
+		t.Fatalf("code = %q, mau %q", code, httpx.CodeInsufficientCapacity)
+	}
+
+	meta := errMeta(t, err)
+	got, ok := meta["until_week"].(string)
+	if !ok {
+		t.Fatalf("meta.until_week = %v, mau string tanggal", meta["until_week"])
+	}
+	want := platform.FormatDate(week)
+	if got != want {
+		t.Fatalf("meta.until_week = %q, mau %q; meta adalah bagian yang dibaca mesin", got, want)
+	}
+	if _, err := platform.ParseDate(got); err != nil {
+		t.Fatalf("meta.until_week %q tidak lolos ParseDate: %v", got, err)
+	}
+}
+
 // TestAccept_ConcurrentDifferentRequests_LoserGetsCapacityAlreadyTaken_FR036 runs
 // two accepts against the SAME period from two DIFFERENT requests. Capacity fits
 // exactly one order, so one commits and the other, having passed the pre-lock

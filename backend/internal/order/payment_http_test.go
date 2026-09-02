@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
 )
 
@@ -67,6 +68,37 @@ func TestPayment_BuyerRecordsStatement_FR041(t *testing.T) {
 	}
 	if p.Note == nil || *p.Note != "Transfer DP 50%" {
 		t.Fatalf("note %v, mau catatan tersimpan", p.Note)
+	}
+}
+
+// TestPayment_DateRoundTripsAsISO_FR041 pins the wire format of the statement
+// date. The handler parses the request date as strict YYYY-MM-DD, so the same
+// field must come back in that form: send 2026-08-20, read 2026-08-20. Rendering
+// it as an Indonesian long date made one field two formats depending on
+// direction, which no client can parse back (contract: PaymentRecord.date is
+// `format: date`).
+func TestPayment_DateRoundTripsAsISO_FR041(t *testing.T) {
+	h := seedAcceptedWorkOrder(t, "wo_pay_iso")
+	handler := woRouter(h, httpx.RoleBuyer, h.buyerAcc)
+
+	const sent = "2026-08-20"
+	rec := paymentReq(handler, uuidString(h.workOrderID),
+		`{"direction":"sent","date":"`+sent+`"}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status %d, mau 201; body %s", rec.Code, rec.Body.String())
+	}
+	body := decodePaymentDetail(t, rec)
+	if len(body.Payments) != 1 {
+		t.Fatalf("payments = %d, mau 1 (FR-041)", len(body.Payments))
+	}
+	if got := body.Payments[0].Date; got != sent {
+		t.Fatalf("date = %q, mau %q apa adanya; tanggal yang dikirim harus kembali dalam bentuk yang sama", got, sent)
+	}
+
+	// The returned date must be exactly what the inbound parser accepts, so it can
+	// be sent straight back without a second format on the client.
+	if _, err := platform.ParseDate(body.Payments[0].Date); err != nil {
+		t.Fatalf("date %q tidak lolos ParseDate: %v", body.Payments[0].Date, err)
 	}
 }
 

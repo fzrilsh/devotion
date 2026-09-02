@@ -110,9 +110,9 @@ func (s *Service) lateItemView(wo sqlcgen.ListLateWorkOrdersForAdminRow) lateOrd
 		BuyerProfileID:         uuidString(wo.BuyerID),
 		SubcontractorProfileID: uuidString(wo.SubcontractorID),
 		Quantity:               wo.Quantity,
-		Deadline:               platform.FormatDateID(wo.Deadline.Time),
+		Deadline:               platform.FormatDate(wo.Deadline.Time),
 		TotalPrice:             wo.TotalPrice,
-		ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
+		ReadinessDeadline:      platform.FormatDate(wo.ReadinessWeekStart.Time),
 	}
 }
 

@@ -230,7 +230,7 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			meta: map[string]any{
 				"quantity_requested": row.Quantity,
 				"remaining_capacity": estimated,
-				"until_week":         platform.FormatDateID(deadlineWeek),
+				"until_week":         platform.FormatDate(deadlineWeek),
 			},
 		}
 	}
@@ -288,7 +288,7 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 				meta: map[string]any{
 					"quantity_requested": row.Quantity,
 					"remaining_capacity": available,
-					"until_week":         platform.FormatDateID(deadlineWeek),
+					"until_week":         platform.FormatDate(deadlineWeek),
 				},
 			}
 		}
@@ -348,7 +348,7 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			}
 			remaining -= take
 			allocations = append(allocations, allocationView{
-				WeekStart:  platform.FormatDateID(raised.WeekStart.Time),
+				WeekStart:  platform.FormatDate(raised.WeekStart.Time),
 				Capacity:   raised.TotalCapacity,
 				Allocated:  raised.UsedCapacity,
 				Remaining:  remainingCapacity(raised),
@@ -451,10 +451,10 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			SubcontractorProfileID: uuidString(row.SubcontractorID),
 			ProductItemID:          uuidString(row.ProductItemID),
 			Quantity:               wo.Quantity,
-			Deadline:               platform.FormatDateID(wo.Deadline.Time),
+			Deadline:               platform.FormatDate(wo.Deadline.Time),
 			TotalPrice:             wo.TotalPrice,
 			ReadinessLeadDays:      row.ReadinessLeadDays,
-			ReadinessDeadline:      platform.FormatDateID(wo.ReadinessWeekStart.Time),
+			ReadinessDeadline:      platform.FormatDate(wo.ReadinessWeekStart.Time),
 			AllowedTransitions:     allowedTransitions(wo.Status),
 			SelfCancellable:        wo.Status == sqlcgen.WorkOrderStatusAccepted,
 			// The accepting caller is a party, and a fresh order is 'accepted', a
