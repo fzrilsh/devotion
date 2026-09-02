@@ -1,5 +1,5 @@
 import { createMasterItem, decideProposal, decideVerification, getDisputes, getItemProposals, getLateOrders, getMasterItems, getVerificationQueue, getWhatsAppStatus, hideReview, mediateDispute, reconnectWhatsApp, resolveDispute, updateMasterItem, type DisputeResolutionRequest, type MasterItemCreateRequest, type MasterItemUpdateRequest, type ProposalDecisionRequest, type VerificationDecisionRequest, type DisputeStatus, type VerificationStatus } from "@api/admin";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const adminKeys = {
     verification: (status?: VerificationStatus) => ["admin", "verification", status ?? "all"] as const,
@@ -17,9 +17,11 @@ const queueQueryOptions = {
 } as const;
 
 export function useVerificationQueue(status?: VerificationStatus) {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: adminKeys.verification(status),
-        queryFn: () => getVerificationQueue({ status }),
+        queryFn: ({ pageParam }) => getVerificationQueue({ status, cursor: pageParam }),
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
         ...queueQueryOptions,
     });
 }
@@ -36,9 +38,11 @@ export function useDecideVerification() {
 }
 
 export function useItemProposals() {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: adminKeys.proposals,
-        queryFn: () => getItemProposals(),
+        queryFn: ({ pageParam }) => getItemProposals({ cursor: pageParam }),
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
         ...queueQueryOptions,
     });
 }
@@ -56,9 +60,11 @@ export function useDecideProposal() {
 }
 
 export function useDisputes(status?: DisputeStatus) {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: adminKeys.disputes(status),
-        queryFn: () => getDisputes({ status }),
+        queryFn: ({ pageParam }) => getDisputes({ status, cursor: pageParam }),
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
         ...queueQueryOptions,
     });
 }
@@ -87,9 +93,11 @@ export function useResolveDispute() {
 }
 
 export function useLateOrders() {
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: adminKeys.lateOrders,
-        queryFn: () => getLateOrders(),
+        queryFn: ({ pageParam }) => getLateOrders({ cursor: pageParam }),
+        initialPageParam: undefined as string | undefined,
+        getNextPageParam: (lastPage) => (lastPage.pagination.has_next ? (lastPage.pagination.next_cursor ?? undefined) : undefined),
         ...queueQueryOptions,
     });
 }

@@ -514,7 +514,13 @@ export default function MyProfile() {
                             </div>
 
                             <div className="col-span-2">
-                                <LocationMap latitude={profile?.latitude ?? 0} longitude={profile?.longitude ?? 0} label={profile?.business_name} />
+                                {profile?.latitude != null && profile?.longitude != null ? (
+                                    <LocationMap latitude={profile.latitude} longitude={profile.longitude} label={profile.business_name} />
+                                ) : (
+                                    <div className="flex h-80 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500">
+                                        Lokasi usaha belum ditandai. Tambahkan titik lokasi pada form edit profil agar calon mitra dapat melihat area usaha Anda.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

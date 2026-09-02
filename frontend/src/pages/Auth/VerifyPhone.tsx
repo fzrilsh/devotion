@@ -121,7 +121,7 @@ export default function VerifyPhone() {
             setCountdown(60);
             setSuccessMessage("Kode verifikasi baru sudah dikirim melalui WhatsApp.");
         } catch (error) {
-            setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 401: "Sesi Anda tidak terbaca. Silakan masuk kembali, lalu ulangi verifikasi.", 410: "Kode verifikasi kedaluwarsa atau sudah dipakai. Kirim ulang kode baru." }));
+            setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi."));
         }
     }
 

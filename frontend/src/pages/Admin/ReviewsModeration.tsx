@@ -56,7 +56,12 @@ export default function AdminReviewsModeration() {
 
         const reason = hideReason.trim();
         if (reason.length < 5) {
-            setActionError("Tuliskan alasan penyembunyian, minimal 5 karakter.");
+            setActionError("Tuliskan alasan penyembunyian minimal 5 karakter dan maksimal 1000 karakter.");
+            return;
+        }
+
+        if (reason.length > 1000) {
+            setActionError("Alasan penyembunyian maksimal 1000 karakter.");
             return;
         }
 

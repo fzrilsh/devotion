@@ -78,7 +78,7 @@ export default function ResetPassword() {
 
             navigate("/auth/login", { replace: true });
         } catch (error) {
-            setError("root", { message: getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 410: "Kode pemulihan kedaluwarsa atau sudah dipakai. Minta kode baru.", 429: "Terlalu banyak percobaan. Coba lagi beberapa saat." }) });
+            setError("root", { message: getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi.", { 400: "Kode pemulihan salah. Periksa kembali enam digit kode yang Anda masukkan.", 410: "Kode pemulihan kedaluwarsa atau sudah dipakai. Minta kode baru.", 429: "Terlalu banyak percobaan. Coba lagi beberapa saat." }) });
         }
     }
 

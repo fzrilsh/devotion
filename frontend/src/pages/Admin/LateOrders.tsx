@@ -6,7 +6,7 @@ import { formatDateId, formatRupiah, workOrderStatusMeta } from "../WorkOrders/m
 
 export default function AdminLateOrders() {
     const lateOrdersQuery = useLateOrders();
-    const orders = lateOrdersQuery.data?.items ?? [];
+    const orders = lateOrdersQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
         <div className="space-y-6">
@@ -27,39 +27,49 @@ export default function AdminLateOrders() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada pesanan yang melewati tenggat. Semua pesanan berjalan sesuai jadwal.</p>
                 </div>
             ) : (
-                <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {orders.map((order) => {
-                        const meta = workOrderStatusMeta[order.status];
+                <>
+                    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {orders.map((order) => {
+                            const meta = workOrderStatusMeta[order.status];
 
-                        return (
-                            <li key={order.work_order_id}>
-                                <Link to={`/admin/orders/${order.work_order_id}`} className="group flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-5 transition-all hover:border-amber-400 hover:shadow-md hover:shadow-slate-200">
-                                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600">
-                                        <LuClock className="size-5" aria-hidden />
-                                    </span>
+                            return (
+                                <li key={order.work_order_id}>
+                                    <Link to={`/admin/orders/${order.work_order_id}`} className="group flex items-center gap-4 rounded-2xl border border-amber-200 bg-white p-5 transition-all hover:border-amber-400 hover:shadow-md hover:shadow-slate-200">
+                                        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-amber-500/10 text-amber-600">
+                                            <LuClock className="size-5" aria-hidden />
+                                        </span>
 
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="text-base font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
-                                            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${meta.className}`}>{meta.label}</span>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-base font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
+                                                <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${meta.className}`}>{meta.label}</span>
+                                            </div>
+
+                                            <p className="mt-1 text-sm text-slate-400">
+                                                Tenggat kesiapan {formatDateId(order.readiness_deadline)}
+                                                <br />
+                                                {order.total_price != null ? `Nilai ${formatRupiah(order.total_price)}` : ""}
+                                            </p>
                                         </div>
 
-                                        <p className="mt-1 text-sm text-slate-400">
-                                            Tenggat kesiapan {formatDateId(order.readiness_deadline ?? order.deadline)}
-                                            <br />
-                                            {order.total_price != null ? `Nilai ${formatRupiah(order.total_price)}` : ""}
-                                        </p>
-                                    </div>
+                                        <div className="flex shrink-0 items-center gap-1 text-sm font-semibold text-slate-500 transition-colors group-hover:text-slate-700">
+                                            Detail
+                                            <LuArrowRight className="size-4" aria-hidden />
+                                        </div>
+                                    </Link>
+                                </li>
+                            );
+                        })}
+                    </ul>
 
-                                    <div className="flex shrink-0 items-center gap-1 text-sm font-semibold text-slate-500 transition-colors group-hover:text-slate-700">
-                                        Detail
-                                        <LuArrowRight className="size-4" aria-hidden />
-                                    </div>
-                                </Link>
-                            </li>
-                        );
-                    })}
-                </ul>
+                    {lateOrdersQuery.hasNextPage ? (
+                        <div className="text-center">
+                            <button type="button" onClick={() => lateOrdersQuery.fetchNextPage()} disabled={lateOrdersQuery.isFetchingNextPage} className="cursor-pointer rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                {lateOrdersQuery.isFetchingNextPage ? "Memuat..." : "Muat lebih banyak"}
+                            </button>
+                        </div>
+                    ) : null}
+                </>
             )}
 
             <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-50 p-4">

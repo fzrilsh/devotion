@@ -62,36 +62,20 @@ export function useIncomingCandidates(status?: CandidateStatus) {
     });
 }
 
-const MAX_INCOMING_SCAN_PAGES = 200;
-
 export function useIncomingCandidate(candidateId: string) {
     const queryClient = useQueryClient();
 
     return useQuery({
         queryKey: ["quota", "incoming", "detail", candidateId] as const,
         queryFn: async () => {
-            const seen = new Set<string>();
-            let cursor: string | undefined;
+            const pages = queryClient.getQueryData<{ pages: { items: IncomingCandidate[] }[] }>(quotaKeys.incoming());
+            const candidate = pages?.pages.flatMap((page) => page.items).find((item) => item.candidate_id === candidateId);
 
-            for (let page = 0; page < MAX_INCOMING_SCAN_PAGES; page += 1) {
-                const result = await getIncomingCandidates({ cursor });
-                const found = result.items.find((item) => item.candidate_id === candidateId);
-
-                if (found) return found;
-                if (!result.pagination.has_next || !result.pagination.next_cursor) break;
-
-                if (seen.has(result.pagination.next_cursor)) break;
-
-                seen.add(result.pagination.next_cursor);
-                cursor = result.pagination.next_cursor;
+            if (candidate) {
+                return candidate;
             }
 
-            throw new Error("CANDIDATE_NOT_LOADED");
-        },
-        select: (fresh) => {
-            const pages = queryClient.getQueryData<{ pages: { items: IncomingCandidate[] }[] }>(quotaKeys.incoming());
-
-            return pages?.pages.flatMap((page) => page.items).find((item) => item.candidate_id === candidateId) ?? fresh;
+            throw new Error("CANDIDATE_NOT_VISIBLE_IN_CACHE");
         },
         enabled: Boolean(candidateId),
         staleTime: 30 * 1000,

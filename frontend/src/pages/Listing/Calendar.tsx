@@ -17,17 +17,11 @@ function formatWeekStart(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-function currentMondayJakarta(): Date {
-    const jakartaNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
-    const day = jakartaNow.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    const monday = new Date(jakartaNow.getFullYear(), jakartaNow.getMonth(), jakartaNow.getDate() + diff);
-
-    return monday;
-}
-
-function addWeeks(monday: Date, weeks: number): Date {
-    return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + weeks * 7);
+function addIsoDays(isoDate: string, days: number): string {
+    const [year, month, day] = isoDate.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + days);
+    return formatWeekStart(date);
 }
 
 const weekFormatter = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short", timeZone: "Asia/Jakarta" });
@@ -50,10 +44,11 @@ type DraftPeriod = {
 export default function Calendar() {
     const listingQuery = useMyListing();
     const [page, setPage] = useState(0);
+    const today = useMemo(() => new Date(), []);
+    const anchorWeekStart = useMemo(() => formatWeekStart(today), [today]);
 
-    const firstMonday = useMemo(() => currentMondayJakarta(), []);
-    const from = useMemo(() => formatWeekStart(addWeeks(firstMonday, page * WEEKS_PER_PAGE)), [firstMonday, page]);
-    const to = useMemo(() => formatWeekStart(addWeeks(firstMonday, page * WEEKS_PER_PAGE + WEEKS_PER_PAGE - 1)), [firstMonday, page]);
+    const from = useMemo(() => addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE), [anchorWeekStart, page]);
+    const to = useMemo(() => addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE + WEEKS_PER_PAGE - 1), [anchorWeekStart, page]);
 
     const periodsQuery = useListingPeriods(listingQuery.data ? from : undefined, listingQuery.data ? to : undefined);
     const updateMutation = useUpdateListingPeriods();
@@ -89,7 +84,7 @@ export default function Calendar() {
     const weeks: { week_start: string; server?: AvailabilityPeriod; current: DraftPeriod; dirty: boolean }[] = [];
 
     for (let index = 0; index < WEEKS_PER_PAGE; index++) {
-        const weekStart = formatWeekStart(addWeeks(firstMonday, page * WEEKS_PER_PAGE + index));
+        const weekStart = addIsoDays(anchorWeekStart, page * WEEKS_PER_PAGE + index);
         const server = serverByWeek.get(weekStart);
         const base: DraftPeriod = server ? { week_start: server.week_start, capacity: server.capacity, marked_full: server.marked_full } : { week_start: weekStart, capacity: listing.weekly_capacity, marked_full: false };
         const current = draft[weekStart] ?? base;

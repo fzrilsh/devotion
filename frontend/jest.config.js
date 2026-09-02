@@ -32,10 +32,11 @@ export default {
                     // Jest dan Vite harus menilai project dengan target ES2023 yang sama,
                     // supaya Array.prototype.at dan fitur modern lain tidak gagal saat test.
                     target: "es2023",
+                    module: "esnext",
                     // types dan moduleResolution eksplisit menutup masalah lint/resolve
                     // yang muncul di setup ts-jest; tanpa ini, test bisa lewat di editor
                     // namun pecah saat Jest menjalankan transform.
-                    types: ["jest", "node", "@testing-library/jest-dom"],
+                    types: ["jest", "node", "@testing-library/jest-dom", "vite/client"],
                     esModuleInterop: true,
                     allowImportingTsExtensions: true,
                     verbatimModuleSyntax: false,

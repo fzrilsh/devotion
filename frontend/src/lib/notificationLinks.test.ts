@@ -47,21 +47,16 @@ describe("getNotificationLink", () => {
         expect(target?.to).toBe("/orders/9f1c2e77-0000-4000-8000-000000000001");
     });
 
-    it("FR-051: request kedaluwarsa mengikuti peran pemanggil", () => {
-        expect(getNotificationLink(notification("request_expired"), true)?.to).toBe("/quota-requests");
-        expect(getNotificationLink(notification("request_expired"), false)?.to).toBe("/requests/incoming");
-    });
-
-    it("FR-051: link request kuota tidak diteruskan ke subkontraktor yang tidak punya rutenya", () => {
+    it("FR-051: link server diteruskan apa adanya untuk path yang valid", () => {
         const link = "/quota-requests/ab9890cb-ac01-414e-b08f-f7e6a90b4cd8";
 
         expect(getNotificationLink(notification("counter_offer", link), true)?.to).toBe(link);
-        expect(getNotificationLink(notification("counter_offer", link), false)?.to).toBe("/requests/incoming");
+        expect(getNotificationLink(notification("counter_offer", link), false)?.to).toBe(link);
     });
 
-    it("FR-051: path khusus pemberi order lain juga jatuh ke tujuan bawaan", () => {
-        expect(getNotificationLink(notification("request_received", "/search?produk=kaos"), false)?.to).toBe("/requests/incoming");
-        expect(getNotificationLink(notification("offer_received", "/quota-requests"), false)?.to).toBe("/requests/incoming");
+    it("FR-051: path khusus pemberi order lain tetap diteruskan bila server mengirimkan path yang valid", () => {
+        expect(getNotificationLink(notification("request_received", "/search?produk=kaos"), false)?.to).toBe("/search?produk=kaos");
+        expect(getNotificationLink(notification("offer_received", "/quota-requests"), false)?.to).toBe("/quota-requests");
     });
 
     it("link absolut ke host lain diabaikan dan jatuh ke tujuan bawaan", () => {

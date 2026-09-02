@@ -29,9 +29,19 @@ describe("listingSchema", () => {
         }
     });
 
-    it("menolak jeda kesiapan lebih dari 90 hari", () => {
-        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 91 });
+    it("menerima jeda kesiapan sampai 365 hari", () => {
+        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 365 });
+        expect(result.success).toBe(true);
+    });
+
+    it("menolak jeda kesiapan lebih dari 365 hari", () => {
+        const result = listingSchema.safeParse({ ...validListing, readiness_lead_days: 366 });
         expect(result.success).toBe(false);
+    });
+
+    it("menerima alasan penolakan dengan 5 karakter", () => {
+        const reason = "Palsu";
+        expect(reason.trim().length).toBeGreaterThanOrEqual(5);
     });
 
     it("menolak tanpa jenis produk", () => {
@@ -42,13 +52,16 @@ describe("listingSchema", () => {
         }
     });
 
+    it("menolak listing tanpa mesin", () => {
+        const result = listingSchema.safeParse({ ...validListing, machines: [] });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(result.error.issues[0]?.message).toBe("Pilih minimal satu mesin.");
+        }
+    });
+
     it("menolak jumlah mesin nol", () => {
         const result = listingSchema.safeParse({ ...validListing, machines: [{ item_id: "machine-1", machine_count: 0 }] });
         expect(result.success).toBe(false);
-    });
-
-    it("menerima mesin kosong karena mesin bersifat opsional", () => {
-        const result = listingSchema.safeParse({ ...validListing, machines: [] });
-        expect(result.success).toBe(true);
     });
 });

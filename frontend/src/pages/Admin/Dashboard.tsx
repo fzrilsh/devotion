@@ -127,10 +127,10 @@ export default function AdminDashboard() {
     const disputesQuery = useDisputes();
     const lateOrdersQuery = useLateOrders();
 
-    const verificationItems = verificationQuery.data?.items ?? [];
-    const pendingProposals = (proposalsQuery.data ?? []).filter((proposal) => proposal.status === "pending");
-    const openDisputes = (disputesQuery.data ?? []).filter((dispute) => dispute.status !== "resolved");
-    const lateOrders = lateOrdersQuery.data?.items ?? [];
+    const verificationItems = verificationQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const pendingProposals = (proposalsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((proposal) => proposal.status === "pending");
+    const openDisputes = (disputesQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((dispute) => dispute.status !== "resolved");
+    const lateOrders = lateOrdersQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
         <div className="space-y-6">
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
                         <li key={order.work_order_id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                             <div className="min-w-0">
                                 <p className="truncate text-sm font-semibold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</p>
-                                <p className="text-xs text-slate-400">Tenggat kesiapan {formatDate(order.readiness_deadline ?? order.deadline)}</p>
+                                <p className="text-xs text-slate-400">Tenggat kesiapan {formatDate(order.readiness_deadline)}</p>
                             </div>
 
                             <Link to={`/admin/orders/${order.work_order_id}`} className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
