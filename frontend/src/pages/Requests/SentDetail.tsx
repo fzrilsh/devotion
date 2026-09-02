@@ -105,7 +105,7 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
                         <div className="space-y-3">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <input type="number" min={1} value={counterPrice} onChange={(event) => setCounterPrice(event.target.value)} placeholder="Harga counter (rupiah)" aria-label="Harga counter" className={inputClassName} />
-                                <input type="text" value={counterNote} onChange={(event) => setCounterNote(event.target.value)} placeholder="Catatan (opsional)" aria-label="Catatan counter" className={inputClassName} />
+                                <input type="text" value={counterNote} onChange={(event) => setCounterNote(event.target.value)} placeholder="Catatan (opsional)" aria-label="Catatan counter" className={inputClassName} maxLength={500} />
                             </div>
 
                             <div className="flex gap-2">

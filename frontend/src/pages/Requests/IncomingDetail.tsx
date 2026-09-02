@@ -353,7 +353,7 @@ export default function IncomingDetail() {
                                     <label htmlFor="offer_note" className={labelClassName}>
                                         Catatan (opsional)
                                     </label>
-                                    <input id="offer_note" type="text" value={offerNote} onChange={(event) => setOfferNote(event.target.value)} className={inputClassName} placeholder="Syarat atau detail tambahan" />
+                                    <input id="offer_note" type="text" value={offerNote} onChange={(event) => setOfferNote(event.target.value)} className={inputClassName} placeholder="Syarat atau detail tambahan" maxLength={500} />
                                 </div>
 
                                 <div className="flex gap-2">
@@ -381,7 +381,7 @@ export default function IncomingDetail() {
                                         <label htmlFor="counter_note" className={labelClassName}>
                                             Catatan (opsional)
                                         </label>
-                                        <input id="counter_note" type="text" value={counterNote} onChange={(event) => setCounterNote(event.target.value)} className={inputClassName} placeholder="Alasan penyesuaian harga" />
+                                        <input id="counter_note" type="text" value={counterNote} onChange={(event) => setCounterNote(event.target.value)} className={inputClassName} placeholder="Alasan penyesuaian harga" maxLength={500} />
                                     </div>
                                 </div>
 

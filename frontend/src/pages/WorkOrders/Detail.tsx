@@ -383,12 +383,12 @@ export default function Detail() {
 
                     <label className="mt-3 block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-500">Uraian masalah</span>
-                        <textarea rows={4} value={disputeBody} onChange={(event) => setDisputeBody(event.target.value)} className={inputClassName} placeholder="Jelaskan kronologi dan masalah yang terjadi" />
+                        <textarea rows={4} value={disputeBody} onChange={(event) => setDisputeBody(event.target.value)} className={inputClassName} placeholder="Jelaskan kronologi dan masalah yang terjadi" minLength={10} maxLength={2000} />
                     </label>
 
                     <button
                         type="button"
-                        disabled={reportDispute.isPending || disputeBody.trim().length < 10}
+                        disabled={reportDispute.isPending || disputeBody.trim().length < 10 || disputeBody.trim().length > 2000}
                         onClick={() => runAction(() => reportDispute.mutateAsync(disputeBody.trim()), "Sengketa dilaporkan. Admin akan meninjau dan menengahi.")}
                         className="mt-3 w-full cursor-pointer rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -411,7 +411,7 @@ export default function Detail() {
 
                     <label className="mt-3 block">
                         <span className="mb-1.5 block text-xs font-semibold text-slate-500">Ulasan (opsional)</span>
-                        <textarea rows={3} value={reviewText} onChange={(event) => setReviewText(event.target.value)} className={inputClassName} placeholder="Ceritakan pengalaman bekerja sama" />
+                        <textarea rows={3} value={reviewText} onChange={(event) => setReviewText(event.target.value)} className={inputClassName} placeholder="Ceritakan pengalaman bekerja sama" maxLength={2000} />
                     </label>
 
                     <button

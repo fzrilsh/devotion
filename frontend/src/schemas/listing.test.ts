@@ -52,13 +52,16 @@ describe("listingSchema", () => {
         }
     });
 
+    it("menolak listing tanpa mesin", () => {
+        const result = listingSchema.safeParse({ ...validListing, machines: [] });
+        expect(result.success).toBe(false);
+        if (!result.success) {
+            expect(result.error.issues[0]?.message).toBe("Pilih minimal satu mesin.");
+        }
+    });
+
     it("menolak jumlah mesin nol", () => {
         const result = listingSchema.safeParse({ ...validListing, machines: [{ item_id: "machine-1", machine_count: 0 }] });
         expect(result.success).toBe(false);
-    });
-
-    it("menerima mesin kosong karena mesin bersifat opsional", () => {
-        const result = listingSchema.safeParse({ ...validListing, machines: [] });
-        expect(result.success).toBe(true);
     });
 });
