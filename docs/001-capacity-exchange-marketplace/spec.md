@@ -132,6 +132,7 @@ Setelah kesepakatan terbentuk, Bu Sari dan Pak Budi melihat pesanan yang sama di
 7. **Given** sebuah pesanan sudah berstatus "Produksi", **When** salah satu pihak ingin membatalkan, **Then** pembatalan sendiri tidak tersedia dan pihak itu diarahkan untuk melaporkan sengketa agar ditengahi admin.
 8. **Given** pembayaran dilakukan langsung antar pihak, **When** salah satu pihak menandai pembayaran terkirim atau diterima, **Then** catatan itu tampil pada pesanan bagi kedua pihak beserta keterangan bahwa platform tidak menahan maupun menjamin dana.
 9. **Given** sebuah transisi status tidak sah (misalnya dari "Menunggu" langsung ke "Dikirim"), **When** dicoba, **Then** sistem menolak dan menjelaskan urutan status yang diizinkan.
+10. **Given** sebuah pesanan sudah terbentuk, **When** salah satu pihak membuka detail pesanan, **Then** ia melihat kontak pihak lawan (nama usaha, email, nomor WhatsApp) untuk berkoordinasi di luar platform, dan pihak ketiga mana pun tidak dapat mengakses kontak itu.
 
 ---
 
@@ -210,7 +211,7 @@ Tim Ops mengelola daftar jenis produk dan jenis mesin yang menjadi tulang punggu
 
 ## Requirements *(mandatory)*
 
-Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser. Revisi 2026-08-22 menambahkan FR-087 sampai FR-091 dari empat pertentangan antar artefak yang ditemukan `/analyze`, seluruhnya menyangkut rentang kapasitas, horizon kalender, propagasi perubahan kapasitas, kesiapan mulai pada penawaran, dan penggolongan notifikasi.
+Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari revisi ditambahkan mulai FR-075, sehingga rujukan yang sudah ada tidak bergeser. Revisi 2026-08-22 menambahkan FR-087 sampai FR-091 dari empat pertentangan antar artefak yang ditemukan `/analyze`, seluruhnya menyangkut rentang kapasitas, horizon kalender, propagasi perubahan kapasitas, kesiapan mulai pada penawaran, dan penggolongan notifikasi. Revisi 2026-08-30 menambahkan FR-092 untuk pertukaran kontak antar kedua pihak setelah pesanan terbentuk, prasyarat pembayaran dan koordinasi yang terjadi di luar platform (FR-040).
 
 ### Istilah yang Mengikat
 
@@ -274,7 +275,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 **Pencarian dan Matching**
 
 - **FR-022**: Pemberi order MUST dapat menyaring subkontraktor berdasarkan jenis produk dan spesifikasi mesin yang dipilih dari daftar baku, wilayah, jeda kesiapan mulai, jumlah yang dibutuhkan, dan deadline, serta mengombinasikan filter-filter tersebut.
-- **FR-023**: Sistem MUST mengurutkan hasil pencarian berdasarkan skor kecocokan yang dihitung hanya dari empat kriteria keras berikut, masing-masing bernilai terpenuhi atau tidak: (a) jenis produk yang dicari termasuk dalam jenis produk listing, (b) spesifikasi mesin yang dicari dimiliki listing, (c) jeda kesiapan mulai listing tidak melebihi jeda yang dapat diterima pemberi order, dan (d) total kapasitas tersisa listing dari periode mingguan berjalan sampai periode yang memuat deadline tidak kurang dari jumlah yang dibutuhkan. Kandidat yang memenuhi lebih banyak kriteria MUST berada di atas.
+- **FR-023**: Sistem MUST mengurutkan hasil pencarian berdasarkan skor kecocokan yang dihitung hanya dari empat kriteria keras berikut, masing-masing bernilai terpenuhi atau tidak: (a) jenis produk yang dicari termasuk dalam jenis produk listing, (b) spesifikasi mesin yang dicari dimiliki listing, (c) jeda kesiapan mulai listing tidak melebihi jeda yang dapat diterima pemberi order, dan (d) total kapasitas tersisa listing di dalam rentang kapasitas tidak kurang dari jumlah yang dibutuhkan. Kandidat yang memenuhi lebih banyak kriteria MUST berada di atas.
 - **FR-024**: Skor kecocokan MUST TIDAK dipengaruhi oleh rating, tingkat penyelesaian, jumlah pekerjaan selesai, status verifikasi, kebaruan pembaruan kalender, jarak koordinat, tanggal pendaftaran, maupun imbalan komersial apa pun.
 - **FR-025**: Ketika beberapa kandidat memiliki skor kecocokan sama, sistem MUST memakai pemecah seri yang tetap dan dapat diulang: total kapasitas tersisa terbesar sampai deadline yang diminta, lalu jeda kesiapan mulai terpendek, lalu urutan abjad nama usaha, lalu pengenal listing.
 - **FR-026**: Sistem MUST dapat menjelaskan kepada pemberi order kriteria mana yang terpenuhi dan tidak terpenuhi untuk setiap kandidat di hasil pencarian.
@@ -293,7 +294,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-032**: Pemberi order MUST dapat melihat seluruh penawaran atas satu request secara berdampingan untuk dibandingkan.
 - **FR-033**: Kedua pihak MUST dapat mengajukan counter-offer harga sampai tercapai kesepakatan atau salah satu pihak menghentikan negosiasi, dan seluruh riwayat penawaran MUST tersimpan.
 - **FR-034**: Sistem MUST membentuk pesanan dengan harga, jumlah, dan deadline yang disepakati saat sebuah penawaran diterima, dan MUST menutup kandidat lain pada request yang sama dengan notifikasi.
-- **FR-035**: Sistem MUST menolak penawaran yang jumlahnya melampaui total kapasitas tersisa subkontraktor dari periode mingguan berjalan sampai periode yang memuat deadline yang diminta, dan MUST menyebutkan total kapasitas yang sebenarnya tersisa sampai deadline tersebut.
+- **FR-035**: Sistem MUST menolak penawaran yang jumlahnya melampaui total kapasitas tersisa subkontraktor di dalam rentang kapasitas sampai periode yang memuat deadline yang diminta, dan MUST menyebutkan total kapasitas yang sebenarnya tersisa sampai deadline tersebut.
 - **FR-036**: Sistem MUST memastikan kapasitas satu periode hanya dialokasikan kepada satu kesepakatan ketika dua kesepakatan atas periode yang sama terjadi berbarengan, sehingga hanya satu yang berhasil dan pihak yang gagal MUST diberi tahu beserta alasannya.
 - **FR-037**: Sistem MUST menandai request yang tidak dibalas melewati batas waktu balasan sebagai kedaluwarsa dan memberi tahu pemberi order.
 - **FR-082**: Sistem MUST menetapkan batas waktu balasan setiap request kuota sebesar 72 jam sejak request dikirim, MUST TIDAK meminta pemberi order menentukannya, dan MUST menampilkan batas itu kepada kedua pihak.
@@ -318,6 +319,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 - **FR-068**: Sistem MUST menandai pesanan berstatus "Dikirim" sebagai dikonfirmasi diterima secara otomatis setelah 7 hari sejak status tersebut ditetapkan, dan MUST memberi tahu kedua pihak bahwa penutupan terjadi secara otomatis.
 - **FR-069**: Sistem MUST memberi tahu pemberi order sebelum tenggat konfirmasi otomatis jatuh, dengan menyebutkan tanggal pesanan akan dianggap diterima.
 - **FR-070**: Sistem MUST menghentikan hitungan konfirmasi otomatis ketika sengketa dilaporkan sebelum tenggat, dan pesanan MUST menunggu keputusan mediasi admin.
+- **FR-092**: Setelah sebuah pesanan terbentuk, sistem MUST menampilkan kontak pihak lawan (nama usaha, email, dan nomor WhatsApp) kepada masing-masing dari kedua pihak pesanan itu, agar pembayaran dan koordinasi yang terjadi langsung antar pihak di luar platform (FR-040) dapat dijalankan. Kontak ini MUST tersedia pada setiap status pesanan, termasuk dibatalkan dan dalam mediasi. Sistem MUST TIDAK menampilkan kontak ini kepada siapa pun selain kedua pihak pesanan tersebut, dan kontak MUST TIDAK dapat diakses sebelum pesanan terbentuk.
 
 **Reputasi**
 
@@ -347,7 +349,7 @@ Nomor FR bersifat tetap dan tidak digunakan ulang. Requirement yang lahir dari r
 
 ### Key Entities
 
-- **Akun Pengguna**: Identitas login satu orang di platform; memuat kredensial, status verifikasi email dan nomor HP, serta satu atau dua peran usaha, atau peran admin. Satu akun memiliki satu Profil Usaha.
+- **Akun Pengguna**: Identitas login satu orang di platform; memuat kredensial, status verifikasi email dan nomor HP, serta satu atau dua peran usaha, atau peran admin. Akun berperan usaha memiliki tepat satu Profil Usaha. Akun berperan admin tidak memiliki Profil Usaha: peran admin bukan peran usaha, sehingga endpoint yang mengembalikan profil usaha menolak akun admin dengan 403, bukan mencari baris yang memang tidak ada.
 - **Profil Usaha**: Identitas usaha yang tampil publik: nama usaha, kota/kabupaten (merujuk Wilayah), titik koordinat lokasi usaha, deskripsi, status lencana verifikasi, ringkasan reputasi. Menjadi pemilik Listing Kapasitas dan menjadi pihak dalam Request Kuota dan Pesanan.
 - **Wilayah**: Satuan lokasi administratif dua tingkat (provinsi dan kota/kabupaten) beserta kode resminya. Setiap kota/kabupaten termasuk dalam tepat satu provinsi. Menjadi dasar penyaringan dan perluasan pencarian, dengan tingkat ketiga berupa seluruh Indonesia yang tidak memerlukan data tersendiri.
 - **Item Daftar Baku**: Satu item pada daftar jenis produk atau daftar jenis mesin, beserta penanda aktif atau nonaktif. Dikelola admin, dirujuk oleh Listing Kapasitas dan oleh filter pencarian, dan tidak dapat diisi bebas oleh pengguna.

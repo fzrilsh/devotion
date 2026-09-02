@@ -1,0 +1,279 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+	"time"
+
+	web "github.com/fzrilsh/devotion/backend"
+	"github.com/fzrilsh/devotion/backend/apidocs"
+	"github.com/fzrilsh/devotion/backend/internal/account"
+	"github.com/fzrilsh/devotion/backend/internal/admin"
+	"github.com/fzrilsh/devotion/backend/internal/db"
+	"github.com/fzrilsh/devotion/backend/internal/listing"
+	"github.com/fzrilsh/devotion/backend/internal/masterdata"
+	"github.com/fzrilsh/devotion/backend/internal/notification"
+	"github.com/fzrilsh/devotion/backend/internal/order"
+	"github.com/fzrilsh/devotion/backend/internal/platform"
+	"github.com/fzrilsh/devotion/backend/internal/platform/config"
+	"github.com/fzrilsh/devotion/backend/internal/platform/health"
+	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
+	"github.com/fzrilsh/devotion/backend/internal/platform/migrate"
+	"github.com/fzrilsh/devotion/backend/internal/platform/observability"
+	"github.com/fzrilsh/devotion/backend/internal/platform/ratelimit"
+	"github.com/fzrilsh/devotion/backend/internal/platform/scheduler"
+	"github.com/fzrilsh/devotion/backend/internal/platform/session"
+	"github.com/fzrilsh/devotion/backend/internal/platform/storage"
+	"github.com/fzrilsh/devotion/backend/internal/platform/tlsconf"
+	"github.com/fzrilsh/devotion/backend/internal/quota"
+	"github.com/fzrilsh/devotion/backend/internal/reputation"
+	"github.com/fzrilsh/devotion/backend/internal/search"
+	"github.com/fzrilsh/devotion/backend/internal/verification"
+)
+
+// devPort is the plain-HTTP listen port outside production. Production always
+// listens on 443 with TLS (research R-01/R-06); development derives no benefit
+// from TLS, so it binds a fixed high port that docker-compose does not use.
+const devPort = ":8080"
+
+// buildVersion is the build identifier echoed by GET /health. CI sets it at
+// link time with -ldflags "-X main.buildVersion=<sha>"; unset builds report
+// "dev".
+var buildVersion = "dev"
+
+// shutdownTimeout bounds graceful shutdown so a hung connection cannot block a
+// deploy rollover forever.
+const shutdownTimeout = 15 * time.Second
+
+// runServe boots the HTTP server: load config, connect the pool, run migrations,
+// build the router, wire the domain services, start the scheduler goroutine,
+// then listen and serve the embedded SPA with graceful shutdown on SIGTERM.
+func runServe(ctx context.Context, args []string) error {
+	flags := flag.NewFlagSet("serve", flag.ExitOnError)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return err
+	}
+
+	log := httpx.NewLogger()
+
+	// Sentry is the only external error sink; a nil DSN (development, or a
+	// production that opted out) makes Init a no-op. Its BeforeSend scrubs by
+	// allowlist so no request, user, or identity-document field can leak.
+	flush, err := observability.Init(cfg.SentryDSN, string(cfg.AppEnv))
+	if err != nil {
+		return err
+	}
+	defer flush()
+
+	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	if err := migrate.Run(ctx, cfg.DatabaseURL, log); err != nil {
+		return err
+	}
+
+	clock := platform.SystemClock{}
+
+	// Cookie Secure stays on unless the base URL is plain HTTP, which only
+	// happens in local development. The exception is logged loudly so a
+	// misconfigured production never disables Secure without a trace.
+	secure := !strings.HasPrefix(cfg.AppBaseURL, "http://")
+	if !secure {
+		log.Warn("cookie sesi tanpa atribut Secure: APP_BASE_URL memakai http, hanya untuk pengembangan lokal",
+			"base_url", cfg.AppBaseURL)
+	}
+
+	sessions := session.New(pool, clock, secure)
+	limiter := ratelimit.New(pool, clock)
+
+	router := httpx.NewRouter(log)
+
+	// The WhatsApp manager runs the whatsmeow client as a goroutine inside this
+	// same process (research R-08), with its session store on the same Postgres
+	// database, so Gate I stays at two services. It is the concrete WhatsAppSender
+	// wired into notification below; its admin route exposes only the link state,
+	// never the service number (FR-082). A store failure at boot is fatal: without
+	// it the WhatsApp channel could never deliver. It is built before the account
+	// service so the verification code delivery can share the same transport.
+	wa, err := admin.New(ctx, cfg.DatabaseURL, log)
+	if err != nil {
+		return err
+	}
+	go wa.Start(ctx)
+
+	// The email sender exists only when Mailjet credentials are configured
+	// (always in production, optional in development). A nil sender fails the
+	// email channel's attempt rather than dropping it silently.
+	var email notification.EmailSender
+	if cfg.MailjetAPIKey != "" && cfg.MailjetSecret != "" && cfg.MailFrom != "" {
+		email = notification.NewMailjetSender(cfg.MailFrom, cfg.MailjetAPIKey, cfg.MailjetSecret)
+	}
+
+	// Verification and recovery codes go out over the same email and WhatsApp
+	// transports as notifications, but out of band of the queue, so registration
+	// actually sends the code it mints (FR-001). The adapter is best effort: a
+	// nil transport or a send failure never fails the request that issued the code.
+	acc := account.New(pool, clock, sessions, limiter, notification.NewCodeDelivery(email, wa), log, cfg.IsDevelopment())
+	acc.Register(router)
+
+	// notif is built before listing and quota because both enqueue notifications:
+	// listing's stale-calendar reminder (FR-021) and quota's request-received
+	// (FR-029) and request-expiry (FR-037) notices all take it as their notifier.
+	notif := notification.New(pool, clock, acc, email, wa)
+	notif.Register(router)
+
+	// listing takes notif so its stale-calendar reminder job can enqueue the
+	// owner nudge (FR-021). The reference is kept so that job joins the scheduler.
+	ls := listing.New(pool, clock, notif)
+	ls.Register(router, acc)
+	// account renders the public profile's capacity card (FR-016) through the
+	// listing service, wired here because account is built before listing.
+	acc.SetListingViewer(ls)
+	search.New(pool, clock, ls).Register(router, acc)
+	wa.Register(router, acc)
+
+	// masterdata registers after notif because its proposal decision path
+	// enqueues a notification to the proposer (FR-061); the read routes are
+	// public, POST /master/proposals is gated to the two business roles.
+	masterdata.New(pool, clock, acc, notif).Register(router, acc)
+
+	// quota registers after notif because sending a request enqueues a
+	// request_received notification per candidate inside the request's
+	// transaction (FR-029); both routes are gated to the buyer role. The
+	// reference is kept so its request-expiry job (FR-037) joins the scheduler.
+	quotaSvc := quota.New(pool, clock, notif)
+	quotaSvc.Register(router, acc)
+
+	// order registers after notif and takes ls as its HorizonEnsurer: accepting
+	// an offer grows the listing calendar to the deadline week under the listing
+	// lock before allocating, and enqueues agreement_formed notifications inside
+	// the formation transaction (FR-034). The single route is gated to the buyer.
+	// The reference is kept so its seven-day auto-confirm job (T055) joins the
+	// scheduler below.
+	orderSvc := order.New(pool, clock, notif, ls)
+	orderSvc.Register(router, acc)
+
+	// reputation wires the review write and the public review list. It reads the
+	// same auto-confirm predicate order uses, so a lazily auto-confirmed order is
+	// reviewable without waiting for the ticker.
+	reputation.New(pool, clock).Register(router, acc)
+
+	// verification wires the applicant file and verification-request endpoints.
+	// The storage service enforces the magic-byte check, EXIF stripping, quota,
+	// and the owner-or-admin gate on GET /api/files/{fileId}; all four routes are
+	// gated to the two business roles (an admin has no business_profile).
+	fileStore, err := storage.New(pool, clock, cfg.UploadPath, cfg.UploadFileLimitMB, cfg.UploadTotalLimitMB)
+	if err != nil {
+		return err
+	}
+	verification.New(pool, clock, fileStore, notif).Register(router, acc)
+
+	// GET /health probes the database, the WhatsApp link, and the upload volume
+	// usage against its quota. It reports storage full when usage reaches the
+	// total limit, which drives 503. It sits outside /api/ and is public
+	// (security:[] in the contract).
+	health.New(pool, wa, clock, cfg.UploadPath, buildVersion, cfg.UploadTotalLimitMB).Register(router)
+
+	// Swagger UI at /docs is a development-only aid for the frontend lane to read
+	// the contract without opening raw YAML. The routes are registered only in
+	// development, so in production they are absent and fall to the existing 404
+	// (T082). Registration is gated here, in one place, rather than registering
+	// then rejecting: a rejected route still leaks that the endpoint exists.
+	if cfg.IsDevelopment() {
+		apidocs.Register(router)
+	}
+
+	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
+		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))
+	}
+
+	// The scheduler runs as a goroutine inside this same process (research
+	// R-07), not a second container, so Gate I stays at two services. It stops
+	// when the serve context is cancelled.
+	sched := scheduler.New(pool, clock, log)
+	sched.Register(notif.DeliverJob())
+	sched.Register(orderSvc.AutoConfirmJob())
+	sched.Register(orderSvc.LateOrderJob())
+	sched.Register(ls.CalendarStaleJob())
+	sched.Register(quotaSvc.RequestExpireJob())
+	sched.Register(orderSvc.DeadlineApproachingJob())
+	go sched.Start(ctx)
+
+	dist, err := fs.Sub(web.FS, "webdist")
+	if err != nil {
+		return err
+	}
+	static, err := httpx.NewStatic(dist, router.Mux(), router.Handler())
+	if err != nil {
+		return err
+	}
+
+	srv := &http.Server{
+		Handler:           static,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	if cfg.IsProduction() {
+		tlsCfg, err := tlsconf.Load(cfg.TLSCertPath, cfg.TLSKeyPath, cfg.CFClientCAPath)
+		if err != nil {
+			return err
+		}
+		srv.Addr = ":443"
+		srv.TLSConfig = tlsCfg
+	} else {
+		srv.Addr = devPort
+	}
+
+	return listenAndServe(ctx, srv, cfg.IsProduction(), log)
+}
+
+// listenAndServe starts the server and blocks until the context is cancelled
+// (SIGINT/SIGTERM) or the server errors, then drains in-flight requests within
+// shutdownTimeout. A production server serves TLS; the certificate and key are
+// already in srv.TLSConfig, so ServeTLS is called with empty paths.
+func listenAndServe(ctx context.Context, srv *http.Server, production bool, log *slog.Logger) error {
+	sigCtx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	errCh := make(chan error, 1)
+	go func() {
+		log.Info("server menyala", "addr", srv.Addr, "tls", production)
+		var err error
+		if production {
+			err = srv.ListenAndServeTLS("", "")
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+			return
+		}
+		errCh <- nil
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-sigCtx.Done():
+		log.Info("sinyal berhenti diterima, mematikan server")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+}

@@ -1,0 +1,219 @@
+// Package health serves GET /api/health, the liveness and readiness probe the
+// container healthcheck and any external uptime monitor read. It checks three
+// dependencies: the database, the upload volume, and the WhatsApp link. A
+// database failure or a full volume is a readiness failure and makes the
+// response 503 so the instance is pulled out of rotation. A dropped WhatsApp
+// link only moves the body status to degraded on a 200, since recovery needs a
+// manual QR scan and a 503 there would restart-loop the container (see R-08).
+// The body reports each dependency's state so an operator sees which one broke
+// without shelling into the box.
+//
+// The response carries no secrets by construction: dependency states are fixed
+// enums, never an error string, connection URL, or the WhatsApp service number.
+package health
+
+import (
+	"context"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/fzrilsh/devotion/backend/internal/platform"
+	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
+)
+
+// Pinger is the database dependency: a pool that can round-trip a ping. It is an
+// interface so health does not import the pool package and the check is trivial
+// to fake in a test.
+type Pinger interface {
+	Ping(ctx context.Context) error
+}
+
+// WhatsAppLink is the WhatsApp dependency, satisfied by *admin.Manager. Only the
+// connected bit is read; the service number never crosses this boundary.
+type WhatsAppLink interface {
+	Connected() bool
+}
+
+// nearFullRatio is the fraction of the total upload quota above which storage is
+// reported near_full: still serving, but an operator should act before it fills.
+const nearFullRatio = 0.9
+
+// Checker holds the dependencies GET /health probes. limitBytes is the total
+// upload quota; usage is compared against it to report ok, near_full, or full.
+type Checker struct {
+	db         Pinger
+	wa         WhatsAppLink
+	clock      platform.Clock
+	uploadPath string
+	version    string
+	limitBytes int64
+}
+
+// New builds a Checker. uploadPath is the directory uploads land in; version is
+// the build identifier echoed in the body; totalLimitMB is the total upload
+// quota in megabytes.
+func New(db Pinger, wa WhatsAppLink, clock platform.Clock, uploadPath, version string, totalLimitMB int) *Checker {
+	return &Checker{
+		db:         db,
+		wa:         wa,
+		clock:      clock,
+		uploadPath: uploadPath,
+		version:    version,
+		limitBytes: int64(totalLimitMB) * 1024 * 1024,
+	}
+}
+
+// storageState is the storage dependency block. It reports a coarse status plus
+// the numbers behind it so an operator sees how close the volume is to full.
+type storageState struct {
+	Status string `json:"status"`
+	UsedMB int64  `json:"used_mb"`
+	LimitMB int64 `json:"limit_mb"`
+}
+
+// dependencies is the per-dependency detail block. Database and whatsapp are
+// fixed enums; storage is an object.
+type dependencies struct {
+	Database string       `json:"database"`
+	WhatsApp string       `json:"whatsapp"`
+	Storage  storageState `json:"storage"`
+}
+
+// response is the /health body, matching the Health contract schema. status is
+// "ok" only when every dependency is, "degraded" otherwise.
+type response struct {
+	Status       string       `json:"status"`
+	Version      string       `json:"version"`
+	Time         time.Time    `json:"time"`
+	Dependencies dependencies `json:"dependencies"`
+}
+
+// Register wires GET /api/health as a public route (security:[] in the
+// contract). The contract's servers url carries the /api prefix, so the /health
+// path there resolves to /api/health; registering it under /api/ keeps it in the
+// same namespace the SPA never claims. It is exempt from the uncovered-route
+// check because Public states the no-auth decision explicitly rather than
+// leaving the gate undeclared.
+func (c *Checker) Register(r *httpx.Router) {
+	r.Public("GET /api/health", c.handle)
+}
+
+// handle probes every dependency and reports 200 when the readiness
+// dependencies pass, 503 when one fails. Readiness is the database and the
+// upload volume: a failure there means the instance cannot serve and should be
+// pulled from rotation. The WhatsApp link is reported but does not drive the
+// code: a dropped whatsmeow session recovers only by a manual QR scan, so a 503
+// there would make the container healthcheck restart-loop the whole site while
+// the database and web are fine (see R-08). WhatsApp down therefore yields a
+// 200 with status "degraded", still visible in dependencies.whatsapp so an
+// uptime monitor doing body keyword matching can alert without a restart. Every
+// check always runs so the body reflects the full state, not just the first
+// failure.
+func (c *Checker) handle(w http.ResponseWriter, r *http.Request) {
+	deps := dependencies{
+		Database: c.checkDB(r.Context()),
+		WhatsApp: c.checkWhatsApp(),
+		Storage:  c.checkStorage(),
+	}
+
+	// Readiness: database and storage only. WhatsApp is excluded on purpose (see
+	// the method doc and R-08); it still moves status to degraded below.
+	ready := deps.Database == "ok" && deps.Storage.Status != "full"
+	healthy := ready &&
+		deps.WhatsApp == "connected"
+
+	body := response{Version: c.version, Time: c.clock.Now(), Dependencies: deps}
+	code := http.StatusOK
+	if healthy {
+		body.Status = "ok"
+	} else {
+		body.Status = "degraded"
+	}
+	if !ready {
+		code = http.StatusServiceUnavailable
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+// checkDB reports whether the pool can reach Postgres within a short deadline,
+// so a hung database cannot hang the health probe itself.
+func (c *Checker) checkDB(ctx context.Context) string {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	if err := c.db.Ping(ctx); err != nil {
+		return "fail"
+	}
+	return "ok"
+}
+
+// checkWhatsApp reports the link state. A down link does not stop the platform
+// from serving, so it never affects the HTTP status code (never drives 503);
+// it only moves the body's status to degraded, since codes and notifications
+// cannot go out while it is down. Recovery needs a manual QR scan, so a 503 here
+// would restart-loop the container (see R-08 and handle).
+func (c *Checker) checkWhatsApp() string {
+	if c.wa != nil && c.wa.Connected() {
+		return "connected"
+	}
+	return "disconnected"
+}
+
+// checkStorage reports how full the upload volume is against its quota. A path
+// that cannot be read is reported full and drives 503, since a new upload would
+// fail there just the same. The read error is logged rather than surfaced in the
+// body: the body carries fixed enums only and must never leak a filesystem path,
+// but an operator still needs the path and error to diagnose why the volume
+// looks full at used_mb 0.
+func (c *Checker) checkStorage() storageState {
+	used, err := dirSize(c.uploadPath)
+	if err != nil {
+		slog.Error("health: gagal membaca direktori unggahan, dilaporkan penuh",
+			"path", c.uploadPath, "error", err)
+		return storageState{Status: "full", UsedMB: 0, LimitMB: c.limitBytes / (1024 * 1024)}
+	}
+	s := storageState{
+		UsedMB:  used / (1024 * 1024),
+		LimitMB: c.limitBytes / (1024 * 1024),
+	}
+	switch {
+	case used >= c.limitBytes:
+		s.Status = "full"
+	case float64(used) >= float64(c.limitBytes)*nearFullRatio:
+		s.Status = "near_full"
+	default:
+		s.Status = "ok"
+	}
+	return s
+}
+
+// dirSize sums the logical size of every regular file under root. It walks
+// rather than reading filesystem free space so the number reflects the platform
+// quota, not the whole disk the VPS shares with Postgres.
+func dirSize(root string) (int64, error) {
+	var total int64
+	err := filepath.WalkDir(root, func(_ string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		total += info.Size()
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}

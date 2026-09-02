@@ -1,0 +1,15 @@
+# Environment
+.env
+
+# Build output
+backend/webdist/
+backend/devotion
+frontend/dist/
+frontend/node_modules/
+
+# TLS material
+*.pem
+*.key
+
+# OS
+.DS_Store

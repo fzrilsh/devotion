@@ -236,11 +236,56 @@ Catat entri di CHANGELOG pada branch kerja yang sama dengan perubahannya, dalam
 commit yang sama bila memungkinkan, supaya riwayat dan catatan tidak terpisah.
 Perubahan tanpa entri CHANGELOG dianggap belum selesai.
 
+### Trailer `Co-Authored-By` di tiap commit
+
+Setiap commit di repository ini mencantumkan seluruh anggota tim sebagai
+co-author, karena pekerjaannya keputusan bersama meski yang mengetik satu orang.
+
+| Nama | Peran | GitHub |
+|------|-------|--------|
+| Juan Kevin Utomo | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
+| Fazril Syaveral Hillaby | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
+| Chiko Maulana Ahmad | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
+
+Blok trailer, ditulis apa adanya di akhir pesan commit setelah satu baris
+kosong, satu trailer per baris tanpa baris kosong di antaranya:
+
+```text
+Co-Authored-By: Juan Kevin Utomo <85393163+TrygerZ@users.noreply.github.com>
+Co-Authored-By: Fazril Syaveral Hillaby <55905559+fzrilsh@users.noreply.github.com>
+Co-Authored-By: Chiko Maulana Ahmad <76936064+ChikoID@users.noreply.github.com>
+```
+
+Yang perlu diperhatikan:
+
+- Alamat `users.noreply.github.com` dipakai supaya GitHub mengaitkan kontribusi
+  ke akun yang benar tanpa memajang alamat email pribadi siapa pun di riwayat
+  publik. Jangan menggantinya dengan alamat pribadi.
+- Ejaan `Co-Authored-By` persis seperti di atas. GitHub tidak mengenali variasi
+  lain, termasuk `Co-Authorized-By`.
+- Anggota yang menjadi author commit tetap ikut ditulis sebagai co-author.
+  Daftarnya sama untuk semua commit, jadi tidak ada yang perlu diingat per kasus.
+- Trailer ini juga ikut pada commit merge.
+- Tiga trailer itu saja. Jangan menambahkan trailer co-author untuk agent atau
+  alat, termasuk `Co-Authored-By: Claude`.
+
+### Menandai task selesai
+
+Saat sebuah task di `docs/001-capacity-exchange-marketplace/tasks.md` betul-betul
+tuntas (semua kondisi "Selesai bila" terpenuhi, uji lulus, entri CHANGELOG ada),
+ubah kotaknya dari `- [ ]` menjadi `- [x]` pada baris task itu. Jangan ubah teks
+task yang lain, hanya penanda kotaknya.
+
+Penanda `tasks.md` di-commit di branch kerja task yang sama dengan
+perubahannya, bukan di branch penanda terpisah, supaya riwayat dan penanda
+selesai tidak terpisah. Tandai hanya setelah task benar-benar selesai, bukan
+saat masih dikerjakan.
+
 ---
 
 ## Backend (Go)
 
-**Stack**: Go 1.22+, `net/http` (router bawaan), `pgx/v5` + `sqlc`,
+**Stack**: Go 1.25+, `net/http` (router bawaan), `pgx/v5` + `sqlc`,
 `golang-migrate`, `bcrypt`, `whatsmeow`, `sentry-go`, PostgreSQL 16.
 
 ### Yang harus benar
@@ -263,8 +308,8 @@ Perubahan tanpa entri CHANGELOG dianggap belum selesai.
   ditulis di dalam transaksi kejadiannya; pengiriman ke email dan WhatsApp
   berjalan setelahnya, maksimal 3 percobaan.
 - **Galat** memakai `application/problem+json` dengan `code` mesin yang stabil
-  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar 28 kode ada di
-  `openapi.yaml`.
+  dan `detail` bahasa Indonesia yang bisa dikutip penguji. Daftar lengkap kode ada
+  di `openapi.yaml`, jumlahnya dicatat di `contracts/README.md`.
 - **Log** memakai `log/slog` format JSON dengan request ID di setiap baris.
 - **Berkas unggahan** tidak pernah dilayani lewat path statis. Selalu lewat
   handler yang memeriksa peran. Nama berkas dibuat sistem (UUID), tipe divalidasi

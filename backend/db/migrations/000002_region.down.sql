@@ -1,0 +1,3 @@
+DROP INDEX IF EXISTS idx_city_province;
+DROP TABLE IF EXISTS city;
+DROP TABLE IF EXISTS province;

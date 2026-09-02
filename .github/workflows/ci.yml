@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging, "develop/**"]
+  pull_request:
+
+# Cancel superseded runs on the same ref so back-to-back pushes do not pile up
+# runners. The queued run is more valuable than the one already stale.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: "1.25.0"
+  NODE_VERSION: "20"
+  IMAGE: ghcr.io/fzrilsh/devotion
+
+jobs:
+  # go vet and go test. Postgres here is CI infrastructure for the test schema,
+  # not a runtime service, so Gate I (exactly two runtime services in
+  # docker-compose.yml) is unaffected.
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: devotion
+          POSTGRES_PASSWORD: devotion
+          POSTGRES_DB: devotion_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devotion"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_TEST: postgres://devotion:devotion@localhost:5432/devotion_test?sslmode=disable
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: backend/go.sum
+      # Fail the build if the committed apidocs copy drifted from the canonical
+      # contract. Running the sync then checking whether it changed anything is
+      # the test: a clean diff means the copy is current, a dirty diff means
+      # someone edited docs/.../openapi.yaml without syncing. The served-spec
+      # identity test (spec vs embed) is a separate layer; this gate guards copy
+      # vs source.
+      - name: Verify OpenAPI copy is in sync
+        run: |
+          ./apidocs-sync.sh
+          git diff --exit-code apidocs/openapi.yaml \
+            || { echo "backend/apidocs/openapi.yaml basi. Jalankan ./backend/apidocs-sync.sh lalu commit."; exit 1; }
+      - run: go vet ./...
+      # -p 1 serializes packages so concurrent test pools stay within Postgres
+      # max_connections=20 (pool 15). Without it, parallel packages exhaust
+      # connections and fail with SQLSTATE 53300.
+      - run: go test ./... -p 1
+
+  # Detect whether the frontend has landed yet. While frontend/ holds only a
+  # placeholder (no package.json), the image and deploy jobs are skipped so the
+  # pipeline stays green as a backend quality gate. Once T003 adds
+  # frontend/package.json, both jobs light up on their own with no workflow edit.
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_frontend: ${{ steps.check.outputs.has_frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "has_frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Build the frontend, embed it into the backend image, and push to GHCR.
+  # Runs only on branch pushes, not pull requests, and only once the frontend
+  # exists. The frontend lives in frontend/ (handled by another contributor);
+  # its build output is copied into backend/webdist/ before the Docker build so
+  # the go:embed directive resolves.
+  image:
+    needs: [backend, detect]
+    if: github.event_name == 'push' && needs.detect.outputs.has_frontend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build
+
+      # Copy dist into webdist before the Docker build. This ordering matters:
+      # the go:embed in the serve command is a compile error on an empty dir.
+      - name: Stage frontend into webdist
+        run: |
+          rm -rf backend/webdist
+          mkdir -p backend/webdist
+          cp -r frontend/dist/. backend/webdist/
+
+      # Sync the OpenAPI contract into backend/apidocs before the image build so
+      # the go:embed in apidocs.go bakes the current contract into the binary.
+      # Same rationale as the sync in the backend job: the copy is committed, so
+      # this only changes anything when the contract was edited without a local
+      # sync.
+      - name: Sync OpenAPI contract into apidocs
+        run: ./backend/apidocs-sync.sh
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+  # Deploy on main only: SSH to the VPS, pull the new image, restart.
+  deploy:
+    needs: image
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /opt/devotion
+            docker compose pull backend
+            docker compose up -d
+            docker image prune -f

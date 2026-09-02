@@ -2,7 +2,7 @@
 
 **Input**: `docs/001-capacity-exchange-marketplace/`
 **Last Revised**: 2026-08-22
-**Prerequisites**: `spec.md` (91 FR), `plan.md`, `research.md`, `data-model.md` (25 tabel), `contracts/openapi.yaml` (63 operasi), `quickstart.md`, `docs/memory/constitution.md` v2.1.0
+**Prerequisites**: `spec.md` (91 FR), `plan.md`, `research.md`, `data-model.md`, `contracts/openapi.yaml` (operasi lihat `contracts/README.md`), `quickstart.md`, `docs/memory/constitution.md` v2.1.0
 
 **Tests**: DIWAJIBKAN. Konstitusi v2.1.0 menetapkan pengujian otomatis sebagai gerbang mutu, bukan pilihan.
 
@@ -39,7 +39,7 @@
 
 Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya berarti salah mengimplementasikan pencarian dan alokasi:
 
-- **Minggu kesiapan mulai** = periode mingguan yang memuat tanggal acuan + `jeda_kesiapan_hari`. Tanggal acuan: tanggal kesepakatan pada pesanan, tanggal pencarian pada perhitungan kandidat. Ini periode paling awal yang boleh dihitung maupun dialokasikan.
+- **Minggu kesiapan mulai** = periode mingguan yang memuat tanggal acuan + `readiness_lead_days`. Tanggal acuan: tanggal kesepakatan pada pesanan, tanggal pencarian pada perhitungan kandidat. Ini periode paling awal yang boleh dihitung maupun dialokasikan.
 - **Rentang kapasitas** = periode mingguan dari minggu kesiapan mulai sampai periode yang memuat deadline, inklusif. Seluruh penjumlahan dan alokasi memakai rentang ini, **bukan** dari minggu berjalan.
 
 ---
@@ -48,14 +48,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Tujuan**: repository dapat dibangun dan dijalankan, meski belum ada fitur.
 
-- [ ] T001 [OPS] Struktur repository dan berkas tingkat atas
+- [x] T001 [OPS] Struktur repository dan berkas tingkat atas
   **Modul**: root
   **Kemampuan**: `README.md` (template panitia, struktur tidak diubah), `LICENSE` MIT, `CLAUDE.md`, `.gitignore`, `.env.example` berisi nama variabel tanpa nilai, direktori `backend/`, `frontend/`, `docs/`
   **Dependency**: tidak ada
   **Selesai bila**: tidak ada direktori tingkat atas di luar daftar konstitusi; `.env` masuk `.gitignore`
   **Hati-hati**: `.env.example` tidak boleh memuat satu pun nilai sungguhan. Repository ini publik. `CLAUDE.md` di root, bukan di `docs/`, agar terbaca agent.
 
-- [ ] T002 [P] [BE] Inisialisasi modul Go dan subcommand
+- [x] T002 [P] [BE] Inisialisasi modul Go dan subcommand
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `go.mod` dengan Go 1.22+, dispatcher subcommand: `serve`, `admin:create`, `seed:regions`, `seed:master-data`, `seed:test-data`, `reset:test-data`, `user:verify`, `health:check`
   **Dependency**: tidak ada, `flag.NewFlagSet` dari standard library; prasyarat T001
@@ -76,21 +76,21 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: tipe ter-generate dan dapat diimpor; skrip terdokumentasi di `docs/menjalankan.md`
   **Hati-hati**: jangan pernah menulis tipe respons dengan tangan. Yang ditulis tangan akan menyimpang dari kontrak tanpa ada yang tahu.
 
-- [ ] T005 [P] [OPS] Compose dua layanan
+- [x] T005 [P] [OPS] Compose dua layanan
   **Modul**: `docker-compose.yml` (path dipatok)
-  **Kemampuan**: tepat dua layanan `backend` dan `postgres`, penyetelan Postgres untuk 2GB sesuai `research.md` R-03, batas log `max-size 10m` `max-file 3` pada keduanya, volume `pgdata` dan bind `/opt/devotion/unggahan`
+  **Kemampuan**: tepat dua layanan `backend` dan `postgres`, penyetelan Postgres untuk 2GB sesuai `research.md` R-03, batas log `max-size 10m` `max-file 3` pada keduanya, volume `pgdata` dan bind `/opt/devotion/uploads`
   **Dependency**: tidak ada; prasyarat T001
   **Selesai bila**: `docker compose config` valid; jumlah entri di bawah `services:` tepat dua
   **Hati-hati**: batas log bukan kebersihan. Log tanpa batas mengisi 50GB, lalu Postgres berhenti menulis dan aplikasi mati total.
 
-- [ ] T006 [P] [OPS] Kerangka dokumentasi dan changelog
+- [x] T006 [P] [OPS] Kerangka dokumentasi dan changelog
   **Modul**: `docs/` + `backend/` + `frontend/`
   **Kemampuan**: di `docs/`, terdiri dari `menjalankan.md`, `pengujian.md`, `dependencies.md`, `utang-teknis.md`, `layanan-luar.md`, `temuan-penguji.md`, `cloudflare-ips.md`, `setup-vps.md`, `skenario-uji-manual.md`, dan direktori `master-data/`. Changelog **terpisah per bagian**: `backend/CHANGELOG.md` dan `frontend/CHANGELOG.md`
   **Dependency**: tidak ada; prasyarat T001
   **Selesai bila**: seluruh berkas ada dengan judul dan kerangka bagian; tidak ada `docs/changelog.md`
   **Saran**: kedua changelog diisi setiap kali sebuah story ditutup di checkpoint, bukan direkonstruksi di akhir. `layanan-luar.md` mencatat Cloudflare, Mailjet, Sentry, pemantau uptime, dan wilayah.id beserta akibat bila masing-masing mati.
 
-- [ ] T007 [OPS] CI pipeline
+- [x] T007 [OPS] CI pipeline
   **Modul**: `.github/workflows/`
   **Kemampuan**: `go vet`, `go test`, `npm test`, `npm run build`, salin `dist` → `backend/webdist/`, build image multi-stage, push ke GHCR, deploy via SSH
   **Dependency**: prasyarat T002, T003, T004 (menjalankan vet dan test Go, test dan build frontend, lalu menyalin `dist` ke `webdist`)
@@ -105,7 +105,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **⚠️ Tidak ada pekerjaan user story yang boleh dimulai sebelum fase ini selesai.**
 
-- [ ] T008 [BE] Clock yang dapat digantikan
+- [x] T008 [BE] Clock yang dapat digantikan
   **Modul**: `backend/internal/platform/clock.go` (path dipatok)
   **FR**: Prinsip V
   **Kemampuan**: interface `Clock` dengan `Now()`, implementasi nyata, implementasi uji yang waktunya dapat disetel dan digeser
@@ -113,44 +113,44 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: ada test yang membuktikan waktu dapat digeser
   **Hati-hati**: dikerjakan **sekarang**, bukan menyusul. Menambahkannya setelah service jadi berarti menyentuh seluruh service. `time.Now()` dilarang muncul di dalam logika bisnis mana pun. `data-model.md` juga melarang `DEFAULT now()` pada seluruh tabel, setiap `INSERT` mengirim waktunya dari `Clock`.
 
-- [ ] T009 [BE] Konfigurasi dan bootstrap
+- [x] T009 [BE] Konfigurasi dan bootstrap
   **Modul**: `backend/internal/platform/config/`
   **Kemampuan**: memuat variabel lingkungan, memvalidasi yang wajib saat startup, membedakan `APP_ENV=development` dan `production`
   **Dependency**: tidak ada, `os.Getenv` cukup; prasyarat T007
   **Selesai bila**: variabel wajib yang hilang menghentikan startup dengan pesan yang menyebut nama variabelnya
   **Saran**: pada `development`, backend melayani HTTP biasa tanpa TLS dan tanpa pemeriksaan sertifikat klien Cloudflare.
 
-- [ ] T010 [BE] Migrasi basis data
+- [x] T010 [BE] Migrasi basis data
   **Modul**: `backend/db/migrations/` (path dipatok)
   **FR**: seluruh entitas
-  **Kemampuan**: 14 migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
+  **Kemampuan**: migrasi berurutan sesuai `data-model.md` §12, dijalankan otomatis saat startup dengan `pg_try_advisory_lock`
   **Dependency**: `golang-migrate` (versi dipatok); prasyarat T007, T009
   **Selesai bila**: `docker compose up` menjalankan migrasi sampai versi terakhir; `schema_migrations.dirty = false`; menjalankan dua kali tidak menimbulkan galat
   **Hati-hati**: seluruh constraint, indeks, dan **tiga trigger** wajib ikut: `used_capacity_within_total`, `week_start_is_monday`, `readiness_not_past_deadline`, `city_belongs_to_province`, trigger jenis item, trigger cegah request ke diri sendiri, trigger cegah alokasi sebelum kesiapan. Constraint itu bukan hiasan: ia yang menahan kerusakan data ketika logika aplikasi keliru. **Tidak ada `DEFAULT now()` di satu pun tabel.**
 
-- [ ] T011 [BE] Lapisan akses data
+- [x] T011 [BE] Lapisan akses data
   **Modul**: `backend/db/queries/` + konfigurasi `sqlc`
   **Kemampuan**: `sqlc.yaml`, pool `pgx` dengan `MaxConns=15`, helper transaksi
   **Dependency**: `pgx/v5`, `sqlc` (perkakas build); prasyarat T007, T009, T010
   **Selesai bila**: `sqlc generate` berhasil; pool tersambung; helper transaksi punya test
   **Hati-hati**: pool 15 dari `max_connections` 20, lima disisakan untuk `pg_dump`, `psql`, dan migrasi. Tanpa sisa itu, cadangan harian gagal justru saat trafik tinggi.
 
-- [ ] T012 [P] [BE] Lapisan HTTP dan format galat
+- [x] T012 [P] [BE] Lapisan HTTP dan format galat
   **Modul**: `backend/internal/platform/httpx/`
   **FR**: seluruh endpoint
-  **Kemampuan**: router `net/http`, middleware request ID, pemulihan panic, `application/problem+json` dengan 28 kode galat dari `openapi.yaml`, log `slog` JSON dengan request ID di setiap baris
+  **Kemampuan**: router `net/http`, middleware request ID, pemulihan panic, `application/problem+json` dengan kode galat dari `openapi.yaml` (jumlah di `contracts/README.md`), log `slog` JSON dengan request ID di setiap baris
   **Dependency**: tidak ada, `net/http` dan `log/slog` standard library; prasyarat T007, T009
   **Selesai bila**: galat validasi mengembalikan bentuk `ProblemValidasi` beserta daftar field; setiap baris log memuat request ID
   **Hati-hati**: `/api/*` yang tidak dikenali mengembalikan 404 JSON, **bukan** `index.html`. Kalau HTML, kesalahan penulisan alamat endpoint jadi menyesatkan saat diagnosis.
 
-- [ ] T013 [P] [BE] Kepercayaan alamat asal
+- [x] T013 [P] [BE] Kepercayaan alamat asal
   **Modul**: `backend/internal/platform/cloudflare/`
   **Kemampuan**: rentang alamat Cloudflare dipatok sebagai konstanta beserta tanggal pengambilan, fungsi `RealIP` yang hanya mempercayai header bila koneksi datang dari rentang itu
   **Dependency**: tidak ada; prasyarat T007
   **Selesai bila**: test membuktikan header diabaikan pada koneksi di luar rentang; `docs/cloudflare-ips.md` memuat daftar beserta tanggal
   **Hati-hati**: daftar rentang di `research.md` R-01 ditulis dari ingatan dan **wajib dicocokkan** ke `cloudflare.com/ips-v4` dan `ips-v6` sebelum dipatok. Jangan mengambilnya lewat jaringan saat startup, satu kegagalan HTTP akan membuat aplikasi gagal menyala.
 
-- [ ] T014 [BE] Sesi, autentikasi, dan akun
+- [x] T014 [BE] Sesi, autentikasi, dan akun
   **Modul**: `backend/internal/platform/session/` + `backend/internal/account/`
   **FR**: FR-001, FR-002, FR-003, FR-005
   **Kemampuan**: registrasi, verifikasi kode enam digit untuk email dan nomor, masuk, keluar, pemulihan kata sandi, cookie `httpOnly Secure SameSite=Lax`, hash token di basis data. **Ditambah**: `GET /me` (akun yang sedang masuk dalam bentuk `MyAccount`: `roles{subcontractor,buyer}`, `profile_id`, `is_admin`) dan `PATCH /me/roles` (menambah peran usaha, menolak pencabutan bila masih ada pesanan aktif)
@@ -158,7 +158,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: seluruh endpoint `/auth/*`, `/me`, dan `/me/roles` sesuai `openapi.yaml`; keluar akun benar-benar mengakhiri sesi; test membuktikan yang disimpan adalah hash, bukan token mentah
   **Hati-hati**: `POST /auth/recover/request` selalu 202, agar tidak membocorkan apakah sebuah email terdaftar. Dua endpoint `/me` sebelumnya tidak punya task pemilik, itu celah yang ditemukan `/analyze`.
 
-- [ ] T015 [BE] Middleware peran
+- [x] T015 [BE] Middleware peran
   **Modul**: `backend/internal/platform/httpx/`
   **FR**: FR-005
   **Kemampuan**: pemeriksaan peran per endpoint; satu akun boleh memegang dua peran usaha; admin terpisah dari peran usaha
@@ -166,14 +166,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: test membuktikan penolakan untuk setiap kombinasi peran yang tidak berwenang
   **Hati-hati**: endpoint tanpa pemeriksaan peran dianggap **cacat**, bukan belum lengkap. Ini gerbang yang diperiksa di setiap story.
 
-- [ ] T016 [P] [BE] Pembatasan laju berbasis data domain
+- [x] T016 [P] [BE] Pembatasan laju berbasis data domain
   **Modul**: `backend/internal/platform/ratelimit/`
   **Kemampuan**: batas per akun untuk percobaan masuk (5/15 menit), per nomor untuk kode sekali pakai (3/jam), per alamat asal untuk kode (10 nomor/jam), per pengguna untuk request kuota (20/jam)
   **Dependency**: tidak ada, tabel Postgres; prasyarat T011, T013
   **Selesai bila**: keempat batas punya test; respons 429 menyertakan `Retry-After`
   **Hati-hati**: tabel, bukan penyimpanan dalam memori. Kalau di memori, penerapan versi baru jadi cara termudah melewatinya. Batas per alamat asal yang menutup pemutaran nomor, itu yang melindungi nomor WhatsApp dari pemblokiran.
 
-- [ ] T017 [P] [BE] Penyimpanan berkas
+- [x] T017 [P] [BE] Penyimpanan berkas
   **Modul**: `backend/internal/platform/storage/`
   **FR**: FR-006, FR-009
   **Kemampuan**: unggah maksimal 5MB, nama berkas UUID dibuat sistem, tipe divalidasi dari magic bytes, metadata lokasi gambar dibuang, kuota total 500MB, akses hanya lewat handler yang memeriksa peran
@@ -181,7 +181,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: bukan pemilik dan bukan admin ditolak (test wajib); berkas dengan ekstensi menipu ditolak; kuota penuh mengembalikan pesan yang jelas
   **Hati-hati**: **jangan pernah** melayani berkas lewat path statis. Foto lokasi usaha dari ponsel membawa koordinat GPS, dan banyak konveksi rumahan berarti itu alamat rumah orang. Dokumen sumber memitigasi risiko kebocoran data identitas dengan enkripsi AES-256, akses RBAC, dan penetration test kuartalan [1]; versi ini hanya menegakkan kontrol akses, sehingga pengujiannya wajib.
 
-- [ ] T018 [BE] Penjadwal dua lapisan
+- [x] T018 [BE] Penjadwal dua lapisan
   **Modul**: `backend/internal/platform/scheduler/`
   **FR**: FR-021, FR-037, FR-045, FR-068, FR-069
   **Kemampuan**: `time.Ticker` 5 menit di dalam proses yang sama, setiap pekerjaan dibungkus advisory lock
@@ -189,7 +189,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: penjadwal menyala saat startup dan tercatat di log; test membuktikan pekerjaan tidak berjalan ganda
   **Hati-hati**: perhitungan tenggat ditulis **satu kali** di satu fungsi domain, dipakai bersama lapisan hitung-saat-baca. Kalau diduplikasi, pesanan yang sama akan tampak berbeda status di halaman berbeda. Bukan proses kedua, Gate I.
 
-- [ ] T019 [BE] Data acuan: wilayah dan daftar baku
+- [x] T019 [BE] Data acuan: wilayah dan daftar baku
   **Modul**: `backend/internal/masterdata/` + subcommand seed
   **FR**: FR-058, FR-062, FR-075
   **Kemampuan**: `seed:regions` mengambil provinsi dan kabupaten/kota dari wilayah.id dengan flag `--refresh`, default membaca salinan `docs/master-data/regions.json`; `seed:master-data` mengisi jenis produk dan mesin; keduanya idempoten memakai kode sebagai identitas. **Ditambah**: endpoint baca `GET /master/products`, `GET /master/machines`, `GET /regions/provinces`, `GET /regions/cities?province=`; `Normalisasi kode kabupaten/kota dengan membuang titik (32.73 → 3273) sebelum menyimpan.`
@@ -197,7 +197,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: kedua perintah jalan dua kali tanpa menduplikasi; hitungan provinsi, kota, produk, mesin semuanya lebih dari nol; keempat endpoint sesuai kontrak
   **Hati-hati**: Bentuk respons sudah diverifikasi; lihat docs/master-data/README.md. Normalisasi kode adalah langkah yang paling mudah terlupakan dan gagalnya senyap sampai constraint menolak seluruh baris. Jalankan kueri verifikasi di README itu setelah seed.
 
-- [ ] T020 [BE] Admin pertama
+- [x] T020 [BE] Admin pertama
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `admin:create` meminta kata sandi lewat prompt tanpa menampilkan ketikan, idempoten
   **Dependency**: prasyarat T014
@@ -212,14 +212,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: dapat masuk dan keluar lewat antarmuka; alur inti dapat diselesaikan dengan keyboard
   **Hati-hati**: token **tidak pernah** disimpan di `localStorage` maupun `sessionStorage`. Satu celah XSS akan langsung berarti pengambilalihan akun, dan aplikasi ini memuat dokumen identitas.
 
-- [ ] T022 [BE] Penyajian frontend oleh backend
+- [x] T022 [BE] Penyajian frontend oleh backend
   **Modul**: `backend/internal/platform/httpx/` + `backend/webdist/` (path dipatok)
   **Kemampuan**: `embed.FS` menyematkan hasil build, berkas statis ber-hash dengan cache panjang, fallback `index.html` untuk path non-API, TLS dengan Cloudflare Origin Certificate dan verifikasi sertifikat klien
   **Dependency**: prasyarat T012, T021
   **Selesai bila**: penyegaran pada halaman dalam tidak menghasilkan 404; `/api/*` tak dikenal mengembalikan JSON
   **Hati-hati**: ini yang membuat Gate I terpenuhi tanpa layanan frontend maupun proxy. Pastikan Cloudflare tidak meng-cache `/api/*`, hasil pencarian ter-cache menampilkan kapasitas basi, persis masalah informasi tidak aktual yang platform ini dibangun untuk menyelesaikan.
 
-- [ ] T023 [BE] Notifikasi
+- [x] T023 [BE] Notifikasi
   **Modul**: `backend/internal/notification/`
   **FR**: FR-051 sampai FR-054, FR-074, FR-085, FR-086, FR-091
   **Kemampuan**: baris notifikasi ditulis di dalam transaksi kejadiannya beserta kolom `transactional`; goroutine pengirim ke email dan WhatsApp maksimal 3 percobaan; notifikasi di dalam platform selalu tampil; preferensi kanal hanya berlaku bagi kejadian non-transaksional
@@ -227,7 +227,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: test membuktikan kegagalan kirim tidak menggagalkan transaksi pemicunya; setelah 3 percobaan ditandai gagal permanen; endpoint `/notifications` dan `/notifications/preferences` sesuai kontrak
   **Hati-hati**: penggolongan transaksional versus non-transaksional ada di `data-model.md` §9, hanya `calendar_stale`, `deadline_approaching`, dan `rating_request` yang non-transaksional. Perhatikan bahwa `confirmation_due_approaching` **transaksional** karena berujung pada penutupan pesanan otomatis, jadi tidak boleh dapat dimatikan. Notifikasi di dalam platform adalah satu-satunya jalur pengamatan bagi penguji manual.
 
-- [ ] T024a [BE] Sambungan WhatsApp dan endpoint QR
+- [x] T024a [BE] Sambungan WhatsApp dan endpoint QR
   **Modul**: `backend/internal/admin/`
   **FR**: FR-002, FR-052
   **Kemampuan**: kelola sesi `whatsmeow`, endpoint yang menyajikan QR dan status sambungan, penyambungan ulang tanpa akses server; `user:verify --phone` sebagai jalan darurat; status WhatsApp masuk ke endpoint health
@@ -243,11 +243,18 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: QR dapat dipindai lewat antarmuka; status tersambung terlihat
   **Hati-hati**: halaman ini yang mencegah kehilangan demo saat sesi WhatsApp lepas. Render dari endpoint, jangan menyimpan status di sisi klien.
 
-- [ ] T025 [P] [BE] Health check dan Sentry
+- [x] T025 [P] [BE] Health check dan Sentry
   **Modul**: `backend/internal/platform/`
-  **Kemampuan**: `GET /health` memeriksa basis data, WhatsApp, dan kuota penyimpanan; Sentry dengan pembersihan data sensitif
+  **Kemampuan**: `GET /api/health` memeriksa basis data, WhatsApp, dan kuota penyimpanan; Sentry dengan pembersihan data sensitif
   **Dependency**: `sentry-go`; prasyarat T011, T012, T024a
-  **Selesai bila**: health mengembalikan 503 bila ada ketergantungan gagal; test membuktikan kata sandi, token, nomor telepon, dan hal terkait dokumen identitas tidak terkirim ke Sentry
+  **Selesai bila**: health mengembalikan 503 hanya bila basis data gagal atau penyimpanan penuh (instance tidak dapat melayani, layak di-restart); WhatsApp terputus dilaporkan di `dependencies.whatsapp` dengan `status: degraded` pada 200, tidak menggerakkan 503 (lihat R-08, restart tidak menyambungkan sesi yang butuh QR manual); test membuktikan kata sandi, token, nomor telepon, dan hal terkait dokumen identitas tidak terkirim ke Sentry
+
+- [x] T082 [P] [BE] Swagger UI untuk kontrak API
+  **Modul**: `backend/internal/platform/httpx/` + `backend/apidocs/`
+  **Kemampuan**: sajikan `GET /docs` (halaman Swagger UI) dan `GET /docs/openapi.yaml` (spesifikasi mentah) HANYA ketika `APP_ENV=development`, supaya lane [FE] dapat membaca kontrak tanpa membuka YAML mentah; `openapi.yaml` disematkan lewat `embed.FS` dari `backend/apidocs/` karena direktif `embed` tidak dapat menjangkau path di atas direktori modul; rute tidak didaftarkan sama sekali di luar development sehingga jatuh ke perilaku 404 yang sudah berlaku
+  **Dependency**: prasyarat T009 (config `APP_ENV`), T012 (router dan format galat), T022 (urutan perutean statis dan fallback SPA)
+  **Selesai bila**: `GET /docs` pada development mengembalikan 200 HTML; `GET /docs/openapi.yaml` pada development mengembalikan 200 YAML yang dapat diurai; `GET /docs` pada production mengembalikan 404 dengan bentuk galat rute tak dikenal; spesifikasi yang disajikan identik byte-per-byte dengan `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml`; `docs/menjalankan.md` memuat cara lane [FE] membukanya beserta catatan bahwa `/docs` tidak ada di production; jumlah layanan `docker-compose.yml` tetap dua
+  **Hati-hati**: task ini tidak melayani FR, melainkan kewajiban dokumentasi konstitusi (docs harus memuat cara menjalankan sistem), sama seperti task scaffolding tanpa rujukan FR di Complexity Tracking `plan.md`. Jangan daftarkan rute lalu tolak di handler: rute yang terdaftar tapi menolak tetap membocorkan keberadaan endpoint docs, jadi kondisi pendaftaran dibaca dari config di satu tempat. `/docs` bukan `/api/docs`, dan pastikan `/docs` tidak jatuh ke fallback SPA `index.html`. Test identitas spesifikasi adalah yang paling penting: bila langkah salin CI terlewat, yang disajikan basi tanpa gejala.
 
 **Checkpoint**: fondasi siap. Seluruh user story boleh dimulai, dan bila ada dua pelaksana, boleh paralel.
 
@@ -259,14 +266,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: daftar sebagai subkontraktor, buat listing lengkap, buka halaman publiknya sebagai pengunjung lain, seluruh atribut kapasitas tampil benar.
 
-- [ ] T026 [P] [US1] [BE] Profil usaha
+- [x] T026 [P] [US1] [BE] Profil usaha
   **Modul**: `backend/internal/account/`
   **FR**: FR-004, FR-057
   **Kemampuan**: baca dan ubah profil sendiri, profil publik, kota dari data wilayah, koordinat opsional
   **Dependency**: prasyarat T014, T017, T019
   **Selesai bila**: `/profile/me` dan `/profile/{profileId}` sesuai kontrak; koordinat di luar Indonesia ditolak; lintang tanpa bujur ditolak
 
-- [ ] T027 [US1] [BE] Listing kapasitas
+- [x] T027 [US1] [BE] Listing kapasitas
   **Modul**: `backend/internal/listing/`
   **FR**: FR-012, FR-013, FR-014, FR-015, FR-076
   **Kemampuan**: buat, ubah, nonaktifkan, aktifkan kembali; satu angka kapasitas mingguan untuk seluruh jenis produk; jeda kesiapan mulai dalam hari
@@ -275,7 +282,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Saran**: pisahkan service dan handler; validasi di service supaya dapat dites tanpa HTTP
   **Hati-hati**: **jangan** buat kolom kapasitas per jenis produk (FR-076). Mesin dan tenaga kerjanya berbagi, sehingga angka terpisah akan mengizinkan penyanggupan ganda pada minggu yang sama. **Jeda kesiapan mulai bukan durasi menyelesaikan pekerjaan**, melainkan jeda sebelum produksi dapat dimulai.
 
-- [ ] T028 [US1] [BE] Kalender awal dan horizon
+- [x] T028 [US1] [BE] Kalender awal dan horizon
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-088
   **Kemampuan**: periode mingguan dibuat otomatis untuk minimal 3 bulan ke depan saat listing dibuat, memakai kapasitas mingguan sebagai kapasitas total; kolom `horizon_until` menyimpan periode terjauh yang sudah dibuat; fungsi memperpanjang horizon sampai minggu tertentu, idempoten dan dapat dipanggil ulang
@@ -283,14 +290,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: setiap `week_start` adalah hari Senin; horizon awal minimal 13 periode; `horizon_until` konsisten dengan `MAX(week_start)`; memperpanjang ke minggu yang sudah tercakup tidak membuat baris ganda
   **Hati-hati**: horizon **bukan** nilai tetap. T035 akan memanggil fungsi perpanjangan ini ketika ada pencarian berdeadline lebih jauh (FR-088), jadi rancang sebagai operasi yang aman dipanggil berulang dan aman dipanggil bersamaan. Batas minggu dihitung di Asia/Jakarta, disimpan sebagai `date`; constraint `week_start_is_monday` akan menolak bila perhitungannya keliru.
 
-- [ ] T029 [P] [US1] [BE] Usulan item daftar baku
+- [x] T029 [P] [US1] [BE] Usulan item daftar baku
   **Modul**: `backend/internal/masterdata/`
   **FR**: FR-061
   **Kemampuan**: pengguna mengusulkan item baru, listing tetap dapat disimpan dengan item yang tersedia
   **Dependency**: prasyarat T019, T023
   **Selesai bila**: `POST /master/proposals` sesuai kontrak; pengusul menerima notifikasi saat diputuskan
 
-- [ ] T030 [P] [US1] [BE] Test backend US1
+- [x] T030 [P] [US1] [BE] Test backend US1
   **Modul**: `backend/internal/{account,listing}/`
   **Kemampuan**: jalur berhasil, penolakan peran, penolakan masukan tidak sah untuk setiap endpoint; listing tayang tanpa verifikasi; horizon awal terbentuk benar dan perpanjangan idempoten
   **Dependency**: prasyarat T026, T027, T028, T029
@@ -335,11 +342,11 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: dengan listing yang sudah tayang, cari 3.000 potong dengan deadline delapan minggu; kandidat berkapasitas 500 per minggu berjeda 0 hari ikut muncul dan ditandai memenuhi kriteria kapasitas.
 
-- [ ] T035 [US2] [BE] Mesin pencarian
+- [x] T035 [US2] [BE] Mesin pencarian
   **Modul**: `backend/internal/search/`
   **FR**: FR-022 sampai FR-028, FR-063, FR-080, FR-081, FR-087, FR-088
   **Kemampuan**:
-  - Hitung **minggu kesiapan mulai** per kandidat = Senin dari (tanggal pencarian + `jeda_kesiapan_hari` listing). Ini batas awal **rentang kapasitas**; batas akhirnya periode yang memuat deadline.
+  - Hitung **minggu kesiapan mulai** per kandidat = Senin dari (tanggal pencarian + `readiness_lead_days` listing). Ini batas awal **rentang kapasitas**; batas akhirnya periode yang memuat deadline.
   - Jumlahkan kapasitas tersisa hanya di dalam rentang itu. Kandidat yang minggu kesiapannya melampaui minggu deadline memiliki rentang kosong sehingga kapasitasnya nol.
   - Perpanjang horizon: bila `horizon_until < minggu_deadline`, hitung minggu yang belum dibuat sebagai berkapasitas penuh, lalu panggil fungsi perpanjangan T028 untuk kandidat yang lolos, di dalam transaksi tersendiri, **di luar** kueri pencarian.
   - Empat kriteria keras sebagai empat nilai boolean yang dijumlahkan; **kriteria yang filternya tidak diisi dihitung terpenuhi** dan responsnya menyebutkan kriteria mana yang tidak dievaluasi.
@@ -348,7 +355,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T027, T028
   **Hati-hati**: **tidak ada pembobotan dan tidak ada normalisasi skor.** Rating, tingkat penyelesaian, verifikasi, kebaruan kalender, jarak, dan tanggal pendaftaran tidak boleh mempengaruhi urutan (FR-024), termasuk kebaruan kalender, meski dokumen sumber justru menyarankan penalti penurunan skor pencarian bagi yang tidak update kalender [1]. `listing_id` sebagai pemecah seri terakhir wajib ada; tanpanya urutan bisa bertukar antar permintaan. Pencarian tetap operasi baca: perpanjangan horizon jangan diletakkan di dalam kueri, karena itu akan memicu penulisan pada setiap permintaan.
 
-- [ ] T036 [P] [US2] [BE] Test determinisme dan rentang kapasitas
+- [x] T036 [P] [US2] [BE] Test determinisme dan rentang kapasitas
   **Modul**: `backend/internal/search/`
   **FR**: FR-023, FR-024, FR-025, FR-080, FR-087, FR-088, SC-013, SC-019, SC-020, SC-021
   **Kemampuan**:
@@ -371,6 +378,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: kursor diteruskan apa adanya; tidak ada kandidat ganda saat berpindah halaman
   **Dependency**: prasyarat T021, T035
   **Hati-hati**: kursor bersifat opaque. Jangan diurai, jangan diubah jadi `?page=2`, karena itu langsung melanggar jaminan urutan stabil. Tampilkan juga kriteria yang tidak dievaluasi, jangan hanya yang gagal, supaya pengguna paham kenapa banyak kandidat berskor sama.
+  **Hati-hati (tipe basi)**: tipe TypeScript hasil T004 sudah usang terhadap `openapi.yaml` dan **wajib** di-generate ulang sebelum task ini mulai. Kontrak berubah dua gelombang sejak itu: (1) `Health` (`checks` menjadi `dependencies`, plus `version` dan `storage` kini objek); (2) `SearchCandidate` bertambah seluruh atribut keputusan FR-027 plus `criteria` per kandidat. Membangun kartu hasil dari tipe lama akan diam-diam menyimpang dari respons backend.
 
 - [ ] T038 [US2] [OPS] Skenario uji manual US2
   **Modul**: `docs/skenario-uji-manual.md`
@@ -387,7 +395,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: kirim ke tiga kandidat, balas dari dua dengan harga berbeda, bandingkan, terima satu.
 
-- [ ] T039 [US3] [BE] Request kuota
+- [x] T039 [US3] [BE] Request kuota
   **Modul**: `backend/internal/quota/`
   **FR**: FR-029, FR-030, FR-082, FR-083
   **Kemampuan**: kirim ke beberapa kandidat dalam satu tindakan; status per kandidat; batas balasan 72 jam ditetapkan sistem dari `Clock`; penolakan request ke listing sendiri
@@ -395,7 +403,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T008, T015, T023, T027
   **Hati-hati**: aplikasi mengirim **kedua** nilai `dibuat_pada` dan `batas_balasan_pada` dari `Clock`; basis data tidak punya `DEFAULT now()` dan constraint-nya hanya menjaga urutan. Angka 72 jam ditegakkan aplikasi dan diuji. FR-083 menyebut jalur "tanpa melalui hasil pencarian" secara eksplisit; trigger basis data adalah jaring pengamannya.
 
-- [ ] T040 [US3] [BE] Penawaran dan negosiasi
+- [x] T040 [US3] [BE] Penawaran dan negosiasi
   **Modul**: `backend/internal/quota/`
   **FR**: FR-031, FR-032, FR-033, FR-035, FR-090
   **Kemampuan**: balas dengan harga dan jeda kesiapan, tolak beralasan, counter-offer berantai dengan riwayat lengkap, perbandingan berdampingan; penolakan bila jumlah melampaui total kapasitas di dalam rentang kapasitas; penolakan bila minggu kesiapan mulai kandidat jatuh setelah periode deadline
@@ -403,25 +411,25 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T035, T039
   **Hati-hati**: harga `int64` rupiah bulat. Setiap counter-offer adalah baris baru, bukan pembaruan baris lama. Rentang kapasitas di sini dihitung dari tanggal penawaran, bukan dari tanggal request, pastikan konsisten dengan T035.
 
-- [ ] T041 [US3] [BE] Pembentukan kesepakatan dan alokasi kapasitas
+- [x] T041 [US3] [BE] Pembentukan kesepakatan dan alokasi kapasitas
   **Modul**: `backend/internal/order/`
   **FR**: FR-034, FR-036, FR-018, FR-077, FR-078, FR-084, FR-087
   **Kemampuan**:
-  - Hitung dan simpan `minggu_kesiapan_mulai` pesanan = Senin dari (tanggal kesepakatan + `jeda_kesiapan_hari` listing saat itu). Disimpan, bukan dihitung ulang, karena jeda pada listing dapat berubah kemudian sementara alokasi tidak boleh bergeser.
+  - Hitung dan simpan `readiness_week_start` pesanan = Senin dari (tanggal kesepakatan + `readiness_lead_days` listing saat itu). Disimpan, bukan dihitung ulang, karena jeda pada listing dapat berubah kemudian sementara alokasi tidak boleh bergeser.
   - Satu transaksi mencakup pembentukan pesanan dan seluruh baris alokasi; penguncian baris periode terurut menaik menurut `week_start`.
   - Alokasi mengisi periode paling awal **di dalam rentang kapasitas** lebih dulu, melewati yang penuh atau habis; kandidat lain ditutup dengan notifikasi.
-  **Selesai bila**: pola transaksi mengikuti `research.md` R-04; kegagalan pada salah satu periode membatalkan seluruh pembentukan; tidak ada baris alokasi pada periode sebelum `minggu_kesiapan_mulai`
+  **Selesai bila**: pola transaksi mengikuti `research.md` R-04; kegagalan pada salah satu periode membatalkan seluruh pembentukan; tidak ada baris alokasi pada periode sebelum `readiness_week_start`
   **Dependency**: prasyarat T008, T027, T040
   **Hati-hati**: alokasi yang naif akan mulai dari minggu berjalan, dan itu berarti menjadwalkan pekerjaan pada minggu yang menurut pernyataan subkontraktor sendiri belum dapat dipakai. Trigger `cegah_alokasi_sebelum_kesiapan` akan menolaknya, tetapi jangan bergantung pada trigger untuk logika normal; ia jaring pengaman. Pengurutan penguncian adalah pencegah deadlock, bukan kerapian.
 
-- [ ] T042 [P] [US3] [BE] Test balapan alokasi
+- [x] T042 [P] [US3] [BE] Test balapan alokasi
   **Modul**: `backend/internal/order/`
   **FR**: FR-036, FR-079, FR-084, SC-018
   **Kemampuan**: dua kesepakatan berbarengan atas periode yang sama, hanya satu berhasil, yang gagal menerima alasan; constraint basis data menolak kapasitas terpakai melebihi total meski logika aplikasi dibuat keliru dengan sengaja
   **Selesai bila**: kedua test lulus; test constraint benar-benar membuktikan penolakan di tingkat penyimpanan data
   **Dependency**: prasyarat T041
 
-- [ ] T043 [P] [US3] [BE] Test request kuota
+- [x] T043 [P] [US3] [BE] Test request kuota
   **Modul**: `backend/internal/quota/`
   **FR**: FR-029, FR-035, FR-082, FR-083, FR-090
   **Kemampuan**: jalur berhasil, penolakan peran, masukan tidak sah, request ke diri sendiri, kapasitas kurang beserta angkanya, kesiapan melampaui deadline, request kedaluwarsa dengan `Clock` digantikan
@@ -434,6 +442,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Kemampuan**: pilih kandidat dari hasil pencarian, form request, daftar request terkirim dengan status per kandidat, perbandingan penawaran berdampingan, aksi counter-offer dan terima
   **Selesai bila**: batas 72 jam terlihat sebagai informasi, bukan kolom masukan
   **Dependency**: prasyarat T037, T039, T041
+  **Hati-hati (tipe basi)**: tipe TypeScript hasil T004 sudah usang terhadap `openapi.yaml` dan **wajib** di-generate ulang sebelum task ini mulai. Perbandingan berdampingan bergantung pada gelombang kontrak ketiga: `RequestCandidate` bertambah `offers` (rantai penawaran terurut `sequence` naik) dan `Offer` bertambah `sequence`. Render riwayat ronde dari `offers`; ambil ronde terakhir sebagai elemen terakhir array (`latest_offer` = elemen terakhir), jangan hitung "terbaru" sendiri di React.
 
 - [ ] T045 [US3] [FE] Frontend: request masuk untuk subkontraktor
   **Modul**: `frontend/src/pages/request/`
@@ -457,22 +466,22 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: konfirmasi pesanan besar, pastikan kapasitas berkurang dari minggu terawal di dalam rentang; batalkan sebelum produksi, pastikan seluruhnya kembali.
 
-- [ ] T047 [US4] [BE] Pengelolaan kalender
+- [x] T047 [US4] [BE] Pengelolaan kalender
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-019, FR-021, FR-089
   **Kemampuan**: baca dan perbarui beberapa periode sekaligus, tandai penuh, penanda kalender basi lebih dari 7 hari; **propagasi perubahan kapasitas mingguan**, yakni ketika `weekly_capacity` listing diubah, perbarui `total_capacity` seluruh periode mendatang yang **belum memiliki alokasi aktif**, dan biarkan periode yang sudah memiliki alokasi tetap seperti semula
   **Selesai bila**: `/listing/me/periods` sesuai kontrak; penanda basi tidak mengubah urutan pencarian; mengubah kapasitas listing benar-benar mengubah periode tanpa alokasi dan tidak menyentuh yang punya alokasi
   **Dependency**: prasyarat T028, T041
-  **Hati-hati**: `kalender_diperbarui_pada` terpisah dari `diperbarui_pada`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
+  **Hati-hati**: `calendar_updated_at` terpisah dari `updated_at`, mengubah listing tidak boleh menghapus penanda basi. Untuk FR-089, **saring periode berdasarkan ada tidaknya baris alokasi aktif lebih dulu**, jangan mencoba memperbarui semuanya lalu menangkap galat constraint; galat itu tidak dapat dijelaskan ke pengguna.
 
-- [ ] T048 [US4] [BE] Pembalikan alokasi
+- [x] T048 [US4] [BE] Pembalikan alokasi
   **Modul**: `backend/internal/order/`
   **FR**: FR-020
   **Kemampuan**: membalik seluruh baris alokasi sebuah pesanan dalam satu transaksi, dengan pola penguncian yang sama seperti pembentukan
-  **Selesai bila**: kapasitas setiap periode kembali ke angka sebelum pesanan terbentuk; baris alokasi ditandai `dibalik_pada`, tidak dihapus
+  **Selesai bila**: kapasitas setiap periode kembali ke angka sebelum pesanan terbentuk; baris alokasi ditandai `reversed_at`, tidak dihapus
   **Dependency**: prasyarat T041
 
-- [ ] T049 [US4] [BE] Penolakan yang bertabrakan dengan alokasi berjalan
+- [x] T049 [US4] [BE] Penolakan yang bertabrakan dengan alokasi berjalan
   **Modul**: `backend/internal/listing/`
   **FR**: FR-017, FR-089
   **Kemampuan**: menolak penurunan kapasitas periode di bawah yang sudah terpakai dan penandaan penuh atas periode yang sudah teralokasi, dengan pesan yang menyebut minggu mana beserta jumlahnya
@@ -480,7 +489,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T041, T047
   **Hati-hati**: constraint akan menolak dengan sendirinya. Tugas task ini menerjemahkannya menjadi pesan yang dapat dibaca pengguna sebelum constraint tersentuh.
 
-- [ ] T050 [P] [US4] [BE] Test alokasi, pembalikan, dan minggu kesiapan
+- [x] T050 [P] [US4] [BE] Test alokasi, pembalikan, dan minggu kesiapan
   **Modul**: `backend/internal/{listing,order}/`
   **FR**: FR-018, FR-020, FR-078, FR-087, FR-089, SC-020
   **Kemampuan**:
@@ -489,7 +498,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   - Periode yang ditandai penuh dilewati, alokasi berpindah ke minggu berikutnya di dalam rentang.
   - Pembalikan memulihkan seluruh periode ke angka semula.
   - Mengubah kapasitas listing memperbarui periode tanpa alokasi dan tidak mengubah periode yang punya alokasi (FR-089).
-  - Trigger menolak upaya menyisipkan alokasi pada periode sebelum `minggu_kesiapan_mulai`.
+  - Trigger menolak upaya menyisipkan alokasi pada periode sebelum `readiness_week_start`.
   **Selesai bila**: seluruh test lulus dan namanya menyebut FR atau SC
   **Dependency**: prasyarat T047, T048
 - [ ] T051 [US4] [FE] Frontend: kalender
@@ -514,7 +523,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: jalankan seluruh transisi status; pada pesanan kedua, biarkan status Dikirim melewati tujuh hari dan pastikan tertutup otomatis.
 
-- [ ] T053 [US5] [BE] Mesin keadaan pesanan
+- [x] T053 [US5] [BE] Mesin keadaan pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-038, FR-039, FR-044
   **Kemampuan**: transisi sesuai diagram `data-model.md` §7; riwayat status dengan waktu dan pelaku; penolakan transisi melompat beserta daftar transisi yang diizinkan
@@ -522,14 +531,14 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: `WorkOrderDetail` mengirim `allowed_transitions` dan `self_cancellable`; galat `INVALID_STATUS_TRANSITION` menyebut urutan yang benar
   **Hati-hati**: perubahan oleh penjadwal ditandai `oleh_sistem`, bukan dibiarkan tanpa identitas.
 
-- [ ] T054 [US5] [BE] Pembatalan
+- [x] T054 [US5] [BE] Pembatalan
   **Modul**: `backend/internal/order/`
   **FR**: FR-065, FR-066, FR-072
   **Kemampuan**: pembatalan oleh kedua pihak selama status masih diterima, wajib beralasan, membalik seluruh alokasi; setelah produksi diarahkan ke sengketa
   **Dependency**: prasyarat T048, T053
   **Selesai bila**: `dibatalkan_oleh_id` tercatat, itu dasar perhitungan tingkat penyelesaian; galat `PEMBATALAN_SETELAH_PRODUKSI` menyebutkan jalur alternatifnya
 
-- [ ] T055 [US5] [BE] Konfirmasi otomatis tujuh hari
+- [x] T055 [US5] [BE] Konfirmasi otomatis tujuh hari
   **Modul**: `backend/internal/order/` + scheduler
   **FR**: FR-068, FR-069, FR-070
   **Kemampuan**: dua lapisan, yaitu dihitung saat pesanan dibaca, dan penjadwal untuk pemberitahuan tenggat mendekat serta penulisan status final; dihentikan oleh sengketa
@@ -537,22 +546,39 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu fungsi domain dipakai kedua lapisan; `dikonfirmasi_otomatis` menandai yang mana
   **Hati-hati**: kalau perhitungan tenggat diduplikasi di beberapa handler, keduanya akan berbeda pada suatu titik dan pesanan yang sama tampak beda status di halaman berbeda.
 
-- [ ] T056 [P] [US5] [BE] Catatan pembayaran
+- [x] T055b [US5] [BE] Konfirmasi manual pemberi order
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-047, FR-068, FR-070
+  **Kemampuan**: pemberi order menutup pesanan berstatus Dikirim lewat `POST /work-orders/{id}/confirm`; `dikonfirmasi_otomatis` false membedakannya dari penutupan tujuh hari; sengketa terbuka menahan konfirmasi
+  **Dependency**: prasyarat T053, T055
+  **Selesai bila**: endpoint memeriksa peran (buyer), bukan pihak jadi 404, status bukan Dikirim jadi `INVALID_STATUS_TRANSITION`; test menyebut FR-047 dan FR-068
+  **Hati-hati**: transisi `shipped -> confirmed` dipakai bersama auto-confirm; jangan duplikasi perhitungan tenggat, pakai `deadline.go` apa adanya.
+
+- [x] T055c [US5] [BE] Pertukaran kontak antar pihak
+  **Modul**: `backend/internal/order/`
+  **FR**: FR-092, FR-040
+  **Kemampuan**: kedua pihak pesanan yang sudah terbentuk saling melihat kontak (nama usaha, email, nomor WhatsApp) lewat `GET /work-orders/{id}/contacts`, prasyarat pembayaran dan koordinasi di luar platform
+  **Dependency**: prasyarat T053
+  **Selesai bila**: rute terautentikasi dengan penjaga pihak, bukan pihak jadi 404, admin juga 404 karena bukan pihak bertransaksi; respons hanya memuat blok pihak lawan; test menyebut FR-092
+  **Hati-hati**: nomor telepon dan email adalah PII sensitif. Endpoint harus dijaga ketat per pihak, tak pernah disajikan publik, dan tak boleh membocorkan keberadaan pesanan ke bukan-pihak.
+
+- [x] T056 [P] [US5] [BE] Catatan pembayaran
   **Modul**: `backend/internal/order/`
   **FR**: FR-040 sampai FR-043
   **Kemampuan**: catat pernyataan terkirim dan diterima, tanpa kolom jumlah uang; penanda perbedaan pernyataan antar pihak; keterangan bahwa platform tidak menjamin
   **Dependency**: prasyarat T053
   **Selesai bila**: tidak ada satu pun kolom jumlah uang maupun integrasi pembayaran
   **Hati-hati**: Batas Keuangan konstitusi. Dokumen sumber menempatkan escrow wajib sebagai mitigasi gagal bayar dan penipuan [1], sekaligus sebagai alat tawar dalam sengketa kualitas produk [1]. Keduanya sengaja tidak dibangun di versi ini, dan konsekuensinya tercatat di Assumptions spec. Jangan menambahkannya kembali tanpa mengubah spec lebih dulu.
+  **Hati-hati (payments sudah ada di kontrak)**: `WorkOrderDetail` sudah punya field `payments`, dan jalur accept (T041) sudah mengisinya sebagai array kosong supaya kontrak dihormati. Task ini yang mengisinya sungguhan (FR-041..FR-043). Pastikan setiap jalur yang mengembalikan `WorkOrderDetail` menyertakan `payments` dari data, bukan lagi array kosong.
 
-- [ ] T057 [P] [US5] [BE] Pelaporan sengketa
+- [x] T057 [P] [US5] [BE] Pelaporan sengketa
   **Modul**: `backend/internal/order/`
   **FR**: FR-046, FR-070
   **Kemampuan**: laporkan sengketa, hentikan hitungan konfirmasi otomatis, satu sengketa terbuka per pesanan
   **Dependency**: prasyarat T053, T055
   **Selesai bila**: pelaporan berulang ditolak; hitungan otomatis benar-benar berhenti
 
-- [ ] T058 [P] [US5] [BE] Test pesanan
+- [x] T058 [P] [US5] [BE] Test pesanan
   **Modul**: `backend/internal/order/`
   **FR**: FR-044, FR-065, FR-066, FR-068, FR-070
   **Kemampuan**: transisi melompat ditolak; pembatalan pra-produksi membalik alokasi; pembatalan pasca-produksi ditolak; konfirmasi otomatis dengan `Clock` digantikan; sengketa menghentikan hitungan
@@ -588,7 +614,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: selesaikan pesanan, isi rating dari kedua sisi; batalkan pesanan lain dari satu sisi, pastikan hanya tingkat penyelesaian pihak itu yang turun.
 
-- [ ] T062 [US6] [BE] Ulasan
+- [x] T062 [US6] [BE] Ulasan
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-047, FR-049, FR-050
   **Kemampuan**: rating 1–5 dan teks hanya atas pesanan yang sudah dikonfirmasi, satu kali per pesanan per pihak, tidak anonim
@@ -596,15 +622,16 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: ulasan atas pesanan belum selesai ditolak; ulasan atas usaha yang belum pernah bertransaksi ditolak
   **Hati-hati**: pemeriksaan status pesanan tidak dapat ditegakkan `CHECK` karena merujuk tabel lain. Wajib di aplikasi.
 
-- [ ] T063 [US6] [BE] Nilai turunan reputasi
+- [x] T063 [US6] [BE] Nilai turunan reputasi
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-048, FR-071, FR-072, FR-073
   **Kemampuan**: rating rata-rata mengecualikan ulasan yang disembunyikan; tingkat penyelesaian dihitung saat dibaca; pembatalan masuk pembagi hanya bagi pihak yang membatalkan; persentase ditahan sampai 3 pesanan disepakati
   **Dependency**: prasyarat T054, T062
   **Selesai bila**: kueri mengikuti `data-model.md` §8; kedua angka penyusun selalu dikirim
   **Hati-hati**: dihitung saat dibaca, **bukan** disimpan sebagai kolom. Kolom yang harus diperbarui setiap kali ulasan disembunyikan atau pesanan dibatalkan adalah sumber ketidaksesuaian yang paling sering muncul.
+  **Hati-hati**: `SearchReputation` di `db/queries/search.sql` sudah menghitung `completed`/`divisor` dengan aturan FR-072 `FILTER (WHERE status <> 'cancelled' OR cancelled_by_id = pr.id)`. T063 wajib memakai kueri yang sama, jangan menulis kueri baru. Kalau ditulis ulang, profil publik dan hasil pencarian akan menampilkan angka berbeda untuk usaha yang sama tanpa gejala. Lihat catatan BERISIKO di `docs/utang-teknis.md`.
 
-- [ ] T064 [P] [US6] [BE] Test reputasi
+- [x] T064 [P] [US6] [BE] Test reputasi
   **Modul**: `backend/internal/reputation/`
   **FR**: FR-047, FR-050, FR-071, FR-072, FR-073
   **Kemampuan**: pembatalan menurunkan tingkat penyelesaian pihak yang membatalkan dan **tidak** mempengaruhi pihak lain; ulasan disembunyikan keluar dari rata-rata; ambang 3 pesanan
@@ -633,7 +660,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 **Independent Test**: tambah jenis produk dan pastikan langsung dapat dipilih; setujui dan tolak satu pengajuan verifikasi, pastikan listing tetap tayang pada kedua kasus.
 
-- [ ] T067 [P] [US7] [BE] Verifikasi identitas
+- [x] T067 [P] [US7] [BE] Verifikasi identitas
   **Modul**: `backend/internal/{account,admin}/`
   **FR**: FR-006 sampai FR-011
   **Kemampuan**: pengajuan dengan dua berkas, antrean admin, setujui atau tolak beralasan, lencana, pengajuan ulang setelah penolakan
@@ -641,28 +668,28 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: satu pengajuan menunggu per profil; penolakan wajib beralasan; listing tetap tayang apa pun keputusannya
   **Hati-hati**: verifikasi **bukan gerbang**. Ini menyimpang dari kriteria penerimaan dokumen sumber yang menempatkan status "Menunggu Verifikasi" pada alur listing [1]; penyimpangannya sudah tercatat di Assumptions spec.
 
-- [ ] T068 [P] [US7] [BE] Pengelolaan daftar baku
+- [x] T068 [P] [US7] [BE] Pengelolaan daftar baku
   **Modul**: `backend/internal/{masterdata,admin}/`
   **FR**: FR-059, FR-060, FR-061
   **Kemampuan**: tambah, ubah nama, nonaktifkan item; keputusan atas usulan pengguna
   **Dependency**: prasyarat T019, T020
   **Selesai bila**: item nonaktif tidak dapat dipilih untuk listing baru, sementara listing yang sudah memakainya tetap utuh dan tetap dapat ditemukan
 
-- [ ] T069 [P] [US7] [BE] Moderasi ulasan
+- [x] T069 [P] [US7] [BE] Moderasi ulasan
   **Modul**: `backend/internal/admin/`
   **FR**: FR-050
   **Kemampuan**: sembunyikan ulasan dengan alasan, tercatat beserta identitas admin dan waktunya
   **Dependency**: prasyarat T020, T062
   **Selesai bila**: ulasan hilang dari profil publik dan rata-rata rating berubah; `alasan_penyembunyian` wajib terisi
 
-- [ ] T070 [P] [US7] [BE] Pemantauan pesanan telat
+- [x] T070 [P] [US7] [BE] Pemantauan pesanan telat
   **Modul**: `backend/internal/admin/` + scheduler
   **FR**: FR-045
   **Kemampuan**: daftar pesanan melewati deadline, notifikasi ke kedua pihak
   **Dependency**: prasyarat T018, T020, T053
   **Selesai bila**: pesanan berstatus Produksi yang melewati deadline muncul di daftar admin
 
-- [ ] T071 [US7] [BE] Mediasi sengketa
+- [x] T071 [US7] [BE] Mediasi sengketa
   **Modul**: `backend/internal/admin/`
   **FR**: FR-046, FR-067
   **Kemampuan**: tandai Dalam Mediasi, baca riwayat lengkap termasuk alokasi kapasitas, catatan pembayaran, dan perbedaan pernyataan; tutup mediasi
@@ -670,7 +697,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Selesai bila**: penutupan sebagai dibatalkan **wajib** menyertakan keputusan pengembalian alokasi, pihak penanggung, dan catatan admin; tanpa ketiganya ditolak
   **Hati-hati**: constraint `penyelesaian_lengkap` menegakkan ini di basis data. Antarmuka harus meminta ketiganya secara eksplisit, bukan memberi nilai bawaan. Mediasi admin adalah jalur yang dipilih untuk fase awal karena penanganan sengketa legal formal menuntut tim hukum dan asuransi, dan tanpa escrow, ia kehilangan salah satu daya paksanya [1].
 
-- [ ] T072 [P] [US7] [BE] Test admin
+- [x] T072 [P] [US7] [BE] Test admin
   **Modul**: `backend/internal/admin/`
   **FR**: FR-007, FR-050, FR-060, FR-067
   **Kemampuan**: non-admin ditolak pada setiap endpoint admin; item nonaktif tidak merusak listing; mediasi tanpa keputusan lengkap ditolak; berkas identitas milik usaha lain tidak dapat diakses
@@ -695,12 +722,12 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 
 ## Phase 10: Polish dan Penyiapan Demo
 
-- [ ] T075 [BE] Data uji
+- [x] T075 [BE] Data uji
   **Modul**: `backend/cmd/devotion/`
   **Kemampuan**: `seed:test-data` menyiapkan 50 usaha, kandidat 500 potong/minggu jeda 0 hari untuk skenario 3.000 potong, kandidat berjeda 14 dan 21 hari untuk memverifikasi minggu kesiapan, kandidat berkapasitas 200/minggu untuk skenario deadline lima bulan, kalender basi 8 hari, request kedaluwarsa, pesanan Dikirim 6 hari dan 8 hari lalu, pesanan telat, dua pengajuan verifikasi, usaha dengan hanya 2 pesanan; `reset:test-data` memulihkan
   **Dependency**: prasyarat T019, T041, T055, T067
   **Selesai bila**: perintah **menolak berjalan** saat `APP_ENV=production`; akun uji memakai domain `.test`
-  **Hati-hati**: alur bertenggat disiapkan sebagai data yang sudah berada pada keadaan itu, bukan lewat kendali geser waktu, data yang di-seed tidak berisiko terbawa ke lingkungan sungguhan.
+  **Hati-hati**: alur bertenggat disiapkan sebagai data yang sudah berada pada keadaan itu, bukan lewat kendali geser waktu, data yang di-seed tidak berisiko terbawa ke lingkungan sungguhan. Pesanan Dikirim 6 hari dan 8 hari sudah punya jalurnya lewat T055: `shipped_at` dipatok pada `Clock.Now()` dikurangi 6 atau 8 hari sehingga jendela konfirmasi otomatis tujuh hari jatuh di sisi yang benar tanpa menunggu waktu nyata.
 
 - [ ] T076 [P] [OPS] Dokumen skenario uji manual final
   **Modul**: `docs/skenario-uji-manual.md`
@@ -708,7 +735,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
   **Dependency**: prasyarat T034, T038, T046, T052, T061, T066, T074
   **Selesai bila**: dapat diikuti orang yang belum pernah melihat sistem ini; setiap langkah menyebut akun yang dipakai
 
-- [ ] T077 [P] [OPS] Runbook VPS
+- [x] T077 [P] [OPS] Runbook VPS
   **Modul**: `docs/setup-vps.md`
   **Kemampuan**: 16 langkah dari `quickstart.md` bagian B
   **Dependency**: prasyarat T005
@@ -756,7 +783,7 @@ Diambil dari `spec.md` bagian Istilah yang Mengikat. Salah memahami keduanya ber
 | Task | Bergantung pada | Alasan |
 |------|-----------------|--------|
 | T035 | T028 | Memanggil fungsi perpanjangan horizon (FR-088) |
-| T041 | T027 | Membaca `jeda_kesiapan_hari` untuk menghitung `minggu_kesiapan_mulai` |
+| T041 | T027 | Membaca `readiness_lead_days` untuk menghitung `readiness_week_start` |
 | T040 | T035 | Rentang kapasitas harus dihitung dengan cara yang sama |
 | T047 | T041 | Propagasi FR-089 harus tahu periode mana punya alokasi aktif |
 | T050 | T041, T047 | Menguji alokasi dan propagasi bersama |

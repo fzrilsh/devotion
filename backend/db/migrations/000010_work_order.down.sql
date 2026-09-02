@@ -1,0 +1,11 @@
+DROP INDEX IF EXISTS idx_payment_order;
+DROP TABLE IF EXISTS payment_record;
+DROP TYPE IF EXISTS payment_direction;
+DROP INDEX IF EXISTS idx_status_history_order;
+DROP TABLE IF EXISTS work_order_status_history;
+DROP INDEX IF EXISTS idx_order_auto_confirm;
+DROP INDEX IF EXISTS idx_order_deadline_active;
+DROP INDEX IF EXISTS idx_order_subcon;
+DROP INDEX IF EXISTS idx_order_buyer;
+DROP TABLE IF EXISTS work_order;
+DROP TYPE IF EXISTS work_order_status;

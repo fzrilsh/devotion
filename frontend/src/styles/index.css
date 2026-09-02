@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+    --font-raleway: "Raleway", sans-serif;
+
+    --color-deep-navy-50: oklch(0.93 0.021 254.92);
+    --color-deep-navy-100: oklch(0.867 0.04 256.59);
+    --color-deep-navy-200: oklch(0.726 0.085 255.94);
+    --color-deep-navy-300: oklch(0.595 0.132 257.13);
+    --color-deep-navy-400: oklch(0.469 0.117 257.12);
+    --color-deep-navy-500: oklch(0.333 0.077 257.1);
+    --color-deep-navy-600: oklch(0.292 0.066 257.03);
+    --color-deep-navy-700: oklch(0.243 0.051 258.3);
+    --color-deep-navy-800: oklch(0.194 0.035 256.45);
+    --color-deep-navy-900: oklch(0.152 0.02 253.73);
+    --color-deep-navy-950: oklch(0.111 0.013 239.31);
+
+    
+    --color-industrial-blue-50: oklch(0.95 0.023 280.64);
+    --color-industrial-blue-100: oklch(0.899 0.047 280.13);
+    --color-industrial-blue-200: oklch(0.797 0.097 278.14);
+    --color-industrial-blue-300: oklch(0.689 0.154 274.27);
+    --color-industrial-blue-400: oklch(0.591 0.206 268.89);
+    --color-industrial-blue-500: oklch(0.488 0.217 264.38);
+    --color-industrial-blue-600: oklch(0.418 0.185 264.25);
+    --color-industrial-blue-700: oklch(0.347 0.154 264.37);
+    --color-industrial-blue-800: oklch(0.285 0.126 264.32);
+    --color-industrial-blue-900: oklch(0.214 0.095 263.99);
+    --color-industrial-blue-950: oklch(0.168 0.075 265.06);
+}

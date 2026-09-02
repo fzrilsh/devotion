@@ -1,0 +1,5 @@
+-- Extensions live in public and are shared by every schema on the database, so
+-- a per-schema teardown must not drop them: a sibling schema may still hold
+-- citext columns. They are database-level infrastructure, provisioned once and
+-- left in place. This down is intentionally empty to keep the down-migration
+-- chain runnable without fighting shared usage.

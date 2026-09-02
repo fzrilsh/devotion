@@ -353,13 +353,21 @@ Syarat yang harus dijaga: perhitungan tenggat ditulis satu kali di satu fungsi d
 **Decision**: whatsmeow berjalan sebagai goroutine di dalam proses backend dengan store sesi pada Postgres yang sama. Ditambah empat hal karena FR-002 menjadikan verifikasi nomor HP sebagai gerbang, sehingga sesi yang lepas berarti tidak ada akun baru yang dapat dibuat.
 
 1. **Halaman admin QR dan status sambungan** menampilkan QR saat sesi perlu disambungkan ulang, dan status terkini. Tanpa ini, satu sesi yang lepas menuntut akses SSH, dan itu tidak mungkin dilakukan saat demo berjalan.
-2. **Endpoint health menyertakan status whatsmeow**, agar pemantau uptime eksternal memberi tahu sebelum juri menemukannya.
+2. **Endpoint health menyertakan status whatsmeow**, agar pemantau uptime eksternal memberi tahu sebelum juri menemukannya. WhatsApp terputus dilaporkan di `dependencies.whatsapp` tetapi **tidak menggerakkan 503**, lihat keputusan di bawah.
 3. **Subcommand darurat** `devotion user:verify --phone` untuk memverifikasi akun secara manual. Bukan untuk pengguna, melainkan agar demo tidak hilang bila nomor terblokir satu jam sebelum penjurian.
 4. **Email dipertahankan sebagai kanal kedua**, FR-052 tetap utuh, sehingga pemulihan akun (FR-003) tidak bergantung pada satu library tidak resmi.
 
 Pengiriman WhatsApp mengikuti pola notifikasi umum: baris ditulis ke tabel di dalam transaksi kejadiannya, goroutine pengirim mencoba paling banyak tiga kali (FR-085), kegagalan tidak menggagalkan transaksi apa pun (FR-086), dan notifikasi di dalam platform tetap tampil (FR-054).
 
 **Risiko yang diterima secara sadar**: whatsmeow memakai protokol WhatsApp Web multidevice, bukan API resmi. Mengirim kode sekali pakai ke banyak nomor yang belum pernah berinteraksi adalah pola yang paling mungkin dideteksi sebagai spam. Pembatasan laju per nomor dan per alamat asal mengurangi risiko itu, tidak menghilangkannya. Nomor yang dipakai adalah nomor khusus lomba, bukan nomor pribadi anggota tim, dan nilainya hanya ada di variabel lingkungan, tidak di repository, dokumentasi, maupun artefak perencanaan.
+
+**Decision (pelaporan health, liveness dan readiness dipisah)**: WhatsApp terputus dilaporkan sebagai `dependencies.whatsapp: disconnected` dengan `status: degraded` pada respons **200**, tidak menggerakkan 503. Hanya basis data gagal atau penyimpanan penuh yang menggerakkan 503, karena keduanya berarti instance memang tidak dapat melayani dan layak di-restart atau ditarik dari rotasi.
+
+**Rationale**: `docker-compose.yml` memakai `restart: unless-stopped` bersama healthcheck yang memanggil `devotion health:check`. Bila WhatsApp terputus menggerakkan 503, healthcheck menandai container tidak sehat dan Docker me-restart-nya. Pemulihan sesi whatsmeow yang lepas menuntut pemindaian QR manual lewat halaman admin (butir 1 di atas), jadi restart tidak menyambungkan apa pun dan hanya menghasilkan restart loop yang menjatuhkan seluruh situs, padahal basis data dan web sehat. Kerusakannya lebih besar daripada yang seharusnya dideteksi. Niat butir 2, "pemantau uptime memberi tahu sebelum juri menemukannya", tetap tercapai dari isi `dependencies.whatsapp`; yang tidak diperlukan adalah kode 503-nya.
+
+**Alternatives considered**:
+
+- **Menyamakan seluruh kegagalan dependency menjadi 503**: ditolak. Selain restart loop di atas, alert yang rutin merah untuk hal yang bukan kerusakan melayani akan diabaikan, sehingga kehilangan nilainya justru saat basis data benar-benar jatuh.
 
 **Rationale**: API resmi Meta menuntut verifikasi bisnis yang tidak akan selesai sebelum tenggat, sementara dokumen sumber mencantumkan notifikasi WhatsApp sebagai bagian dari fitur yang dijanjikan [1]. whatsmeow adalah satu-satunya jalan, jadi keputusannya bukan apakah memakainya, melainkan bagaimana agar kegagalannya tidak menjatuhkan seluruh demo.
 
@@ -374,7 +382,7 @@ Pengiriman WhatsApp mengikuti pola notifikasi umum: baris ditulis ke tabel di da
 
 ## R-09. Email transaksional lewat Mailjet dan penyiapan DNS
 
-**Decision**: Mailjet melalui SMTP dengan `net/smtp` dari standard library, tanpa menambah dependency SDK. Pengirim `noreply@devotion.cloud`. Tiga record DNS dipasang di Cloudflare **pada awal pengerjaan, bukan menjelang tenggat**: SPF, DKIM (nilainya diberikan Mailjet), dan DMARC dengan `p=none` pada tahap ini.
+**Decision**: Mailjet melalui SMTP dengan `net/smtp` dari standard library, tanpa menambah dependency SDK. Pengirim `noreply@devotion.web.id`. Tiga record DNS dipasang di Cloudflare **pada awal pengerjaan, bukan menjelang tenggat**: SPF, DKIM (nilainya diberikan Mailjet), dan DMARC dengan `p=none` pada tahap ini.
 
 Verifikasi email memakai **kode enam digit**, bukan tautan sekali klik, karena penguji dapat membuka email di perangkat yang berbeda dari perangkat pendaftarannya. Pengiriman berjalan di goroutine, respons HTTP tidak pernah menunggu SMTP selesai, dan tombol kirim ulang selalu tersedia dengan jeda yang membesar.
 

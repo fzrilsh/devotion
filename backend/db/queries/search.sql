@@ -1,0 +1,187 @@
+-- SearchCandidates ranks published listings against the four hard criteria
+-- (FR-023..FR-025) and returns one keyset page. The query shape follows
+-- data-model.md section 10: score lives in the `ranked` CTE so the keyset WHERE
+-- can filter on it, capacity is summed across the readiness..deadline range
+-- (FR-080), and periods past horizon_until are counted optimistically as full
+-- (FR-088). The application rounds the deadline to Monday before calling this,
+-- so Go stays the single source of truth for that rounding, and horizon
+-- extension happens outside this read query for passing candidates only. A NULL
+-- product/machine/lead filter counts as satisfied (FR-023, decision C-4) so the
+-- score stays 0..4 with no weighting or normalization (FR-024). The keyset tuple
+-- ends in listing_id to make the order total and repeatable across pages.
+-- name: SearchCandidates :many
+WITH param AS (
+    SELECT
+        @search_date::date    AS search_date,
+        @deadline_week::date  AS deadline_week,
+        @quantity::int        AS quantity,
+        sqlc.narg('product_item')::uuid  AS product_item,
+        sqlc.narg('machine_item')::uuid  AS machine_item,
+        sqlc.narg('max_lead')::int       AS max_lead,
+        @searcher_profile::uuid          AS searcher_profile,
+        sqlc.narg('city_code')::text     AS city_code,
+        sqlc.narg('province_code')::text AS province_code
+),
+base_candidate AS (
+    SELECT
+        l.id AS listing_id,
+        l.profile_id,
+        pr.business_name,
+        pr.verified,
+        pr.city_code,
+        l.weekly_capacity,
+        l.readiness_lead_days,
+        l.horizon_until,
+        l.calendar_updated_at,
+        date_trunc('week', p.search_date + (l.readiness_lead_days || ' days')::interval)::date
+            AS readiness_week
+    FROM capacity_listing l
+    JOIN business_profile pr ON pr.id = l.profile_id
+    CROSS JOIN param p
+    WHERE l.published
+      AND l.profile_id <> p.searcher_profile
+      AND (p.city_code IS NULL OR pr.city_code = p.city_code)
+      AND (p.province_code IS NULL OR pr.city_code IN (
+              SELECT code FROM city WHERE province_code = p.province_code))
+),
+capacity AS (
+    SELECT
+        c.listing_id,
+        coalesce(sum(pk.total_capacity - pk.used_capacity), 0) AS recorded_remaining,
+        greatest(0, (
+            (p.deadline_week - greatest(c.readiness_week, c.horizon_until + 7)) / 7 + 1
+        )) * c.weekly_capacity AS uncreated_remaining
+    FROM base_candidate c
+    CROSS JOIN param p
+    LEFT JOIN availability_period pk
+           ON pk.listing_id = c.listing_id
+          AND NOT pk.marked_full
+          AND pk.week_start BETWEEN c.readiness_week AND p.deadline_week
+    GROUP BY c.listing_id, c.readiness_week, c.horizon_until,
+             c.weekly_capacity, p.deadline_week
+),
+scored AS (
+    SELECT
+        c.listing_id,
+        c.profile_id,
+        c.business_name,
+        c.verified,
+        c.city_code,
+        c.weekly_capacity,
+        c.readiness_lead_days,
+        c.horizon_until,
+        c.calendar_updated_at,
+        c.readiness_week,
+        (cap.recorded_remaining + cap.uncreated_remaining)::bigint AS remaining_capacity,
+        (p.product_item IS NULL OR EXISTS (
+            SELECT 1 FROM listing_product lp
+             WHERE lp.listing_id = c.listing_id AND lp.item_id = p.product_item))::int
+            AS product_match,
+        (p.machine_item IS NULL OR EXISTS (
+            SELECT 1 FROM listing_machine lm
+             WHERE lm.listing_id = c.listing_id AND lm.item_id = p.machine_item))::int
+            AS machine_match,
+        (p.max_lead IS NULL OR c.readiness_lead_days <= p.max_lead)::int
+            AS lead_match,
+        ((cap.recorded_remaining + cap.uncreated_remaining) >= p.quantity)::int
+            AS capacity_enough
+    FROM base_candidate c
+    JOIN capacity cap ON cap.listing_id = c.listing_id
+    CROSS JOIN param p
+),
+ranked AS (
+    SELECT *,
+           (product_match + machine_match + lead_match + capacity_enough) AS score
+    FROM scored
+)
+SELECT
+    r.listing_id,
+    r.profile_id,
+    r.business_name,
+    r.verified,
+    r.city_code,
+    ct.name AS city_name,
+    r.weekly_capacity,
+    r.readiness_week,
+    r.readiness_lead_days,
+    r.horizon_until,
+    r.calendar_updated_at,
+    r.remaining_capacity,
+    coalesce((
+        SELECT array_agg(ci.name ORDER BY ci.name)
+          FROM listing_machine lm
+          JOIN catalog_item ci ON ci.id = lm.item_id
+         WHERE lm.listing_id = r.listing_id
+    ), ARRAY[]::text[])::text[] AS machine_types,
+    r.product_match,
+    r.machine_match,
+    r.lead_match,
+    r.capacity_enough,
+    r.score
+FROM ranked r
+LEFT JOIN city ct ON ct.code = r.city_code
+-- Keyset "after the cursor" expanded as an explicit lexicographic OR chain
+-- because the sort mixes directions: score and remaining_capacity descend while
+-- lead, business_name, and listing_id ascend. A single row-value "<" comparison
+-- cannot express mixed directions, so each tier compares in its own direction
+-- (DESC via "<", ASC via ">") after the higher tiers tie. listing_id is the
+-- final ASC tiebreaker that makes the order total and repeatable (FR-025). The
+-- first page passes a score sentinel of 5, above the 0..4 maximum, so the first
+-- clause admits every row.
+WHERE score < @cursor_score::int
+   OR (score = @cursor_score::int
+       AND remaining_capacity < @cursor_remaining::bigint)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days < @cursor_neg_lead::int)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days = @cursor_neg_lead::int
+       AND business_name > @cursor_name::text)
+   OR (score = @cursor_score::int
+       AND remaining_capacity = @cursor_remaining::bigint
+       AND -readiness_lead_days = @cursor_neg_lead::int
+       AND business_name = @cursor_name::text
+       AND listing_id > @cursor_listing::uuid)
+ORDER BY score DESC, remaining_capacity DESC, readiness_lead_days ASC,
+         business_name ASC, listing_id ASC
+LIMIT @page_size::int;
+
+-- SearchReputation computes reputation for the profiles on one search page,
+-- read at query time and never stored as a column (data-model.md section 19,
+-- FR-071). It mirrors the two derived-value formulas the public profile uses:
+-- average_rating and review_count from visible reviews, completed_jobs from
+-- confirmed orders where the profile is subcontractor (FR-048), and the
+-- completion-rate numerator/denominator (FR-071/FR-072). The FR-073 threshold
+-- (divisor >= 3 before a percentage is shown) is applied in the service, not
+-- here, so the raw counts stay visible. One query over the whole page avoids an
+-- N+1 across candidates.
+-- name: SearchReputation :many
+SELECT
+    pr.id AS profile_id,
+    coalesce(rev.average_rating, 0)::numeric AS average_rating,
+    coalesce(rev.review_count, 0)::bigint    AS review_count,
+    coalesce(job.completed_jobs, 0)::bigint  AS completed_jobs,
+    coalesce(comp.completed, 0)::bigint      AS completion_completed,
+    coalesce(comp.divisor, 0)::bigint        AS completion_divisor
+FROM business_profile pr
+LEFT JOIN LATERAL (
+    SELECT round(avg(r.rating)::numeric, 2) AS average_rating,
+           count(*) AS review_count
+      FROM review r
+     WHERE r.reviewee_id = pr.id AND NOT r.hidden
+) rev ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) AS completed_jobs
+      FROM work_order o
+     WHERE o.subcontractor_id = pr.id AND o.status = 'confirmed'
+) job ON true
+LEFT JOIN LATERAL (
+    SELECT count(*) FILTER (WHERE status = 'confirmed') AS completed,
+           count(*) FILTER (
+               WHERE status <> 'cancelled' OR cancelled_by_id = pr.id
+           ) AS divisor
+      FROM work_order o
+     WHERE o.buyer_id = pr.id OR o.subcontractor_id = pr.id
+) comp ON true
+WHERE pr.id = ANY(@profile_ids::uuid[]);

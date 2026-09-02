@@ -26,7 +26,7 @@ teknis ada di `research.md`.
 | Akun Sentry | DSN untuk backend, opsional untuk frontend |
 | Nomor WhatsApp khusus | Bukan nomor pribadi anggota tim; ponselnya tersedia untuk memindai QR |
 | GitHub | Repository dan izin menulis ke GitHub Container Registry |
-| Mesin lokal | Docker, Go 1.22+, Node 20+ untuk pengembangan |
+| Mesin lokal | Docker, Go 1.25+, Node 20+ untuk pengembangan |
 
 Yang **tidak** dibutuhkan dan sengaja tidak dipakai: payment gateway (dilarang Batas
 Keuangan konstitusi, sehingga mitigasi gagal bayar berupa escrow wajib pada dokumen
@@ -135,7 +135,7 @@ Setelah langkah B6, uji bahwa origin benar-benar tertutup dari luar Cloudflare:
 
 ```bash
 curl -sk --max-time 5 https://<IP_VPS>/api/health    # harus timeout atau tertolak
-curl -s https://devotion.cloud/api/health                  # harus 200
+curl -s https://devotion.web.id/api/health                  # harus 200
 ```
 
 Bila perintah pertama berhasil, lapisan tepi bisa dilewati begitu saja beserta seluruh
@@ -180,11 +180,11 @@ sudo chmod 644 /opt/devotion/tls/origin.pem /opt/devotion/tls/cf-client-ca.pem
 ### B7. Struktur direktori dan volume
 
 ```bash
-sudo mkdir -p /opt/devotion/{tls,unggahan,cadangan}
+sudo mkdir -p /opt/devotion/{tls,uploads,backups}
 sudo chown -R devotion:devotion /opt/devotion
 ```
 
-`unggahan` adalah volume terpisah dari image, agar penerapan versi baru tidak menghapus
+`uploads` adalah volume terpisah dari image, agar penerapan versi baru tidak menghapus
 berkas yang sudah diunggah.
 
 ### B8. Variabel lingkungan
@@ -202,7 +202,7 @@ ini:
 
 ```text
 APP_ENV=production
-APP_BASE_URL=https://devotion.cloud
+APP_BASE_URL=https://devotion.web.id
 TLS_CERT_PATH=/opt/devotion/tls/origin.pem
 TLS_KEY_PATH=/opt/devotion/tls/origin.key
 CF_CLIENT_CA_PATH=/opt/devotion/tls/cf-client-ca.pem
@@ -214,14 +214,14 @@ DATABASE_URL=
 
 MAILJET_API_KEY=
 MAILJET_SECRET_KEY=
-MAIL_FROM=noreply@devotion.cloud
+MAIL_FROM=noreply@devotion.web.id
 
 WHATSAPP_NUMBER=
 SENTRY_DSN=
 
-UPLOAD_PATH=/opt/devotion/unggahan
-UPLOAD_TOTAL_LIMIT_MB=500
-UPLOAD_FILE_LIMIT_MB=5
+UPLOAD_PATH=/opt/devotion/uploads
+UPLOAD_MAX_TOTAL_MB=500
+UPLOAD_MAX_FILE_MB=5
 ```
 
 `.env` tidak pernah masuk repository. `.env.example` hanya memuat nama kunci tanpa nilai.
@@ -258,6 +258,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB:       ${POSTGRES_DB}
       TZ: Asia/Jakarta
+    ports:
+      # Hanya loopback. Dibutuhkan agar `go run ./cmd/devotion serve` dari host (bagian D)
+      # dapat menjangkau Postgres di dalam container. 5434 dipilih agar tidak bentrok
+      # dengan Postgres lain di mesin pengembang.
+      - "127.0.0.1:5434:5432"
     command:
       - postgres
       - -c max_connections=20
@@ -293,8 +298,9 @@ services:
     ports:
       - "443:443"
     volumes:
-      - /opt/devotion/tls:/tls:ro
-      - /opt/devotion/unggahan:/unggahan
+      # Path di dalam container sengaja dibuat cermin dengan path host agar .env tidak perlu dua versi.
+      - /opt/devotion/tls:/opt/devotion/tls:ro
+      - ${UPLOAD_PATH}:${UPLOAD_PATH}
     healthcheck:
       test: ["CMD", "/devotion", "health:check"]
       interval: 30s
@@ -314,6 +320,12 @@ batas akan mengisi 50GB, lalu Postgres berhenti menerima tulisan dan aplikasi ma
 Tidak ada layanan frontend karena Go menyajikannya, dan tidak ada layanan proxy karena Go
 menghabiskan TLS sendiri. **Cara memeriksa Gate I: hitung entri di bawah `services:`.
 Lebih dari dua berarti pelanggaran.**
+
+Port Postgres dipublikasikan hanya ke `127.0.0.1`, bukan ke `0.0.0.0`, sehingga tidak
+pernah terjangkau dari luar mesin. Ini bukan lubang keamanan sekaligus perlu diingat:
+port yang dipublikasikan Docker melewati aturan `ufw`, jadi mengikat ke loopback adalah
+satu-satunya yang menahan Postgres tetap tertutup di VPS. `UPLOAD_PATH` diambil dari
+`.env` agar path host dan container hanya ditulis satu kali.
 
 ### B11. Menyalakan dan memverifikasi migrasi
 
@@ -355,7 +367,7 @@ docker compose exec backend /devotion seed:master-data
 
 # Admin pertama. Kata sandi diminta lewat prompt, tidak lewat argumen,
 # agar tidak tersimpan di riwayat shell.
-docker compose exec -it backend /devotion admin:create --email admin@devotion.cloud
+docker compose exec -it backend /devotion admin:create --email admin@devotion.web.id
 ```
 
 Ketiganya idempoten: menjalankan dua kali tidak menduplikasi data.
@@ -385,8 +397,13 @@ senyap saat pencarian.
 
 ### B13. Menyambungkan WhatsApp
 
-Buka `https://devotion.cloud/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
+Buka `https://devotion.web.id/admin/whatsapp`, masuk sebagai admin, pindai QR dengan ponsel yang
 memegang nomor khusus lomba.
+
+Kode QR punya masa berlaku pendek. Muat ulang halaman untuk mendapat kode baru, atau tekan
+tombol sambung ulang bila kode di layar sudah kedaluwarsa. Setiap pemuatan halaman
+menyiapkan siklus pemasangan baru bila tautan belum terpasangkan, jadi tidak ada jendela
+waktu setelah proses menyala yang membuat QR berhenti muncul.
 
 Sesi dapat lepas kapan saja, termasuk bila ponselnya lama tidak aktif. Halaman ini ada
 justru agar penyambungan ulang tidak memerlukan akses SSH, dan itu penting karena FR-002
@@ -403,11 +420,27 @@ docker compose exec backend /devotion user:verify --phone 62xxxxxxxxxx
 ### B14. Health check dan pemantau uptime
 
 ```bash
-curl -s https://devotion.cloud/api/health | jq
+curl -s https://devotion.web.id/api/health | jq
 ```
 
-Yang diharapkan: `status: sehat`, basis data sehat, WhatsApp tersambung, penyimpanan
-berkas sehat dengan `terpakai_mb` jauh di bawah 500.
+Yang diharapkan: `status: ok`, `dependencies.database: ok`, `dependencies.whatsapp:
+connected`, dan `dependencies.storage.status: ok` dengan `used_mb` jauh di bawah `limit_mb`.
+
+Kode responsnya dibedakan per dependency, bukan disamakan:
+
+- Basis data gagal (`database: fail`) atau penyimpanan penuh (`storage.status: full`)
+  menghasilkan **503** dengan `status: degraded`. Instance memang tidak dapat melayani,
+  jadi layak di-restart atau ditarik dari rotasi.
+- WhatsApp terputus (`whatsapp: disconnected`) menghasilkan **200** dengan `status:
+  degraded`, bukan 503. Pemantau uptime tetap dapat memberi alert dari isi body, tetapi
+  healthcheck kontainer tidak me-restart proses: pemulihan sesi menuntut pemindaian QR
+  manual lewat halaman admin, jadi restart hanya akan memicu restart loop (lihat R-08).
+
+Karena WhatsApp terputus kini berkode 200, pemantau uptime yang hanya melihat kode
+status akan menganggapnya hijau dan sinyalnya hilang sama sekali. Konfigurasikan pemantau
+dengan pencocokan kata kunci pada isi respons: cari `"whatsapp":"connected"` dan picu
+alert bila tidak ditemukan. Tanpa ini, keputusan memindahkan WhatsApp dari 503 ke
+200-degraded menukar alert palsu dengan tidak ada alert.
 
 Daftarkan URL itu ke layanan pemantau uptime gratis dengan interval 5 menit. Layanannya
 berada di luar server sehingga tidak dihitung dalam batas dua layanan, dan wajib dicatat
@@ -420,22 +453,22 @@ ketika aplikasi sedang mati atau rusak, justru saat itulah cadangan paling dibut
 Penyimpangan ini tercatat di Complexity Tracking `plan.md`.
 
 ```bash
-cat > /opt/devotion/cadangan.sh <<'EOF'
+cat > /opt/devotion/backup.sh <<'EOF'
 #!/bin/bash
 set -euo pipefail
 cd /opt/devotion
 set -a; . ./.env; set +a
 STAMP=$(date +%Y%m%d-%H%M)
 docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" devotion \
-  | gzip > "/opt/devotion/cadangan/devotion-$STAMP.sql.gz"
-ls -1t /opt/devotion/cadangan/devotion-*.sql.gz | tail -n +4 | xargs -r rm --
+  | gzip > "/opt/devotion/backups/devotion-$STAMP.sql.gz"
+ls -1t /opt/devotion/backups/devotion-*.sql.gz | tail -n +4 | xargs -r rm --
 EOF
 
-chmod +x /opt/devotion/cadangan.sh
-/opt/devotion/cadangan.sh        # uji sekarang, jangan tunggu besok
-ls -lh /opt/devotion/cadangan/
+chmod +x /opt/devotion/backup.sh
+/opt/devotion/backup.sh        # uji sekarang, jangan tunggu besok
+ls -lh /opt/devotion/backups/
 
-( crontab -l 2>/dev/null; echo "15 2 * * * /opt/devotion/cadangan.sh >> /opt/devotion/cadangan/cron.log 2>&1" ) | crontab -
+( crontab -l 2>/dev/null; echo "15 2 * * * /opt/devotion/backup.sh >> /opt/devotion/backups/cron.log 2>&1" ) | crontab -
 ```
 
 Disalurkan langsung ke gzip agar tidak menulis berkas mentah besar, dan hanya tiga salinan
@@ -445,7 +478,7 @@ terakhir disimpan.
 itu sendiri yang bermasalah. Dari mesin lokal:
 
 ```bash
-rsync -avz devotion@devotion.cloud:/opt/devotion/cadangan/ ./cadangan-devotion/
+rsync -avz devotion@devotion.web.id:/opt/devotion/backups/ ./backups-devotion/
 ```
 
 ### B16. Snapshot VPS
@@ -498,20 +531,42 @@ git clone https://github.com/fzrilsh/devotion.git && cd devotion
 cp .env.example .env        # isi untuk lokal; APP_ENV=development
 
 docker compose up -d postgres
+
+set -a; . ./.env; set +a    # biner Go membaca env, bukan berkas .env
 cd backend && go run ./cmd/devotion serve
 
 cd ../frontend && npm ci && npm run dev
 ```
 
-Pada `APP_ENV=development`, backend melayani HTTP biasa tanpa TLS dan tanpa pemeriksaan
-sertifikat klien Cloudflare, dan Vite dev server memproksikan `/api` ke backend.
+Langkah `set -a; . ./.env; set +a` tidak bisa dilewati. `.env` hanya dibaca Docker
+Compose; biner Go mengambil konfigurasi dari variabel lingkungan lewat `os.Getenv`,
+jadi tanpa ekspor itu `serve` berhenti dengan `variabel lingkungan wajib belum
+diisi: APP_ENV`. Yang wajib di setiap lingkungan hanya empat: `APP_ENV`,
+`APP_BASE_URL`, `DATABASE_URL`, `UPLOAD_PATH`.
+
+Perintah compose di bagian ini ditulis sebagai plugin (`docker compose`), bentuk
+yang dipasang skrip resmi Docker di VPS. Pemasangan lewat Homebrew di mesin lokal
+hanya menyediakan biner standalone `docker-compose`; pakai bentuk yang ada, sebab
+keduanya Compose v2 dan menerima berkas yang sama.
+
+Pada `APP_ENV=development`, backend melayani HTTP biasa di `:8080` tanpa TLS dan
+tanpa pemeriksaan sertifikat klien Cloudflare, dan Vite dev server memproksikan
+`/api` ke backend.
 
 Pengujian:
 
 ```bash
-cd backend  && go test ./...              # seluruh pengujian backend
-cd frontend && npm test                   # Jest
+cd backend
+DATABASE_URL_TEST=postgres://devotion:devotion@127.0.0.1:5434/devotion?sslmode=disable \
+  go test ./... -p 1                      # seluruh pengujian backend
+cd ../frontend && npm test                # Jest
 ```
+
+`DATABASE_URL_TEST` disebut eksplisit karena nilai bawaannya di dalam kode
+menunjuk port 5432 sementara compose menerbitkan 5434. Uji yang tidak dapat
+menjangkau basis data memilih `t.Skip` daripada gagal, jadi variabel yang salah
+membuat seluruh uji basis data dilewati sementara hasilnya tetap hijau. `-p 1`
+menjaga total koneksi di bawah `max_connections=20`.
 
 Pengujian backend memakai **skema terpisah pada layanan Postgres yang sama**, bukan
 layanan basis data tambahan. Konstitusi melarang menambah layanan untuk keperluan
@@ -770,7 +825,7 @@ diterima sebagai utang dengan alasannya.
 | Kode verifikasi email tidak sampai | SPF/DKIM belum benar, atau masuk spam | Dasbor Mailjet; periksa folder spam |
 | Kode WhatsApp tidak sampai | Sesi lepas atau nomor terblokir | `/admin/whatsapp`; jalur darurat `user:verify` |
 | Aplikasi mati mendadak | Memori habis, atau disk penuh | `free -h`, `df -h`, `docker stats`, `dmesg \| grep -i oom` |
-| Postgres berhenti menerima tulisan | Disk penuh | `df -h`; periksa ukuran log dan direktori unggahan |
+| Postgres berhenti menerima tulisan | Disk penuh | `df -h`; periksa ukuran log dan direktori uploads |
 | Halaman dalam menghasilkan 404 saat disegarkan | Fallback SPA tidak aktif | Perutean statis di backend |
 | Hasil pencarian menampilkan kapasitas basi | Cloudflare meng-cache `/api/*` | Cache Rules; pastikan bypass |
 
@@ -786,7 +841,7 @@ docker compose logs backend | grep '<request_id>'
 ## H. Sebelum Penjurian
 
 ```text
-[ ] Cadangan manual: /opt/devotion/cadangan.sh dijalankan, hasilnya disalin keluar VPS
+[ ] Cadangan manual: /opt/devotion/backup.sh dijalankan, hasilnya disalin keluar VPS
 [ ] Snapshot VPS terbaru diambil
 [ ] Sesi WhatsApp tersambung; /admin/whatsapp menunjukkan tersambung
 [ ] Satu email uji sampai ke kotak masuk, bukan spam

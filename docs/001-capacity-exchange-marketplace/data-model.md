@@ -5,6 +5,8 @@
 **Last Revised**: 2026-08-22
 **Input**: `spec.md` (91 FR, 16 entitas), `research.md` (R-03, R-04, R-05), `docs/memory/constitution.md` v2.1.0
 
+16 entitas domain diwujudkan pada 26 tabel. Angka ini adalah sumber tunggal jumlah tabel; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
+
 ## Aturan yang Berlaku di Seluruh Model
 
 | Aturan | Penerapan | Sumber |
@@ -53,6 +55,7 @@ Nilai turunan sengaja tidak dimaterialisasi. Kolom yang harus diperbarui setiap 
 | Tabel | Dituntut oleh | Alasan tidak jadi entitas |
 |-------|---------------|---------------------------|
 | `session` | FR-003 | Mekanisme autentikasi, bukan konsep bisnis |
+| `verification_code` | FR-002, R-09 | Kode enam digit email/telepon/pemulihan, disimpan sebagai hash |
 | `uploaded_file` | FR-006, FR-009 | Metadata penyimpanan; entitas pemiliknya Pengajuan Verifikasi |
 | `listing_product`, `listing_machine` | FR-012, FR-076 | Relasi banyak-ke-banyak; `listing_machine` menyimpan jumlah mesin per jenis |
 | `request_candidate` | FR-030 | Satu status per kandidat pada satu request; tidak dapat jadi kolom |
@@ -120,6 +123,24 @@ CREATE INDEX idx_session_expires ON session (expires_at);
 ```
 
 Yang disimpan adalah hash token, bukan token mentah (R-10).
+
+```sql
+CREATE TYPE verification_purpose AS ENUM ('email', 'phone', 'recovery');
+
+CREATE TABLE verification_code (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    account_id  uuid NOT NULL REFERENCES user_account(id) ON DELETE CASCADE,
+    purpose     verification_purpose NOT NULL,
+    code_hash   bytea NOT NULL,
+    expires_at  timestamptz NOT NULL,
+    consumed_at timestamptz,
+    created_at  timestamptz NOT NULL
+);
+
+CREATE INDEX idx_verification_code_lookup ON verification_code (account_id, purpose);
+```
+
+Kode enam digit untuk verifikasi email dan telepon (R-09) serta pemulihan kata sandi. Yang disimpan adalah hash SHA-256 kodenya, bukan kode mentah, dengan alasan yang sama dengan token sesi: kebocoran basis data tidak boleh memberi kode yang masih berlaku. `consumed_at` menandai kode yang sudah dipakai agar satu kode hanya sah sekali; `expires_at` diisi aplikasi lewat `Clock`, bukan `DEFAULT`. `purpose` memisah tiga alur (verifikasi email, verifikasi telepon, pemulihan) sehingga kode satu alur tidak dapat dipakai di alur lain.
 
 ```sql
 CREATE TABLE business_profile (
@@ -294,6 +315,7 @@ CREATE TABLE capacity_listing (
     readiness_lead_days integer NOT NULL,
     published           boolean NOT NULL DEFAULT true,
     calendar_updated_at timestamptz NOT NULL,
+    stale_notified_at   timestamptz,
     horizon_until       date NOT NULL,
     created_at          timestamptz NOT NULL,
     updated_at          timestamptz NOT NULL,
@@ -316,6 +338,8 @@ Satu angka `weekly_capacity` untuk seluruh listing, tanpa kolom kapasitas per je
 `one_listing_per_profile` adalah penyederhanaan model: spec tidak pernah menyebut satu usaha punya beberapa listing, dan seluruh Acceptance Scenario memakai bentuk tunggal. Melepasnya nanti tidak mengubah tabel lain, tetapi kueri pencarian dan alokasi perlu disesuaikan.
 
 `calendar_updated_at` terpisah dari `updated_at` karena FR-021 mengukur kebaruan kalender: mengubah harga atau deskripsi tidak boleh menghapus penanda "Data Belum Diperbarui".
+
+`stale_notified_at` adalah penanda dedup untuk pekerjaan pengingat kalender basi (FR-021). Job menandainya di bawah guard `IS NULL` saat mengirim satu pengingat, dan `calendar_updated_at` yang baru mengalahkannya kembali menjadi `NULL` di jalur pembaruan kalender, sehingga pemilik diingatkan sekali per episode basi, bukan sekali per tick. Nullable karena listing yang kalendernya masih segar belum pernah diingatkan.
 
 ```sql
 CREATE TABLE listing_product (
@@ -587,6 +611,10 @@ CREATE TABLE work_order (
     shipped_at          timestamptz,
     confirmed_at        timestamptz,
     auto_confirmed      boolean NOT NULL DEFAULT false,
+    confirm_warn_sent_at timestamptz,
+    auto_confirm_base_at timestamptz,
+    late_notified_at    timestamptz,
+    deadline_warn_sent_at timestamptz,
     cancelled_by_id     uuid REFERENCES business_profile(id),
     cancellation_reason text,
     cancelled_at        timestamptz,
@@ -608,6 +636,10 @@ CREATE TABLE work_order (
     ),
     CONSTRAINT auto_confirm_needs_confirmation CHECK (
         NOT auto_confirmed OR confirmed_at IS NOT NULL
+    ),
+    CONSTRAINT auto_confirm_base_after_shipped CHECK (
+        auto_confirm_base_at IS NULL OR shipped_at IS NULL
+        OR auto_confirm_base_at >= shipped_at
     )
 );
 
@@ -615,7 +647,12 @@ CREATE INDEX idx_order_buyer ON work_order (buyer_id, status);
 CREATE INDEX idx_order_subcon ON work_order (subcontractor_id, status);
 CREATE INDEX idx_order_deadline_active ON work_order (deadline)
     WHERE status IN ('accepted', 'production', 'completed', 'shipped');
-CREATE INDEX idx_order_auto_confirm ON work_order (shipped_at) WHERE status = 'shipped';
+CREATE INDEX idx_order_auto_confirm ON work_order (COALESCE(auto_confirm_base_at, shipped_at))
+    WHERE status = 'shipped';
+CREATE INDEX idx_order_confirm_warn ON work_order (shipped_at)
+    WHERE status = 'shipped' AND confirm_warn_sent_at IS NULL;
+CREATE INDEX idx_order_deadline_warn ON work_order (deadline)
+    WHERE status IN ('accepted', 'production', 'completed') AND deadline_warn_sent_at IS NULL;
 ```
 
 **`readiness_week_start` adalah kolom baru untuk FR-087.** Ia dihitung sekali saat kesepakatan terbentuk, dari tanggal kesepakatan ditambah `readiness_lead_days` listing, lalu dibulatkan ke Senin minggu yang memuatnya. Disimpan alih-alih dihitung ulang karena `readiness_lead_days` pada listing dapat berubah kemudian, sementara alokasi pesanan yang sudah terbentuk tidak boleh bergeser. Ini juga yang menutup salah satu edge case spec: subkontraktor mengubah jeda kesiapan setelah punya alokasi berjalan.
@@ -626,7 +663,15 @@ CREATE INDEX idx_order_auto_confirm ON work_order (shipped_at) WHERE status = 's
 
 `two_distinct_parties` adalah lapisan kedua atas larangan request ke diri sendiri: bahkan bila trigger dilewati, pesanan berdua pihak sama tidak dapat terbentuk.
 
-Dua indeks parsial terakhir adalah jalur penjadwal R-07: `idx_order_auto_confirm` untuk FR-068 dan FR-069, `idx_order_deadline_active` untuk FR-045.
+`confirm_warn_sent_at` menandai kapan peringatan tenggat konfirmasi otomatis (FR-069) sudah dikirim ke pemberi order, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam jendela peringatan. Ia direset ke NULL hanya pada satu kasus: sengketa ditutup dengan hasil `continued` atas pesanan yang sebelumnya sudah `shipped`, sehingga hitungan konfirmasi otomatis dimulai ulang dari waktu mediasi ditutup dan peringatan baru dapat dikirim untuk jendela yang baru. Pada penutupan yang tidak memulai ulang jam itu (dibatalkan, atau dikonfirmasi paksa admin) ia tidak disentuh.
+
+`auto_confirm_base_at` adalah titik mulai jam konfirmasi otomatis tujuh hari (FR-068), normalnya NULL. `shipped_at` adalah fakta historis kapan pesanan dikirim dan tidak pernah bergeser; saat sengketa atas pesanan yang sudah `shipped` ditutup dengan hasil `continued`, jam konfirmasi harus mulai ulang dari saat mediasi ditutup, bukan dari pengiriman asli. Alih-alih menimpa `shipped_at` (yang akan menghapus fakta pengiriman), jalur resolve mengisi `auto_confirm_base_at` dengan waktu penutupan mediasi, dan aritmetika konfirmasi membaca `COALESCE(auto_confirm_base_at, shipped_at)` sebagai basis efektifnya. NULL di tempat lain berarti basisnya `shipped_at`, sehingga pesanan yang tidak pernah dimediasi berperilaku persis seperti sebelumnya. Constraint `auto_confirm_base_after_shipped` menegakkan basis hanya boleh maju dari pengiriman: mediasi selalu terjadi setelah pesanan dikirim, jadi basis yang lebih awal dari `shipped_at` adalah bug urutan waktu. Indeks parsial `idx_order_auto_confirm` mengunci ekspresi `COALESCE(auto_confirm_base_at, shipped_at)` yang sama agar pemindaian penjadwal tetap naik indeks alih-alih menyortir.
+
+`late_notified_at` menandai kapan pemberitahuan pesanan telat (FR-045) sudah dikirim, sehingga pemberitahuan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali setelah deadline terlewat.
+
+`deadline_warn_sent_at` menandai kapan peringatan tenggat pengiriman mendekat (FR-051) sudah dikirim ke kedua pihak, sehingga peringatan itu terkirim tepat sekali meski penjadwal berjalan berkali-kali di dalam masa peringatan tujuh hari. Job menandainya di bawah guard `IS NULL`. Nullable karena pesanan yang deadline-nya masih di luar masa peringatan belum pernah diperingatkan. Rentang peringatannya adalah `[PastDeadlineCutoff, DeadlineApproachingCutoff]`: pesanan yang sudah lewat deadline diserahkan ke job pesanan telat (FR-045), pesanan yang deadline-nya masih di luar tujuh hari belum disentuh, sehingga kedua pemberitahuan tidak pernah menimpa satu sama lain.
+
+Tiga indeks parsial jalur penjadwal R-07: `idx_order_auto_confirm` untuk penutupan otomatis FR-068, `idx_order_confirm_warn` untuk peringatan FR-069 (hanya baris yang belum diperingatkan), `idx_order_deadline_active` untuk FR-045. Ditambah `idx_order_deadline_warn` untuk peringatan tenggat mendekat FR-051 (hanya pesanan aktif belum-terkirim yang belum diperingatkan).
 
 **Transisi status yang sah** (FR-044). Semua transisi lain ditolak beserta penjelasan urutan yang diizinkan:
 
@@ -644,8 +689,10 @@ accepted ──▶ production ──▶ completed ──▶ shipped ──▶ co
 | `production → completed → shipped` | Subkontraktor | Berurutan, tidak boleh melompat |
 | `shipped → confirmed` | Pemberi order, atau sistem setelah 7 hari | FR-068; `auto_confirmed` menandai yang mana |
 | `accepted → cancelled` | Kedua pihak | Wajib beralasan; seluruh alokasi dibalik (FR-020, FR-065) |
-| `* → in_mediation` | Kedua pihak melapor | Menghentikan hitungan konfirmasi otomatis (FR-070) |
+| `* → in_mediation` | Admin, saat menengahi sengketa | Sengketa terbuka sudah menghentikan hitungan konfirmasi otomatis lewat penjaga `NOT EXISTS` pada tabel `dispute`; admin memindahkan status saat mengambil kasus (FR-070) |
 | `in_mediation → cancelled` | Admin | Admin menentukan pengembalian alokasi dan pihak penanggung (FR-067) |
+| `in_mediation → confirmed` | Admin | Admin memaksa pesanan diterima; `auto_confirmed` tetap FALSE karena ini bukan penutupan tujuh hari oleh sistem (FR-067) |
+| `in_mediation → status sebelumnya` | Admin | Sengketa ditutup tanpa membatalkan; pesanan kembali ke status terakhir sebelum masuk mediasi, dibaca dari `work_order_status_history` (FR-067, FR-070) |
 
 ```sql
 CREATE TABLE work_order_status_history (
@@ -754,6 +801,7 @@ Pembagi mengecualikan pesanan yang dibatalkan pihak lain, sesuai FR-072. Ambang 
 
 ```sql
 CREATE TYPE dispute_status AS ENUM ('reported', 'in_mediation', 'resolved');
+CREATE TYPE dispute_result AS ENUM ('cancelled', 'continued', 'confirmed');
 
 CREATE TABLE dispute (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -761,6 +809,7 @@ CREATE TABLE dispute (
     reporter_id        uuid NOT NULL REFERENCES business_profile(id) ON DELETE RESTRICT,
     report_body        text NOT NULL,
     status             dispute_status NOT NULL DEFAULT 'reported',
+    result             dispute_result,
     admin_note         text,
     allocation_reversed boolean,
     liable_party_id    uuid REFERENCES business_profile(id),
@@ -771,7 +820,8 @@ CREATE TABLE dispute (
     CONSTRAINT resolution_complete CHECK (
         status <> 'resolved'
         OR (handled_by IS NOT NULL AND resolved_at IS NOT NULL
-            AND allocation_reversed IS NOT NULL AND admin_note IS NOT NULL)
+            AND allocation_reversed IS NOT NULL AND admin_note IS NOT NULL
+            AND result IS NOT NULL)
     )
 );
 
@@ -781,6 +831,8 @@ CREATE INDEX idx_dispute_queue ON dispute (created_at) WHERE status <> 'resolved
 ```
 
 `resolution_complete` menegakkan FR-067: admin tidak dapat menutup mediasi tanpa memutuskan secara eksplisit apakah alokasi dikembalikan dan siapa yang menanggung. Keduanya `NULL` selama sengketa belum selesai, bukan diberi nilai bawaan yang menyesatkan.
+
+`result` merekam apa yang admin putuskan saat menutup sengketa: `cancelled` (pesanan dibatalkan), `continued` (pesanan dilanjutkan sepanjang rantai produksinya), atau `confirmed` (admin memaksa konfirmasi). Ia disimpan eksplisit, bukan diturunkan dari status akhir pesanan, karena pesanan `continued` dapat sendiri mencapai `confirmed` sehingga tak terbedakan dari penutupan `confirmed` oleh admin. `NULL` sampai sengketa selesai, sejalan dengan `allocation_reversed` dan `liable_party_id`, dan `resolution_complete` diperluas agar sengketa yang selesai selalu memuat `result`.
 
 `idx_one_open_dispute` menutup edge case pelaporan berulang untuk menghentikan konfirmasi otomatis berkali-kali. Penanganan sengketa lewat mediasi admin memang jalur yang dipilih dokumen sumber untuk fase awal, karena penanganan legal formal menuntut tim hukum dan asuransi [1].
 
@@ -794,7 +846,7 @@ CREATE TYPE event_type AS ENUM (
     'order_status_changed', 'payment_record', 'deadline_approaching', 'deadline_passed',
     'verification_decision', 'rating_request', 'order_cancelled',
     'confirmation_due_approaching', 'order_auto_closed', 'item_proposal_decision',
-    'calendar_stale'
+    'calendar_stale', 'request_expired'
 );
 
 CREATE TABLE notification (
@@ -821,6 +873,7 @@ CREATE INDEX idx_notification_unread ON notification (account_id) WHERE read_at 
 | `order_status_changed`, `order_cancelled`, `payment_record` | Transaksional |
 | `deadline_passed`, `confirmation_due_approaching`, `order_auto_closed` | Transaksional |
 | `verification_decision`, `item_proposal_decision` | Transaksional |
+| `request_expired` | Transaksional |
 | `calendar_stale`, `deadline_approaching`, `rating_request` | Non-transaksional |
 
 Hanya yang non-transaksional dapat dimatikan pengguna (FR-053). Perhatikan bahwa `deadline_approaching` non-transaksional sementara `confirmation_due_approaching` transaksional, karena yang kedua berujung pada penutupan pesanan otomatis, sehingga tidak boleh dapat dimatikan.
@@ -984,7 +1037,7 @@ Lima hal yang perlu diperhatikan tentang kueri ini.
 
 **`uncreated_remaining` adalah perkiraan optimis** atas periode yang belum ada: setiap minggu di luar `horizon_until` dihitung berkapasitas penuh, karena periode baru memang dibuat dengan `weekly_capacity` sebagai kapasitas total (FR-088). Ini yang mencegah kandidat dinilai tidak memenuhi kriteria hanya karena periodenya belum pernah dibuat.
 
-**Periode benar-benar dibuat sebagai efek samping pencarian**, bukan di dalam kueri ini. Aplikasi memeriksa `horizon_until < deadline_week` pada kandidat yang lolos, lalu membuat periode yang kurang di dalam transaksi tersendiri sebelum mengembalikan hasil. Menempatkannya di luar kueri pencarian membuat pencarian tetap operasi baca dan tidak memicu penulisan pada setiap permintaan.
+**Periode benar-benar dibuat saat kesepakatan terbentuk**, bukan di dalam kueri ini. Ketika sebuah penawaran diterima (`/offers/{offerId}/accept`), aplikasi memeriksa `horizon_until < deadline_week` lalu membuat periode yang kurang di dalam transaksi kesepakatan itu (FR-088). Menempatkannya di sana, bukan di jalur pencarian, membuat pencarian tetap operasi baca dan tidak memicu penulisan pada setiap permintaan.
 
 **Kriteria yang filternya `NULL` dihitung terpenuhi** (FR-023, keputusan C-4). Skor tetap 0–4 tanpa normalisasi, sehingga kriteria yang tidak dievaluasi menaikkan skor semua kandidat secara seragam dan tidak membedakan siapa pun. Respons menyertakan nilai per kriteria agar klien dapat menyebutkan mana yang tidak dievaluasi (FR-026).
 
@@ -1001,7 +1054,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 | Kapasitas terpakai ≤ total (FR-079, SC-018) | `CHECK` | Penguncian baris terurut (R-04) |
 | Alokasi tidak mendahului minggu kesiapan (FR-087, SC-020) | Trigger | Perhitungan minggu kesiapan dari `Clock` |
 | Kesiapan tidak melewati deadline (FR-090) | `CHECK` | Penolakan penawaran beserta penjelasan |
-| Horizon diperpanjang sampai deadline (FR-088, SC-021) | Tidak ada | Pembuatan periode sebagai efek samping pencarian |
+| Horizon diperpanjang sampai deadline (FR-088, SC-021) | Tidak ada | Pembuatan periode saat kesepakatan terbentuk |
 | Propagasi perubahan kapasitas (FR-089) | Tidak ada | Menyaring periode tanpa alokasi aktif |
 | Satu kesepakatan per request (FR-034) | Indeks unik parsial | Penutupan kandidat lain |
 | Larangan request ke diri sendiri (FR-081, FR-083) | Trigger + `two_distinct_parties` | Penyaringan pencarian, pesan pengguna |
@@ -1024,7 +1077,7 @@ Yang hanya bergantung pada aplikasi adalah kandidat utama pengujian otomatis yan
 
 ## 12. Urutan Migrasi
 
-Mengikuti arah ketergantungan kunci asing:
+16 migrasi berurutan, mengikuti arah ketergantungan kunci asing. Daftar ini adalah sumber tunggal jumlah migrasi; dokumen lain merujuk ke sini, tidak menyebut angkanya sendiri.
 
 ```text
 001_extensions            citext, pgcrypto
@@ -1043,6 +1096,14 @@ Mengikuti arah ketergantungan kunci asing:
 012_reputation            review, dispute
 013_notification          notification (+ transactional), notification_channel
 014_rate_limit            rate_limit
+015_verification_code     verification_code
+016_confirm_warn_sent     work_order.confirm_warn_sent_at (+ idx_order_confirm_warn)
+017_late_notified         work_order.late_notified_at
+018_auto_confirm_base     work_order.auto_confirm_base_at (+ constraint, idx_order_auto_confirm)
+019_dispute_result        dispute.result (+ dispute_result enum, resolution_complete)
+020_listing_stale_notified capacity_listing.stale_notified_at
+021_request_expired_event  request_expired ditambahkan ke enum event_type
+022_deadline_warn_sent     work_order.deadline_warn_sent_at (+ idx_order_deadline_warn)
 ```
 
 `item_proposal` menunjuk `business_profile` lewat kunci asing, sehingga ia harus dibuat setelah tabel itu ada. Karena itu ia masuk `005_profile`, bukan `004_master_data` bersama `catalog_item`, meski keduanya sama-sama tergolong daftar baku secara domain. `catalog_item` sendiri tidak bergantung pada `business_profile`, jadi tetap di `004`.
