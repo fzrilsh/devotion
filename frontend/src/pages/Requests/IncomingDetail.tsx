@@ -1,6 +1,6 @@
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
-import { useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
+import { CANDIDATE_LISTS_NOT_LOADED, useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useReloadIncomingCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
 import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { getProblem, getProblemMessage } from "@lib/problem";
 import { cn } from "@lib/utils";
@@ -58,6 +58,7 @@ export default function IncomingDetail() {
     const candidateId = stateCandidateId ?? paramCandidateId;
 
     const candidateQuery = useIncomingCandidate(candidateId);
+    const reloadCandidate = useReloadIncomingCandidate(candidateId);
     const sessionOffers = useSessionOffers(candidateId);
 
     const sendOfferMutation = useSendOffer(candidateId);
@@ -74,11 +75,29 @@ export default function IncomingDetail() {
     const [rejectReason, setRejectReason] = useState("");
     const [error, setError] = useState("");
     const [capacityInfo, setCapacityInfo] = useState<CapacityInfo | null>(null);
+    const [reloading, setReloading] = useState(false);
+
+    // The lists are what actually go to the server, so the spinner has to cover
+    // their refetch too, not only the cache-only detail entry.
+    const refreshing = reloading || candidateQuery.isFetching;
+
+    async function handleReload() {
+        setReloading(true);
+
+        try {
+            await reloadCandidate();
+        } finally {
+            setReloading(false);
+        }
+    }
 
     if (candidateQuery.isLoading) return <Loading />;
 
     if (candidateQuery.isError || !candidateQuery.data) {
-        const directLinkMessage = !stateCandidateId && !paramCandidateId.startsWith("candidate_") ? "Kandidat belum dibuka dari daftar request masuk. Buka daftar dulu, lalu pilih kandidat yang ingin Anda lihat." : "Kandidat tidak ditemukan atau sudah tidak tersedia untuk listing Anda.";
+        // Two different failures, told apart by why the cache lookup failed
+        // rather than by guessing from the URL.
+        const listsNeverLoaded = candidateQuery.error instanceof Error && candidateQuery.error.message === CANDIDATE_LISTS_NOT_LOADED;
+        const directLinkMessage = listsNeverLoaded ? "Kandidat belum dibuka dari daftar request masuk. Buka daftar dulu, lalu pilih kandidat yang ingin Anda lihat." : "Kandidat tidak ditemukan atau sudah tidak tersedia untuk listing Anda.";
 
         return (
             <div className="space-y-6">
@@ -277,12 +296,12 @@ export default function IncomingDetail() {
 
                                 <button
                                     type="button"
-                                    onClick={() => candidateQuery.refetch()}
-                                    disabled={candidateQuery.isFetching}
+                                    onClick={handleReload}
+                                    disabled={refreshing}
                                     className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <LuRefreshCw className={cn("size-4", candidateQuery.isFetching && "animate-spin")} aria-hidden />
-                                    {candidateQuery.isFetching ? "Memuat..." : "Muat ulang data"}
+                                    <LuRefreshCw className={cn("size-4", refreshing && "animate-spin")} aria-hidden />
+                                    {refreshing ? "Memuat..." : "Muat ulang data"}
                                 </button>
                             </>
                         ) : null}
@@ -319,12 +338,12 @@ export default function IncomingDetail() {
 
                         <button
                             type="button"
-                            onClick={() => candidateQuery.refetch()}
-                            disabled={candidateQuery.isFetching}
+                            onClick={handleReload}
+                            disabled={refreshing}
                             className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <LuRefreshCw className={cn("size-4", candidateQuery.isFetching && "animate-spin")} aria-hidden />
-                            {candidateQuery.isFetching ? "Memuat..." : "Muat ulang data"}
+                            <LuRefreshCw className={cn("size-4", refreshing && "animate-spin")} aria-hidden />
+                            {refreshing ? "Memuat..." : "Muat ulang data"}
                         </button>
                     </div>
                 ) : null}

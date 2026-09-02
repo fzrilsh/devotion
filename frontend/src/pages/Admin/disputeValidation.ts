@@ -1,9 +1,11 @@
+import type { DisputeResult } from "@api/admin";
+
 export function validateDisputeResolution({
     result,
     liableProfileId,
     note,
 }: {
-    result: "continued" | "confirmed" | "cancelled";
+    result: DisputeResult;
     liableProfileId: string;
     note: string;
 }): string | null {
@@ -11,7 +13,7 @@ export function validateDisputeResolution({
         return "Pilih pihak yang menanggung pembatalan.";
     }
 
-    if (result === "cancelled" && !note) {
+    if (result === "cancelled" && !note.trim()) {
         return "Catatan wajib diisi saat hasil mediasi dibatalkan.";
     }
 
