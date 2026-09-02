@@ -1,24 +1,10 @@
-import type { Dispute } from "@api/admin";
 import Loading from "@components/common/Loading";
 import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
-import { useDisputes } from "@hooks/useAdmin";
 import { useWorkOrder } from "@hooks/useWorkOrders";
 import { cn } from "@lib/utils";
 import { LuArrowLeft, LuArrowRight, LuBanknote, LuCalendarDays, LuEye, LuPackage, LuShieldAlert } from "react-icons/lu";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { formatDateId, formatDateTimeId, formatRupiah, workOrderStatusMeta } from "../WorkOrders/meta";
-
-const disputeStatusMeta: Record<Dispute["status"], { label: string; className: string }> = {
-    reported: { label: "Dilaporkan", className: "bg-red-500/10 text-red-600" },
-    in_mediation: { label: "Dalam Mediasi", className: "bg-amber-500/10 text-amber-600" },
-    resolved: { label: "Selesai", className: "bg-emerald-500/10 text-emerald-600" },
-};
-
-const disputeResultLabel: Record<string, string> = {
-    continued: "Pesanan dilanjutkan",
-    confirmed: "Pesanan dinyatakan selesai",
-    cancelled: "Pesanan dibatalkan",
-};
 
 function ErrorCard({ message, onBack }: { message: string; onBack: () => void }) {
     return (
@@ -41,9 +27,6 @@ export default function AdminOrderDetail() {
     const { workOrderId = "" } = useParams();
     const navigate = useNavigate();
     const workOrderQuery = useWorkOrder(workOrderId);
-
-    const disputesQuery = useDisputes();
-    const disputes = (disputesQuery.data ?? []).filter((dispute) => dispute.work_order_id === workOrderId);
 
     function handleBack() {
         navigate(-1);
@@ -224,32 +207,9 @@ export default function AdminOrderDetail() {
                             Sengketa
                         </h2>
 
-                        {disputesQuery.isLoading ? (
-                            <p className="mt-3 text-xs text-slate-500">Memuat antrean sengketa...</p>
-                        ) : disputesQuery.isError ? (
-                            <p className="mt-3 text-xs text-red-600">Antrean sengketa tidak dapat dimuat, jadi laporan pada pesanan ini belum tentu tampil.</p>
-                        ) : disputes.length === 0 ? (
-                            <p className="mt-3 text-xs text-slate-500">Tidak ada laporan sengketa pada pesanan ini.</p>
-                        ) : (
-                            <ul className="mt-3 space-y-3">
-                                {disputes.map((dispute) => {
-                                    const meta = disputeStatusMeta[dispute.status];
-
-                                    return (
-                                        <li key={dispute.dispute_id} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span className={cn("rounded-full px-2.5 py-0.5 text-[11px] font-bold", meta.className)}>{meta.label}</span>
-                                                <span className="text-xs text-slate-400">{formatDateTimeId(dispute.created_at)}</span>
-                                            </div>
-
-                                            <p className="mt-1.5 text-xs leading-5 text-slate-600">{dispute.report_body}</p>
-
-                                            {dispute.result ? <p className="mt-1.5 text-xs font-semibold text-slate-500">Hasil: {disputeResultLabel[dispute.result] ?? dispute.result}</p> : null}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
+                        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-600">
+                            Laporan sengketa dipelihara pada antrean sengketa admin, bukan diambil dari halaman pertama daftar. Buka antrean untuk melihat riwayat yang relevan terhadap pesanan ini.
+                        </div>
 
                         <Link to="/admin/disputes" className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
                             Buka antrean sengketa

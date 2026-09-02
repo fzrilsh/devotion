@@ -135,7 +135,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
 export default function AdminVerificationQueue() {
     const [status, setStatus] = useState<VerificationStatus | "all">("pending");
     const queueQuery = useVerificationQueue(status === "all" ? undefined : status);
-    const items = queueQuery.data?.items ?? [];
+    const items = queueQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
         <div className="space-y-6">
@@ -169,11 +169,21 @@ export default function AdminVerificationQueue() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada pengajuan dengan status ini.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {items.map((request) => (
-                        <RequestCard key={request.request_id} request={request} />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {items.map((request) => (
+                            <RequestCard key={request.request_id} request={request} />
+                        ))}
+                    </div>
+
+                    {queueQuery.hasNextPage ? (
+                        <div className="text-center">
+                            <button type="button" onClick={() => queueQuery.fetchNextPage()} disabled={queueQuery.isFetchingNextPage} className="cursor-pointer rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                {queueQuery.isFetchingNextPage ? "Memuat..." : "Muat lebih banyak"}
+                            </button>
+                        </div>
+                    ) : null}
+                </>
             )}
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">

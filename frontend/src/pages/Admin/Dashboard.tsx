@@ -127,10 +127,10 @@ export default function AdminDashboard() {
     const disputesQuery = useDisputes();
     const lateOrdersQuery = useLateOrders();
 
-    const verificationItems = verificationQuery.data?.items ?? [];
-    const pendingProposals = (proposalsQuery.data ?? []).filter((proposal) => proposal.status === "pending");
-    const openDisputes = (disputesQuery.data ?? []).filter((dispute) => dispute.status !== "resolved");
-    const lateOrders = lateOrdersQuery.data?.items ?? [];
+    const verificationItems = verificationQuery.data?.pages.flatMap((page) => page.items) ?? [];
+    const pendingProposals = (proposalsQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((proposal) => proposal.status === "pending");
+    const openDisputes = (disputesQuery.data?.pages.flatMap((page) => page.items) ?? []).filter((dispute) => dispute.status !== "resolved");
+    const lateOrders = lateOrdersQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
         <div className="space-y-6">

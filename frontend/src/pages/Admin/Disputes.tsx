@@ -201,7 +201,7 @@ function DisputeCard({ dispute }: { dispute: Dispute }) {
 export default function AdminDisputes() {
     const [status, setStatus] = useState<DisputeStatus | "all">("all");
     const disputesQuery = useDisputes(status === "all" ? undefined : status);
-    const disputes = disputesQuery.data ?? [];
+    const disputes = disputesQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
     return (
         <div className="space-y-6">
@@ -235,11 +235,21 @@ export default function AdminDisputes() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada sengketa dengan status ini.</p>
                 </div>
             ) : (
-                <div className="space-y-4">
-                    {disputes.map((dispute) => (
-                        <DisputeCard key={dispute.dispute_id} dispute={dispute} />
-                    ))}
-                </div>
+                <>
+                    <div className="space-y-4">
+                        {disputes.map((dispute) => (
+                            <DisputeCard key={dispute.dispute_id} dispute={dispute} />
+                        ))}
+                    </div>
+
+                    {disputesQuery.hasNextPage ? (
+                        <div className="text-center">
+                            <button type="button" onClick={() => disputesQuery.fetchNextPage()} disabled={disputesQuery.isFetchingNextPage} className="cursor-pointer rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                {disputesQuery.isFetchingNextPage ? "Memuat..." : "Muat lebih banyak"}
+                            </button>
+                        </div>
+                    ) : null}
+                </>
             )}
 
             <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">

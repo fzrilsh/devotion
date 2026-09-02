@@ -4,6 +4,10 @@
 
 ### Diperbaiki
 
+* Memperbaiki root cause antrean admin yang membuang metadata paginasi: `src/api/admin.ts` tidak lagi menurunkan `pagination` ke array kosong atau membaca cabang `response.data` yang tidak ada di kontrak. Keempat sandaran admin masih memakai `useInfiniteQuery`, dan `next_cursor` diteruskan apa adanya pada permintaan berikutnya tanpa parsing ke nomor halaman.
+
+* Menghapus kesimpulan palsu di `src/pages/Admin/OrderDetail.tsx`: halaman detail pesanan tidak lagi menilai ada atau tidaknya sengketa dari halaman pertama daftar admin, karena filter daftar berhalaman itu bukan sumber kebenaran untuk satu pesanan. Detail sekarang membimbing admin ke antrean sengketa yang berdiri sendiri.
+
 * Menyesuaikan form resolusi sengketa admin di `src/pages/Admin/Disputes.tsx` agar `POST /admin/disputes/{disputeId}/resolve` mengikuti kontrak OpenAPI: `result` memakai enum yang benar, `allocation_reversed` hanya dikirim saat keputusan membatalkan pesanan, dan `liable_profile_id` diisi ketika `result === "cancelled"` dengan memilih pihak pembeli atau subkontraktor yang menanggung. UI sekarang memvalidasi pilihan ini sebelum submit agar request yang dikirim tidak lagi melanggar skema backend. Catatan keputusan juga berubah menjadi wajib saat `result === "cancelled"` dan tetap opsional pada hasil lain, sesuai deskripsi kontrak yang kini menyatakan syarat kondisional secara eksplisit.
 
 * Memperbarui kontrak `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml` agar menjelaskan secara eksplisit bahwa `liable_profile_id` dan `note` wajib saat `result === "cancelled"`, sementara `allocation_reversed` diabaikan pada hasil `continued` dan `confirmed`. Deskripsi bersyarat ini memberi sinyal yang jelas ke generator tipe dan tim frontend sehingga syarat ini tidak lagi luput seperti pada versi lama.

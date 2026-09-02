@@ -111,7 +111,7 @@ export default function AdminProposals() {
     const [filter, setFilter] = useState<(typeof filterOptions)[number]["value"]>("pending");
     const proposalsQuery = useItemProposals();
 
-    const proposals = proposalsQuery.data ?? [];
+    const proposals = proposalsQuery.data?.pages.flatMap((page) => page.items) ?? [];
     const filtered = filter === "all" ? proposals : proposals.filter((proposal) => proposal.status === filter);
 
     return (
@@ -146,11 +146,21 @@ export default function AdminProposals() {
                     <p className="mt-3 text-sm text-slate-500">Tidak ada usulan dengan status ini.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {filtered.map((proposal) => (
-                        <ProposalCard key={proposal.proposal_id} proposal={proposal} />
-                    ))}
-                </div>
+                <>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {filtered.map((proposal) => (
+                            <ProposalCard key={proposal.proposal_id} proposal={proposal} />
+                        ))}
+                    </div>
+
+                    {proposalsQuery.hasNextPage ? (
+                        <div className="text-center">
+                            <button type="button" onClick={() => proposalsQuery.fetchNextPage()} disabled={proposalsQuery.isFetchingNextPage} className="cursor-pointer rounded-xl border border-slate-300 bg-white px-6 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                {proposalsQuery.isFetchingNextPage ? "Memuat..." : "Muat lebih banyak"}
+                            </button>
+                        </div>
+                    ) : null}
+                </>
             )}
         </div>
     );

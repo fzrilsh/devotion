@@ -23,18 +23,29 @@ type DisputeResolution = NonNullable<paths["/admin/disputes/{disputeId}/resolve"
 
 type JsonBody<T> = T extends { content: { "application/json": infer Body } } ? Body : never;
 
+type PaginatedResponse<T> = {
+    items: T[];
+    pagination: {
+        has_next: boolean;
+        next_cursor?: string | null;
+    };
+};
+
 export type VerificationDecisionRequest = JsonBody<VerificationDecision>;
 export type ProposalDecisionRequest = JsonBody<ProposalDecision>;
 export type MasterItemCreateRequest = JsonBody<MasterItemCreate>;
 export type MasterItemUpdateRequest = JsonBody<MasterItemUpdate>;
 export type DisputeResolutionRequest = JsonBody<DisputeResolution>;
 
-function extractItems<T>(response: T[] | { items?: T[]; data?: T[] }): T[] {
+function extractPaginated<T>(response: T[] | PaginatedResponse<T>): PaginatedResponse<T> {
     if (Array.isArray(response)) {
-        return response;
+        return {
+            items: response,
+            pagination: { has_next: false },
+        };
     }
 
-    return response.items ?? response.data ?? [];
+    return response;
 }
 
 export async function getVerificationQueue(params?: { status?: VerificationStatus; cursor?: string }): Promise<VerificationRequestList> {
@@ -53,7 +64,7 @@ export async function getVerificationQueue(params?: { status?: VerificationStatu
     return apiClient<VerificationRequestList>(`/admin/verification${query ? `?${query}` : ""}`);
 }
 
-export async function getItemProposals(params?: { cursor?: string }): Promise<ItemProposal[]> {
+export async function getItemProposals(params?: { cursor?: string }): Promise<PaginatedResponse<ItemProposal>> {
     const searchParams = new URLSearchParams();
 
     if (params?.cursor) {
@@ -61,13 +72,12 @@ export async function getItemProposals(params?: { cursor?: string }): Promise<It
     }
 
     const query = searchParams.toString();
+    const response = await apiClient<ItemProposal[] | PaginatedResponse<ItemProposal>>(`/admin/proposals${query ? `?${query}` : ""}`);
 
-    const response = await apiClient<ItemProposal[] | { items?: ItemProposal[]; data?: ItemProposal[] }>(`/admin/proposals${query ? `?${query}` : ""}`);
-
-    return extractItems(response);
+    return extractPaginated(response);
 }
 
-export async function getDisputes(params?: { status?: DisputeStatus; cursor?: string }): Promise<Dispute[]> {
+export async function getDisputes(params?: { status?: DisputeStatus; cursor?: string }): Promise<PaginatedResponse<Dispute>> {
     const searchParams = new URLSearchParams();
 
     if (params?.status) {
@@ -79,10 +89,9 @@ export async function getDisputes(params?: { status?: DisputeStatus; cursor?: st
     }
 
     const query = searchParams.toString();
+    const response = await apiClient<Dispute[] | PaginatedResponse<Dispute>>(`/admin/disputes${query ? `?${query}` : ""}`);
 
-    const response = await apiClient<Dispute[] | { items?: Dispute[]; data?: Dispute[] }>(`/admin/disputes${query ? `?${query}` : ""}`);
-
-    return extractItems(response);
+    return extractPaginated(response);
 }
 
 export async function getLateOrders(params?: { cursor?: string }): Promise<LateOrderList> {
