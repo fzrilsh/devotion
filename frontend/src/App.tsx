@@ -2,6 +2,7 @@ import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } 
 
 import GuestRoute from "@routes/GuestRoute";
 import ProtectedRoute from "@routes/ProtectedRoute";
+import UnverifiedRoute from "@routes/UnverifiedRoute";
 
 import Home from "@pages/Home";
 import NotFound from "@pages/NotFound";
@@ -67,7 +68,7 @@ export default function App() {
                     <Route path="reset-password" element={<ResetPassword />} handle={{ title: "Atur Ulang Kata Sandi" }} />
                 </Route>
 
-                <Route element={<ProtectedRoute />}>
+                <Route element={<UnverifiedRoute />}>
                     <Route path="/auth/verify-email" element={<VerifyEmail />} handle={{ title: "Verifikasi Email" }} />
                     <Route path="/auth/verify-phone" element={<VerifyPhone />} handle={{ title: "Verifikasi Nomor Telepon" }} />
                 </Route>
