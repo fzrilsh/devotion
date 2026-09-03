@@ -12,6 +12,13 @@ type VerifyPhoneLocationState = {
     email?: string;
 };
 
+function formatCountdown(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function maskPhone(phone: string): string {
     const digits = phone.replace(/\D/g, "");
 
@@ -58,10 +65,33 @@ export default function VerifyPhone() {
         }
     }, [user, navigate]);
 
+    // Kirim ulang kode sekali saat nomor HP sudah diketahui, jadi pengguna
+    // tidak perlu menekan tombol hanya untuk menerima kode yang belum tentu
+    // sampai. Bila server menolak karena rate limit, waktu tunggunya diambil
+    // dari header Retry-After dan ditampilkan sebagai countdown, bukan pesan
+    // galat. Efek menunggu phone, bukan email, karena target pengirimannya
+    // memang nomor itu dan bisa baru terisi setelah profil selesai dimuat.
+    const autoResent = useRef(false);
+
+    useEffect(() => {
+        if (!phone || autoResent.current) return;
+
+        autoResent.current = true;
+        handleResend();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phone]);
+
     const handleChange = (value: string, index: number) => {
         const digits = value.replace(/\D/g, "");
 
-        if (!digits) return;
+        if (!digits) {
+            // Backspace mengosongkan kotak: nilai kosong tetap harus disimpan,
+            // kalau tidak state lama kembali dan digit tidak bisa dihapus.
+            const cleared = [...otp];
+            cleared[index] = "";
+            setOtp(cleared);
+            return;
+        }
 
         if (digits.length > 1) {
             const merged = [...otp];
@@ -143,6 +173,11 @@ export default function VerifyPhone() {
             setCountdown(60);
             setSuccessMessage("Kode verifikasi baru sudah dikirim melalui WhatsApp.");
         } catch (error) {
+            if (error instanceof ApiError && error.status === 429 && error.retryAfterSeconds) {
+                setCountdown(error.retryAfterSeconds);
+                return;
+            }
+
             setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi."));
         }
     }
@@ -219,7 +254,7 @@ export default function VerifyPhone() {
                     <div className="mt-6 text-center">
                         {countdown > 0 ? (
                             <p className="text-sm text-slate-400">
-                                Kirim ulang kode dalam <span className="font-semibold text-slate-600">00:{String(countdown).padStart(2, "0")}</span>
+                                Kirim ulang kode dalam <span className="font-semibold text-slate-600">{formatCountdown(countdown)}</span>
                             </p>
                         ) : (
                             <button
