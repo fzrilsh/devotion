@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://gist.github.com/user-attachments/assets/69a93922-e7fe-4724-a4c7-05d5bc26ac35" alt="Devotion Logo" width="400" style="margin-bottom: 8px; height: auto;">
+<img src="https://gist.githubusercontent.com/TrygerZ/f6601f096885e7307b7210a750f92f7e/raw/logo.png" alt="Devotion Logo" width="400" style="margin-bottom: 8px; height: auto;">
 
 # Devotion
 ### Marketplace kapasitas produksi untuk UMKM konveksi
