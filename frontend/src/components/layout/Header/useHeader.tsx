@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { scrollToSection } from "@lib/anchors";
+
+export function sectionIdFromHref(href: string): string {
+    const hashIndex = href.indexOf("#");
+    return hashIndex >= 0 ? href.slice(hashIndex + 1) : "";
+}
 
 export interface NavItem {
     href: string;
@@ -9,22 +16,28 @@ export function useHeader(navItems: NavItem[] = [], offset: number = 0) {
     const [isScrolled, setIsScrolled] = useState<boolean>(false);
     const [isOpen, setIsOpen] = useState<boolean>(false);
     const [activeLink, setActiveLink] = useState<string>(navItems[0]?.href || "");
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
 
     const toggleMenu = useCallback(() => setIsOpen((prev) => !prev), []);
     const closeMenu = useCallback(() => setIsOpen(false), []);
 
     const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement, MouseEvent>, href: string) => {
-        if (href.startsWith("#")) {
-            e.preventDefault();
-            const targetId = href.replace("#", "");
-            const targetElement = document.getElementById(targetId);
+        const hashIndex = href.indexOf("#");
+        if (hashIndex < 0) return;
 
-            if (targetElement) {
-                targetElement.scrollIntoView({ behavior: "smooth" });
-                setActiveLink(href);
-            }
+        e.preventDefault();
+        const sectionId = href.slice(hashIndex + 1);
+
+        if (pathname !== "/") {
+            navigate(`/#${sectionId}`);
+            return;
         }
-    }, []);
+
+        if (scrollToSection(sectionId)) {
+            setActiveLink(href);
+        }
+    }, [navigate, pathname]);
 
     useEffect(() => {
         let ticking = false;
@@ -42,7 +55,7 @@ export function useHeader(navItems: NavItem[] = [], offset: number = 0) {
                     const scrollPosition = scrollTop + offset;
 
                     for (const nav of navItems) {
-                        const section = document.querySelector<HTMLElement>(nav.href);
+                        const section = document.getElementById(sectionIdFromHref(nav.href));
                         if (!section) continue;
 
                         const sectionTop = section.offsetTop;
