@@ -12,27 +12,80 @@
 package observability
 
 import (
+	"time"
+
 	"github.com/getsentry/sentry-go"
 )
 
 // Init starts Sentry when dsn is non-empty and returns a flush function to call
-// on shutdown. An empty dsn (development, or a production that opted out) makes
-// this a no-op with a flush that does nothing, so callers need no dsn check of
-// their own. environment tags each event so production noise is separable from
-// a staging run.
+// on shutdown. An empty dsn installs Sentry's no-op client, so callers can
+// report failures unconditionally in every environment. Environment tags each
+// event so production noise is separable from a staging run.
 func Init(dsn, environment string) (flush func(), err error) {
 	if dsn == "" {
+		// BindClient(nil) disables a client that may have been initialized by an
+		// earlier run in the same process. Calling sentry.Init with an empty DSN
+		// would fall back to the SENTRY_DSN environment variable.
+		sentry.CurrentHub().BindClient(nil)
 		return func() {}, nil
 	}
-	err = sentry.Init(sentry.ClientOptions{
-		Dsn:         dsn,
-		Environment: environment,
-		BeforeSend:  scrub,
-	})
-	if err != nil {
+	opts := sentry.ClientOptions{
+		Dsn:              dsn,
+		Environment:      environment,
+		AttachStacktrace: true,
+		BeforeSend:       scrub,
+	}
+	if err := sentry.Init(opts); err != nil {
 		return func() {}, err
 	}
-	return func() { sentry.Flush(2 * 1e9) }, nil
+	return func() { sentry.Flush(2 * time.Second) }, nil
+}
+
+// CaptureException reports err to Sentry. requestID is optional and is copied
+// only to the allowlisted request_id tag. The SDK's no-op client makes this safe
+// to call when Sentry is disabled.
+func CaptureException(err error, requestID ...string) {
+	if err == nil {
+		return
+	}
+	withRequestID(requestID, func(hub *sentry.Hub) {
+		hub.CaptureException(err)
+	})
+}
+
+// CapturePanic reports a recovered panic to Sentry. The SDK creates an
+// exception event for error values and a message event for other panic values,
+// attaching the current stack because Init enables AttachStacktrace.
+func CapturePanic(value any, requestID ...string) {
+	if value == nil {
+		return
+	}
+	withRequestID(requestID, func(hub *sentry.Hub) {
+		hub.Recover(value)
+	})
+}
+
+// CaptureMessage reports a non-error internal failure, such as an HTTP 500
+// whose original error was already converted into a generic client response.
+func CaptureMessage(message string, requestID ...string) {
+	if message == "" {
+		return
+	}
+	withRequestID(requestID, func(hub *sentry.Hub) {
+		hub.CaptureMessage(message)
+	})
+}
+
+func withRequestID(requestID []string, capture func(*sentry.Hub)) {
+	hub := sentry.CurrentHub().Clone()
+	if len(requestID) == 0 || requestID[0] == "" {
+		capture(hub)
+		return
+	}
+	hub.ConfigureScope(func(scope *sentry.Scope) {
+		scope.SetTag("request_id", requestID[0])
+	})
+	capture(hub)
 }
 
 // scrub rebuilds the outgoing event from an allowlist of fields that carry no
