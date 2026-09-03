@@ -50,15 +50,33 @@ export default function ResetPassword() {
     }, [email, navigate]);
 
     const handleChange = (value: string, index: number) => {
-        const digit = value.replace(/\D/g, "").slice(-1);
+        const digits = value.replace(/\D/g, "");
+
+        if (!digits) return;
+
+        if (digits.length > 1) {
+            const merged = [...otp];
+            let cursor = index;
+
+            for (const digit of digits) {
+                if (cursor >= otp.length) break;
+                merged[cursor] = digit;
+                cursor += 1;
+            }
+
+            setOtp(merged);
+            setValue("code", merged.join(""), { shouldValidate: true });
+            inputRefs.current[Math.min(cursor, otp.length - 1)]?.focus();
+            return;
+        }
 
         const newOtp = [...otp];
-        newOtp[index] = digit;
+        newOtp[index] = digits;
 
         setOtp(newOtp);
         setValue("code", newOtp.join(""), { shouldValidate: true });
 
-        if (digit && index < newOtp.length - 1) {
+        if (index < otp.length - 1) {
             inputRefs.current[index + 1]?.focus();
         }
     };
@@ -67,6 +85,11 @@ export default function ResetPassword() {
         if (event.key === "Backspace" && !otp[index] && index > 0) {
             inputRefs.current[index - 1]?.focus();
         }
+    };
+
+    const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>, index: number) => {
+        event.preventDefault();
+        handleChange(event.clipboardData.getData("text"), index);
     };
 
     async function onSubmit(values: RecoverConfirmForm) {
@@ -137,6 +160,7 @@ export default function ResetPassword() {
                                         value={digit}
                                         onChange={(event) => handleChange(event.target.value, index)}
                                         onKeyDown={(event) => handleKeyDown(event, index)}
+                                        onPaste={(event) => handlePaste(event, index)}
                                         inputMode="numeric"
                                         maxLength={1}
                                         disabled={confirmMutation.isPending}

@@ -63,10 +63,13 @@ export default function App() {
                 <Route path="/auth" element={<GuestRoute />}>
                     <Route path="register" element={<Register />} handle={{ title: "Daftar" }} />
                     <Route path="login" element={<Login />} handle={{ title: "Masuk" }} />
-                    <Route path="verify-email" element={<VerifyEmail />} handle={{ title: "Verifikasi Email" }} />
-                    <Route path="verify-phone" element={<VerifyPhone />} handle={{ title: "Verifikasi Nomor Telepon" }} />
                     <Route path="forgot-password" element={<ForgotPassword />} handle={{ title: "Lupa Kata Sandi" }} />
                     <Route path="reset-password" element={<ResetPassword />} handle={{ title: "Atur Ulang Kata Sandi" }} />
+                </Route>
+
+                <Route element={<ProtectedRoute />}>
+                    <Route path="/auth/verify-email" element={<VerifyEmail />} handle={{ title: "Verifikasi Email" }} />
+                    <Route path="/auth/verify-phone" element={<VerifyPhone />} handle={{ title: "Verifikasi Nomor Telepon" }} />
                 </Route>
 
                 <Route element={<ProtectedRoute />}>
