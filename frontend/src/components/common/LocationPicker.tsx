@@ -4,6 +4,7 @@ import { usePlaceSearch } from "@hooks/usePlaceSearch";
 import type { Coordinate } from "@lib/geo";
 import type { GeocodeBounds, GeocodePlace } from "@lib/geocode";
 import { MIN_QUERY_LENGTH } from "@lib/geocode";
+import { defaultMarkerIcon } from "@lib/leafletIcons";
 import { cn } from "@lib/utils";
 import L from "leaflet";
 import { useEffect, useRef, useState } from "react";
@@ -286,7 +287,7 @@ export default function LocationPicker({ latitude, longitude, onChange, onLocati
                 <SearchControl query={query} setQuery={setQuery} places={places} isSearching={isSearching} error={error} onSelect={selectPlace} disabled={disabled} />
                 <LocateControl onLocate={onChange} onLocationSelected={onLocationSelected} disabled={disabled} />
 
-                {hasMarker ? <Marker position={[latitude, longitude]} /> : null}
+                {hasMarker ? <Marker position={[latitude, longitude]} icon={defaultMarkerIcon} /> : null}
             </MapContainer>
         </div>
     );

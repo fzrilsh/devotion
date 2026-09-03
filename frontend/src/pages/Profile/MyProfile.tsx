@@ -387,12 +387,30 @@ export default function MyProfile() {
                             </span>
                         ) : null}
                     </div>
+
+                    {!editMode && status?.label !== "Terverifikasi" ? (
+                        <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                            <p className="text-sm text-slate-500">Dapatkan lencana terverifikasi pada profil publik dan hasil pencarian Anda.</p>
+
+                            <Link
+                                to="/verification"
+                                className="mt-3 inline-flex shrink-0 items-center gap-2 rounded-xl bg-industrial-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-industrial-blue-600 sm:mt-0"
+                            >
+                                <LuShieldCheck className="size-4" aria-hidden />
+                                {status?.label === "Menunggu Verifikasi" ? "Lihat Status Pengajuan" : status?.label === "Verifikasi Ditolak" ? "Ajukan Ulang Verifikasi" : "Ajukan Verifikasi"}
+                            </Link>
+                        </div>
+                    ) : null}
                 </div>
             </div>
 
             {profile?.verification_status === "rejected" ? (
                 <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
-                    Verifikasi identitas Anda ditolak. Periksa alasan penolakan dan ajukan ulang di halaman Verifikasi.
+                    Verifikasi identitas Anda ditolak. Periksa alasan penolakan dan{" "}
+                    <Link to="/verification" className="font-bold text-red-800 underline underline-offset-2 hover:text-red-900">
+                        ajukan ulang di halaman Verifikasi
+                    </Link>
+                    .
                 </div>
             ) : null}
 

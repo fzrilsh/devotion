@@ -149,21 +149,21 @@ export default function VerifyPhone() {
 
     return (
         <AuthLayout>
-            <section className="col-span-1 lg:col-span-2 relative flex min-h-full w-full items-center justify-center overflow-hidden px-6 py-10">
+            <section className="relative col-span-1 flex min-h-screen w-full items-center justify-center overflow-hidden px-4 py-8 sm:px-6 sm:py-10 lg:col-span-2">
                 <Blob size="lg" className="-top-24 -right-24 bg-industrial-blue-500/20" />
                 <Blob size="md" className="-bottom-32 -left-24 bg-deep-navy-500/30" animate={true} />
 
-                <div className="relative w-full max-w-xl">
-                    <div className="mb-8 flex items-center flex-col gap-3">
+                <div className="relative min-w-0 w-full max-w-xl">
+                    <div className="mb-8 flex flex-col items-center gap-3 text-center">
                         <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-industrial-blue-500">Verifikasi Nomor HP</p>
 
-                        <h1 className="text-3xl font-bold text-slate-900">Satu langkah lagi</h1>
+                        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Satu langkah lagi</h1>
 
-                        <p className="mt-2 leading-6 text-slate-500">Masukkan kode verifikasi yang kami kirimkan melalui WhatsApp ke nomor:</p>
+                        <p className="mt-2 max-w-md leading-6 text-slate-500">Masukkan kode verifikasi yang kami kirimkan melalui WhatsApp ke nomor:</p>
 
-                        <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                        <div className="mt-4 flex max-w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-center">
                             <LuPhone className="h-4 w-4 text-industrial-blue-500" />
-                            <span className="text-sm font-bold text-slate-800">{phone ? maskPhone(phone) : "-"}</span>
+                            <span className="min-w-0 break-all text-sm font-bold text-slate-800">{phone ? maskPhone(phone) : "-"}</span>
                         </div>
                     </div>
 
@@ -188,7 +188,7 @@ export default function VerifyPhone() {
                     <div className="mb-6">
                         <label className="mb-3 block text-sm font-semibold text-slate-500">Kode Verifikasi</label>
 
-                        <div className="grid grid-cols-6 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-6 gap-1.5 sm:gap-3">
                             {otp.map((digit, index) => (
                                 <input
                                     key={index}
@@ -201,7 +201,7 @@ export default function VerifyPhone() {
                                     onPaste={(event) => handlePaste(event, index)}
                                     inputMode="numeric"
                                     maxLength={1}
-                                    className="h-14 w-full rounded-xl border border-slate-300 bg-white text-center text-xl font-bold text-slate-800 outline-none transition-all focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10"
+                                    className="h-12 w-full rounded-lg border border-slate-300 bg-white text-center text-lg font-bold text-slate-800 outline-none transition-all focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10 sm:h-14 sm:rounded-xl sm:text-xl"
                                 />
                             ))}
                         </div>
