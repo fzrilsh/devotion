@@ -2,6 +2,15 @@ import { ApiError } from "@api/client";
 
 export type ProblemDetails = { code?: string; detail: string; meta?: Record<string, unknown> };
 
+// Parses the Retry-After response header (seconds). Returns undefined when the
+// header is absent or not a plain integer, so callers can fall back safely.
+export function parseRetryAfter(header: string | null): number | undefined {
+    if (header === null) return undefined;
+
+    const value = Number.parseInt(header, 10);
+    return Number.isNaN(value) || value < 0 ? undefined : value;
+}
+
 export function getProblem(error: unknown): ProblemDetails | null {
     if (!(error instanceof ApiError)) return null;
 
