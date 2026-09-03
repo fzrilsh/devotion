@@ -105,7 +105,7 @@ export default function Register() {
                 roles: getRoles(selectedRole),
             });
 
-            navigate("/auth/verify-email", { replace: true, state: { email: values.email } });
+            navigate("/auth/login", { replace: true });
         } catch (error) {
             setError("root", {
                 message: getProblemMessage(error, "Pendaftaran gagal. Silakan coba lagi.", { 409: "Email atau data akun tersebut sudah terdaftar.", 429: "Terlalu banyak percobaan pendaftaran. Coba lagi beberapa saat." }),

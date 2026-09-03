@@ -47,10 +47,10 @@ export default function VerifyPhone() {
     }, [countdown]);
 
     useEffect(() => {
-        if (!email && !user) {
-            navigate("/auth/register", { replace: true });
+        if (!email) {
+            navigate("/profile/me", { replace: true });
         }
-    }, [email, user, navigate]);
+    }, [email, navigate]);
 
     useEffect(() => {
         if (user?.phone_verified) {
@@ -90,18 +90,14 @@ export default function VerifyPhone() {
         try {
             await verifyMutation.mutateAsync({ code });
 
-            if (user) {
-                navigate(
-                    getDefaultRedirectPath({
-                        subcontractor: user.roles?.subcontractor,
-                        buyer: user.roles?.buyer,
-                        is_admin: user.is_admin,
-                    }),
-                    { replace: true },
-                );
-            } else {
-                navigate("/auth/login", { replace: true });
-            }
+            navigate(
+                getDefaultRedirectPath({
+                    subcontractor: user?.roles?.subcontractor,
+                    buyer: user?.roles?.buyer,
+                    is_admin: user?.is_admin,
+                }),
+                { replace: true },
+            );
         } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
                 setSessionLost(true);

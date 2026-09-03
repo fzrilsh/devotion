@@ -35,9 +35,9 @@ export default function VerifyEmail() {
 
     useEffect(() => {
         if (!email) {
-            navigate(user ? "/profile/me" : "/auth/register", { replace: true });
+            navigate("/profile/me", { replace: true });
         }
-    }, [email, user, navigate]);
+    }, [email, navigate]);
 
     const handleChange = (value: string, index: number) => {
         const digit = value.replace(/\D/g, "").slice(-1);
@@ -71,14 +71,10 @@ export default function VerifyEmail() {
         try {
             await verifyMutation.mutateAsync({ code });
 
-            if (user) {
-                if (user.phone_verified) {
-                    navigate("/profile/me", { replace: true });
-                } else {
-                    navigate("/auth/verify-phone", { replace: true, state: { email } });
-                }
+            if (user?.phone_verified) {
+                navigate("/profile/me", { replace: true });
             } else {
-                navigate("/auth/login", { replace: true });
+                navigate("/auth/verify-phone", { replace: true });
             }
         } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
