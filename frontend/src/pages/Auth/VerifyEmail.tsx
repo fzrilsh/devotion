@@ -40,14 +40,31 @@ export default function VerifyEmail() {
     }, [email, navigate]);
 
     const handleChange = (value: string, index: number) => {
-        const digit = value.replace(/\D/g, "").slice(-1);
+        const digits = value.replace(/\D/g, "");
+
+        if (!digits) return;
+
+        if (digits.length > 1) {
+            const merged = [...otp];
+            let cursor = index;
+
+            for (const digit of digits) {
+                if (cursor >= otp.length) break;
+                merged[cursor] = digit;
+                cursor += 1;
+            }
+
+            setOtp(merged);
+            inputRefs.current[Math.min(cursor, otp.length - 1)]?.focus();
+            return;
+        }
 
         const newOtp = [...otp];
-        newOtp[index] = digit;
+        newOtp[index] = digits;
 
         setOtp(newOtp);
 
-        if (digit && index < otp.length - 1) {
+        if (index < otp.length - 1) {
             inputRefs.current[index + 1]?.focus();
         }
     };
@@ -56,6 +73,15 @@ export default function VerifyEmail() {
         if (event.key === "Backspace" && !otp[index] && index > 0) {
             inputRefs.current[index - 1]?.focus();
         }
+
+        if (event.key === "Enter" && otp.join("").length === 6) {
+            handleVerify();
+        }
+    };
+
+    const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>, index: number) => {
+        event.preventDefault();
+        handleChange(event.clipboardData.getData("text"), index);
     };
 
     async function handleVerify() {
@@ -148,6 +174,7 @@ export default function VerifyEmail() {
                                     value={digit}
                                     onChange={(event) => handleChange(event.target.value, index)}
                                     onKeyDown={(event) => handleKeyDown(event, index)}
+                                    onPaste={(event) => handlePaste(event, index)}
                                     inputMode="numeric"
                                     maxLength={1}
                                     className="h-14 w-full rounded-xl border border-slate-300 bg-white text-center text-xl font-bold text-slate-800 outline-none transition-all focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10"
