@@ -1,15 +1,21 @@
 <div align="center">
 
+<img src="https://gist.github.com/user-attachments/assets/69a93922-e7fe-4724-a4c7-05d5bc26ac35" alt="Devotion Logo" width="400" style="margin-bottom: 8px; height: auto;">
+
 # Devotion
 ### Marketplace kapasitas produksi untuk UMKM konveksi
 
 **Delegate Your Overload Production**
 
+<br>
+
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_Site-success?style=for-the-badge)](https://devotion.web.id/)
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github)](https://github.com/fzrilsh/devotion)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-**Submission for ITECHNO CUP 2026 - Web Development**
+<br><br>
+
+**Submission for ITECHNO CUP 2026 — Web Development**
 
 **By Indonesia Emas 74 Kg**
 
