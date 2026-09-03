@@ -5,6 +5,7 @@ import { getProblemMessage } from "@lib/problem";
 import { loginSchema, type LoginForm } from "@schemas/auth";
 import { forwardRef, useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
+import logo from "@assets/logo.png";
 import { LuEye, LuEyeOff, LuMail } from "react-icons/lu";
 import { Link, useNavigate } from "react-router-dom";
 import { getDefaultRedirectPath } from "@lib/roles";
@@ -96,9 +97,8 @@ export default function Login() {
 
             <main className="flex items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
                 <div className="w-full max-w-md">
-                    <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
-                        <span className="grid size-9 place-items-center rounded-xl bg-industrial-blue-500 text-sm font-extrabold text-white">D</span>
-                        <span className="text-lg font-bold tracking-tight text-slate-900">Devotion</span>
+                    <Link to="/" className="mb-8 flex items-center justify-center lg:hidden">
+                        <img src={logo} alt="Devotion" className="h-10" />
                     </Link>
 
                     <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Masuk ke Devotion</h2>

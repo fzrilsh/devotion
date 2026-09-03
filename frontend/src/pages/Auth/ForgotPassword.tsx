@@ -6,6 +6,7 @@ import { recoverRequestSchema, type RecoverRequestForm } from "@schemas/auth";
 import { useForm } from "react-hook-form";
 import { LuKeyRound, LuMail } from "react-icons/lu";
 import { Link, useNavigate } from "react-router-dom";
+import logo from "@assets/logo.png";
 
 const inputClassName = "w-full rounded-xl border py-3 pl-11 pr-4 border-slate-300 bg-white text-sm text-slate-800 outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-industrial-blue-500 focus:ring-2 focus:ring-industrial-blue-500/10";
 const labelClassName = "sr-only";
@@ -55,9 +56,8 @@ export default function ForgotPassword() {
 
             <main className="flex items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
                 <div className="w-full max-w-md">
-                    <Link to="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
-                        <span className="grid size-9 place-items-center rounded-xl bg-industrial-blue-500 text-sm font-extrabold text-white">D</span>
-                        <span className="text-lg font-bold tracking-tight text-slate-900">Devotion</span>
+                    <Link to="/" className="mb-8 flex items-center justify-center lg:hidden">
+                        <img src={logo} alt="Devotion" className="h-10" />
                     </Link>
 
                     <h2 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">Lupa kata sandi?</h2>
