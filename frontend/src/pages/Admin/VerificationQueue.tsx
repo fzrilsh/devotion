@@ -1,6 +1,6 @@
-import { apiUrl } from "@api/client";
 import type { VerificationRequest, VerificationStatus } from "@api/admin";
 import Loading from "@components/common/Loading";
+import FilePreviewModal from "@components/common/FilePreviewModal";
 import { useDecideVerification, useVerificationQueue } from "@hooks/useAdmin";
 import { statusFilters } from "@lib/statusFilters";
 import { cn } from "@lib/utils";
@@ -19,7 +19,9 @@ const statusMeta: Record<VerificationStatus, { label: string; className: string 
 
 const filterOptions = statusFilters(statusMeta, { allLast: true });
 
-function RequestCard({ request }: { request: VerificationRequest }) {
+type PreviewTarget = { fileId: string; title: string } | null;
+
+function RequestCard({ request, onPreview }: { request: VerificationRequest; onPreview: (target: PreviewTarget) => void }) {
     const decideMutation = useDecideVerification();
     const [rejectOpen, setRejectOpen] = useState(false);
     const [reason, setReason] = useState("");
@@ -63,17 +65,25 @@ function RequestCard({ request }: { request: VerificationRequest }) {
 
                 <div className="flex shrink-0 gap-2">
                     {request.identity_file_id ? (
-                        <a href={apiUrl(`/files/${request.identity_file_id}`)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                        <button
+                            type="button"
+                            onClick={() => onPreview({ fileId: request.identity_file_id!, title: "Dokumen Identitas" })}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                        >
                             <LuFileImage className="size-3.5" aria-hidden />
                             Dokumen
-                        </a>
+                        </button>
                     ) : null}
 
                     {request.location_file_id ? (
-                        <a href={apiUrl(`/files/${request.location_file_id}`)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50">
+                        <button
+                            type="button"
+                            onClick={() => onPreview({ fileId: request.location_file_id!, title: "Foto Lokasi" })}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                        >
                             <LuFileImage className="size-3.5" aria-hidden />
                             Foto Lokasi
-                        </a>
+                        </button>
                     ) : null}
                 </div>
             </div>
@@ -134,6 +144,7 @@ function RequestCard({ request }: { request: VerificationRequest }) {
 
 export default function AdminVerificationQueue() {
     const [status, setStatus] = useState<VerificationStatus | "all">("pending");
+    const [preview, setPreview] = useState<PreviewTarget>(null);
     const queueQuery = useVerificationQueue(status === "all" ? undefined : status);
     const items = queueQuery.data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -172,9 +183,11 @@ export default function AdminVerificationQueue() {
                 <>
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {items.map((request) => (
-                            <RequestCard key={request.request_id} request={request} />
+                            <RequestCard key={request.request_id} request={request} onPreview={setPreview} />
                         ))}
                     </div>
+
+                    <FilePreviewModal fileId={preview?.fileId ?? null} title={preview?.title ?? "Pratinjau"} onClose={() => setPreview(null)} />
 
                     {queueQuery.hasNextPage ? (
                         <div className="text-center">
