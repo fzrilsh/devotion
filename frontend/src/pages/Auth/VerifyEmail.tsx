@@ -11,6 +11,13 @@ type VerifyEmailLocationState = {
     email?: string;
 };
 
+function formatCountdown(totalSeconds: number): string {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export default function VerifyEmail() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -39,10 +46,31 @@ export default function VerifyEmail() {
         }
     }, [email, navigate]);
 
+    // Kirim ulang kode sekali saat halaman dibuka, jadi pengguna tidak perlu
+    // menekan tombol hanya untuk menerima kode yang belum tentu sampai. Bila
+    // server menolak karena rate limit, waktu tunggunya diambil dari header
+    // Retry-After dan ditampilkan sebagai countdown, bukan pesan galat.
+    const autoResent = useRef(false);
+
+    useEffect(() => {
+        if (!email || autoResent.current) return;
+
+        autoResent.current = true;
+        handleResend();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [email]);
+
     const handleChange = (value: string, index: number) => {
         const digits = value.replace(/\D/g, "");
 
-        if (!digits) return;
+        if (!digits) {
+            // Backspace mengosongkan kotak: nilai kosong tetap harus disimpan,
+            // kalau tidak state lama kembali dan digit tidak bisa dihapus.
+            const cleared = [...otp];
+            cleared[index] = "";
+            setOtp(cleared);
+            return;
+        }
 
         if (digits.length > 1) {
             const merged = [...otp];
@@ -121,6 +149,11 @@ export default function VerifyEmail() {
             setCountdown(60);
             setSuccessMessage("Kode verifikasi baru sudah dikirim ke email Anda.");
         } catch (error) {
+            if (error instanceof ApiError && error.status === 429 && error.retryAfterSeconds) {
+                setCountdown(error.retryAfterSeconds);
+                return;
+            }
+
             setErrorMessage(getProblemMessage(error, "Permintaan tidak dapat diproses. Silakan coba lagi."));
         }
     }
@@ -190,7 +223,7 @@ export default function VerifyEmail() {
                     <div className="mt-6 text-center">
                         {countdown > 0 ? (
                             <p className="text-sm text-slate-400">
-                                Kirim ulang kode dalam <span className="font-semibold text-slate-600">00:{String(countdown).padStart(2, "0")}</span>
+                                Kirim ulang kode dalam <span className="font-semibold text-slate-600">{formatCountdown(countdown)}</span>
                             </p>
                         ) : (
                             <button type="button" onClick={handleResend} disabled={resendMutation.isPending} className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-industrial-blue-500 hover:text-industrial-blue-600 disabled:cursor-not-allowed disabled:opacity-60">
