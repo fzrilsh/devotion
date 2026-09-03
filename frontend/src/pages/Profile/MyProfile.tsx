@@ -375,10 +375,20 @@ export default function MyProfile() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 pb-1">
-                        <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold", status ? status.className : "border-slate-200 bg-slate-50 text-slate-500")}>
-                            <StatusIcon className="size-3.5" aria-hidden />
-                            {status ? status.label : "Verifikasi belum diajukan"}
-                        </span>
+                        {!editMode && status?.label !== "Terverifikasi" ? (
+                            <Link
+                                to="/verification"
+                                className="inline-flex items-center gap-1.5 rounded-full border border-industrial-blue-500/20 bg-industrial-blue-500/10 px-3 py-1.5 text-xs font-bold text-industrial-blue-600 transition-colors hover:bg-industrial-blue-500/15"
+                            >
+                                <LuShieldCheck className="size-3.5" aria-hidden />
+                                {status?.label === "Menunggu Verifikasi" ? "Lihat Status Pengajuan" : status?.label === "Verifikasi Ditolak" ? "Ajukan Ulang Verifikasi" : "Ajukan Verifikasi"}
+                            </Link>
+                        ) : (
+                            <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold", status ? status.className : "border-slate-200 bg-slate-50 text-slate-500")}>
+                                <StatusIcon className="size-3.5" aria-hidden />
+                                {status ? status.label : "Verifikasi belum diajukan"}
+                            </span>
+                        )}
 
                         {profile?.identity_verified ? (
                             <span className="inline-flex items-center gap-1.5 rounded-full border border-industrial-blue-500/20 bg-industrial-blue-500/10 px-3 py-1.5 text-xs font-bold text-industrial-blue-600">
@@ -388,19 +398,6 @@ export default function MyProfile() {
                         ) : null}
                     </div>
 
-                    {!editMode && status?.label !== "Terverifikasi" ? (
-                        <div className="border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
-                            <p className="text-sm text-slate-500">Dapatkan lencana terverifikasi pada profil publik dan hasil pencarian Anda.</p>
-
-                            <Link
-                                to="/verification"
-                                className="mt-3 inline-flex shrink-0 items-center gap-2 rounded-xl bg-industrial-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-industrial-blue-600 sm:mt-0"
-                            >
-                                <LuShieldCheck className="size-4" aria-hidden />
-                                {status?.label === "Menunggu Verifikasi" ? "Lihat Status Pengajuan" : status?.label === "Verifikasi Ditolak" ? "Ajukan Ulang Verifikasi" : "Ajukan Verifikasi"}
-                            </Link>
-                        </div>
-                    ) : null}
                 </div>
             </div>
 
