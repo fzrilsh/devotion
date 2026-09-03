@@ -1,5 +1,6 @@
 import "leaflet/dist/leaflet.css";
 
+import { defaultMarkerIcon } from "@lib/leafletIcons";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 
 type LocationMapProps = {
@@ -14,7 +15,7 @@ export default function LocationMap({ latitude, longitude, label = "Lokasi" }: L
             <MapContainer center={[latitude, longitude]} zoom={15} scrollWheelZoom={false} className="h-full w-full z-10">
                 <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-                <Marker position={[latitude, longitude]}>
+                <Marker position={[latitude, longitude]} icon={defaultMarkerIcon}>
                     <Popup>{label}</Popup>
                 </Marker>
             </MapContainer>
