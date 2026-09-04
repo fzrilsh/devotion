@@ -82,8 +82,8 @@ func (h *harness) seedCandidateFor(t *testing.T, listingID, subconAcc, subconPro
 
 	var requestID pgtype.UUID
 	err := h.pool.QueryRow(ctx,
-		`INSERT INTO quota_request (buyer_id, product_item_id, quantity, material, deadline, reply_due_at, created_at)
-		 VALUES ($1, $2, $3, 'Katun combed 30s', $4, $5, $6) RETURNING id`,
+		`INSERT INTO quota_request (buyer_id, product_item_id, quantity, material, deadline, note, reply_due_at, created_at)
+		 VALUES ($1, $2, $3, 'Katun combed 30s', $4, 'Catatan dari pembeli', $5, $6) RETURNING id`,
 		h.buyerProf, h.productID, quantity, pgdate(deadline),
 		tstz(baseTime.Add(72*time.Hour)), tstz(baseTime)).Scan(&requestID)
 	if err != nil {

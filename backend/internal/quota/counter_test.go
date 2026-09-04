@@ -94,6 +94,13 @@ func TestCounter_BuyerCountersSubcontractorOffer_FR033(t *testing.T) {
 	if len(h.notifier.events) != 2 || h.notifier.events[1] != sqlcgen.EventTypeCounterOffer {
 		t.Fatalf("mau notifikasi kedua counter_offer, dapat %v", h.notifier.events)
 	}
+	if len(h.notifier.links) != 2 || h.notifier.links[1] == nil {
+		t.Fatalf("tautan notifikasi counter kosong")
+	}
+	wantLink := "/requests/incoming/" + uuidString(f.candidateID)
+	if *h.notifier.links[1] != wantLink {
+		t.Fatalf("tautan counter %q, mau %q", *h.notifier.links[1], wantLink)
+	}
 }
 
 // TestCounter_ChainAlternatesParties_FR033 proves a counter can be answered by a

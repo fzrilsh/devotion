@@ -62,10 +62,83 @@ func TestIncoming_ListsOwnCandidates_FR030(t *testing.T) {
 	}
 }
 
+// TestIncomingDetail_LoadsWithoutListCache_FR030 proves a subcontractor can open
+// a candidate directly, including after a browser refresh with no incoming-list
+// query in the client cache.
+func TestIncomingDetail_LoadsWithoutListCache_FR030(t *testing.T) {
+	h := newHarness(t, "incoming_detail_direct")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	h.asSubcontractor(f.subconAcc)
+
+	rec := h.do(http.MethodGet, "/api/candidates/"+uuidString(f.candidateID))
+	mustStatus(t, rec, http.StatusOK)
+
+	var got struct {
+		CandidateID string  `json:"candidate_id"`
+		Quantity    int32   `json:"quantity"`
+		Material    string  `json:"material"`
+		Deadline    string  `json:"deadline"`
+		Note        *string `json:"note"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode candidate detail %q: %v", rec.Body.String(), err)
+	}
+	if got.CandidateID != uuidString(f.candidateID) {
+		t.Fatalf("candidate_id %q, mau %q", got.CandidateID, uuidString(f.candidateID))
+	}
+	if got.Quantity != 50 || got.Deadline != deadlineParam(4) {
+		t.Fatalf("detail quantity/deadline = %d/%q, mau 50/%q", got.Quantity, got.Deadline, deadlineParam(4))
+	}
+	if got.Material != "Katun combed 30s" {
+		t.Fatalf("material %q, mau Katun combed 30s", got.Material)
+	}
+	if got.Note == nil || *got.Note != "Catatan dari pembeli" {
+		t.Fatalf("note = %v, mau catatan pembeli", got.Note)
+	}
+}
+
+// TestIncomingDetail_RejectsBuyer_FR030 proves the direct incoming detail route
+// is restricted to subcontractors.
+func TestIncomingDetail_RejectsBuyer_FR030(t *testing.T) {
+	h := newHarness(t, "incoming_detail_role")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	h.asBuyer(h.buyerAcc)
+
+	rec := h.do(http.MethodGet, "/api/candidates/"+uuidString(f.candidateID))
+	mustStatus(t, rec, http.StatusForbidden)
+}
+
+// TestIncomingDetail_RejectsMalformedID_FR030 proves a malformed candidate id is
+// rejected as validation input before the database is queried.
+func TestIncomingDetail_RejectsMalformedID_FR030(t *testing.T) {
+	h := newHarness(t, "incoming_detail_bad_id")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	h.asSubcontractor(f.subconAcc)
+
+	rec := h.do(http.MethodGet, "/api/candidates/bukan-uuid")
+	mustStatus(t, rec, http.StatusUnprocessableEntity)
+	if problem := decodeProblem(t, rec); problem.Code != "VALIDATION_FAILED" {
+		t.Fatalf("code %q, mau VALIDATION_FAILED", problem.Code)
+	}
+}
+
+// TestIncomingDetail_HidesOtherSubcontractorCandidate_FR030 proves a copied
+// candidate link is not readable by a different subcontractor account.
+func TestIncomingDetail_HidesOtherSubcontractorCandidate_FR030(t *testing.T) {
+	h := newHarness(t, "incoming_detail_owner")
+	f := h.seedCandidate(t, "alfa", 50, platform_deadline(4))
+	otherAcc := seedAccount(t, h.pool, "other-subkon@contoh.test", nextPhone(), true)
+	seedProfile(t, h.pool, otherAcc, "Subkon Lain", "3273")
+	h.asSubcontractor(otherAcc)
+
+	rec := h.do(http.MethodGet, "/api/candidates/"+uuidString(f.candidateID))
+	mustStatus(t, rec, http.StatusNotFound)
+}
+
 // TestIncoming_ExposesCapacityAndFulfilment_FR035_FR090 proves the read side
 // carries the request's quantity and deadline plus the subcontractor's remaining
 // capacity in the readiness..deadline range, and marks can_fulfill true when that
-// capacity covers the request. weekly_capacity 100 over weeks 1..4 with a 7-day
+// capacity covers the requested quantity. weekly_capacity 100 over weeks 1..4 with a 7-day
 // readiness lead leaves 400 in range, so a request for 50 is fulfillable.
 func TestIncoming_ExposesCapacityAndFulfilment_FR035_FR090(t *testing.T) {
 	h := newHarness(t, "incoming_capacity_ok")

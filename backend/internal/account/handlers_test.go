@@ -57,6 +57,9 @@ func (c *captureDelivery) SendRecoveryCode(_ context.Context, _, code string) er
 // waitEmail blocks for the next emailed code, failing the test if none arrives.
 func (c *captureDelivery) waitEmail(t *testing.T) string { return waitCode(t, c.emailCh, "email") }
 func (c *captureDelivery) waitPhone(t *testing.T) string { return waitCode(t, c.phoneCh, "phone") }
+func (c *captureDelivery) waitRecovery(t *testing.T) string {
+	return waitCode(t, c.recoveryCh, "recovery")
+}
 
 func waitCode(t *testing.T, ch chan string, which string) string {
 	t.Helper()
@@ -423,6 +426,53 @@ func TestRecoverRequest_AlwaysAccepted(t *testing.T) {
 		if rec.Code != http.StatusAccepted {
 			t.Fatalf("email %q: status %d, mau 202", email, rec.Code)
 		}
+	}
+}
+
+// TestRecoverRequest_UnverifiedAccountReceivesCode_FR003 proves password recovery
+// does not require email or phone verification. The account created here remains
+// unverified, yet the recovery code reaches the delivery channel.
+func TestRecoverRequest_UnverifiedAccountReceivesCode_FR003(t *testing.T) {
+	h := newHarness(t, "account_recover_unverified")
+	h.registerAndLogin(t, "unverified@example.com", "+6281277779999", "rahasia123")
+
+	var verified bool
+	if err := h.pool.QueryRow(context.Background(),
+		`SELECT email_verified FROM user_account WHERE email = $1`, "unverified@example.com").Scan(&verified); err != nil {
+		t.Fatalf("baca status verifikasi: %v", err)
+	}
+	if verified {
+		t.Fatal("akun uji sudah terverifikasi, mau tetap belum terverifikasi")
+	}
+
+	rec := h.do("POST", "/api/auth/recover/request", map[string]any{"email": "unverified@example.com"}, "")
+	if rec.Code != http.StatusAccepted {
+		t.Fatalf("status %d, mau 202", rec.Code)
+	}
+	if code := h.delivery.waitRecovery(t); !codeRe.MatchString(code) {
+		t.Fatalf("kode recovery = %q, mau enam digit", code)
+	}
+}
+
+// TestRecoverRequest_RepeatedRequestsDeliverFreshCodes_FR003 proves a second
+// recovery request is delivered and replaces the first recovery code without a
+// resend-code rate-limit budget blocking it.
+func TestRecoverRequest_RepeatedRequestsDeliverFreshCodes_FR003(t *testing.T) {
+	h := newHarness(t, "account_recover_repeat")
+	h.registerAndLogin(t, "repeat@example.com", "+6281288889999", "rahasia123")
+
+	request := func() string {
+		rec := h.do("POST", "/api/auth/recover/request", map[string]any{"email": "repeat@example.com"}, "")
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("status %d, mau 202", rec.Code)
+		}
+		return h.delivery.waitRecovery(t)
+	}
+
+	first := request()
+	second := request()
+	if first == second {
+		t.Fatalf("kode recovery kedua sama dengan pertama: %q", second)
 	}
 }
 
