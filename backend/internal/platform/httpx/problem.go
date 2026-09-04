@@ -1,8 +1,11 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+
+	"github.com/fzrilsh/devotion/backend/internal/platform/observability"
 )
 
 // problemContentType is the RFC 9457 media type. Every error body uses it so a
@@ -80,10 +83,35 @@ func writeProblem(w http.ResponseWriter, p Problem) {
 	_ = json.NewEncoder(w).Encode(p)
 }
 
-// WriteInternal writes a generic 500 problem+json. A panic is an internal fault:
-// the client learns nothing beyond that something failed, and the stack goes to
-// the log via the Recover middleware.
-func WriteInternal(w http.ResponseWriter) {
+// WriteInternal writes a generic 500 problem+json and reports the internal
+// failure to Sentry. When the caller has the original error, it is captured as
+// an exception. A no-argument call remains valid for invariant failures where
+// there is no safe error value to attach.
+func WriteInternal(w http.ResponseWriter, cause ...error) {
+	requestID := RequestIDFromContext(requestContextFromWriter(w))
+	if len(cause) > 0 && cause[0] != nil {
+		observability.CaptureException(cause[0], requestID)
+	} else {
+		observability.CaptureMessage("internal server error", requestID)
+	}
+	writeInternalResponse(w)
+}
+
+// requestContextWriter is implemented by the request logger's response writer.
+// It lets generic response helpers correlate captured failures with request logs
+// without changing every handler signature.
+type requestContextWriter interface {
+	RequestContext() context.Context
+}
+
+func requestContextFromWriter(w http.ResponseWriter) context.Context {
+	if rw, ok := w.(requestContextWriter); ok {
+		return rw.RequestContext()
+	}
+	return context.Background()
+}
+
+func writeInternalResponse(w http.ResponseWriter) {
 	writeProblem(w, Problem{
 		Type:   typeBaseURI + "internal",
 		Title:  "Terjadi galat",
