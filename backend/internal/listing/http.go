@@ -34,15 +34,15 @@ type machineView struct {
 // calendar_updated_at is nullable (null until the owner first edits the
 // calendar), so it is a pointer.
 type listingView struct {
-	ListingID         string         `json:"listing_id"`
-	ProfileID         string         `json:"profile_id"`
-	WeeklyCapacity    int32          `json:"weekly_capacity"`
-	ReadinessLeadDays int32          `json:"readiness_lead_days"`
-	Published         bool           `json:"published"`
-	CalendarUpdatedAt *time.Time     `json:"calendar_updated_at"`
-	HorizonUntil      string         `json:"horizon_until"`
-	ProductItems      []catalogItem  `json:"product_items"`
-	Machines          []machineView  `json:"machines"`
+	ListingID         string        `json:"listing_id"`
+	ProfileID         string        `json:"profile_id"`
+	WeeklyCapacity    int32         `json:"weekly_capacity"`
+	ReadinessLeadDays int32         `json:"readiness_lead_days"`
+	Published         bool          `json:"published"`
+	CalendarUpdatedAt *time.Time    `json:"calendar_updated_at"`
+	HorizonUntil      string        `json:"horizon_until"`
+	ProductItems      []catalogItem `json:"product_items"`
+	Machines          []machineView `json:"machines"`
 }
 
 // periodView is the AvailabilityPeriod response body. remaining is derived in
@@ -419,10 +419,7 @@ func writeErr(w http.ResponseWriter, err error) {
 		httpx.WriteProblem(w, httpx.CodeListingNotFound, "Belum ada listing kapasitas. Buat listing lebih dulu.")
 	case errors.Is(err, errListingExists):
 		httpx.WriteProblem(w, httpx.CodeListingAlreadyExists, "Profil ini sudah punya listing. Ubah listing yang ada, bukan membuat baru.")
-	case errors.Is(err, errPeriodOutsideCal):
-		httpx.WriteInternal(w)
 	default:
 		httpx.WriteInternal(w)
 	}
 }
-

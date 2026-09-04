@@ -7,7 +7,7 @@ requirement, memenuhi Gate III konstitusi.
 
 ## Cakupan
 
-66 operasi pada 58 path. Seluruh 91 FR spec tercakup, kecuali tiga belas yang memang bukan
+67 operasi pada 59 path. Seluruh 91 FR spec tercakup, kecuali tiga belas yang memang bukan
 kontrak API, dan itu disebut eksplisit di bawah agar `/analyze` tidak melaporkannya
 sebagai celah. Skema `Problem` di `openapi.yaml` memuat 34 kode galat mesin yang stabil.
 

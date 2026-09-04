@@ -21,7 +21,7 @@ import (
 // 5); a request_received notification is enqueued per candidate inside that
 // transaction so a queue failure rolls the whole thing back.
 func (s *Service) createRequest(ctx context.Context, accountID pgtype.UUID, in requestInput) (requestView, error) {
-	v, verr := validateRequestInput(in)
+	v, verr := s.validateRequestInput(in)
 	if verr != nil {
 		return requestView{}, verr
 	}

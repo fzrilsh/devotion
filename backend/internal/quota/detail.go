@@ -124,7 +124,9 @@ type incomingCandidateView struct {
 	Status          string      `json:"status"`
 	RejectionReason *string     `json:"rejection_reason"`
 	Quantity        int32       `json:"quantity"`
+	Material        string      `json:"material"`
 	Deadline        string      `json:"deadline"`
+	Note            *string     `json:"note"`
 	CapacityInRange int64       `json:"capacity_in_range"`
 	CanFulfill      bool        `json:"can_fulfill"`
 	Offers          []offerView `json:"offers,omitempty"`
@@ -209,6 +211,67 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 	}, nil
 }
 
+// incomingDetail loads one candidate for the subcontractor that owns its listing.
+// It returns the same fields as an incoming-list item, including capacity and the
+// complete offer chain, so a direct browser navigation has no cache prerequisite.
+func (s *Service) incomingDetail(ctx context.Context, accountID, candidateID pgtype.UUID) (incomingCandidateView, error) {
+	c, err := s.queries().GetIncomingCandidate(ctx, sqlcgen.GetIncomingCandidateParams{
+		ID:        candidateID,
+		AccountID: accountID,
+	})
+	if err != nil {
+		if isNoRows(err) {
+			return incomingCandidateView{}, &conflictError{code: httpx.CodeNotFound, detail: "Kandidat tidak ditemukan."}
+		}
+		return incomingCandidateView{}, err
+	}
+
+	now := s.clock.Now()
+	view := incomingCandidateView{
+		CandidateID:     uuidString(c.CandidateID),
+		ListingID:       uuidString(c.ListingID),
+		ProfileID:       uuidString(c.SubcontractorID),
+		BusinessName:    c.BusinessName,
+		Status:          string(c.Status),
+		RejectionReason: textPtr(c.RejectionReason),
+		Quantity:        c.Quantity,
+		Material:        c.Material,
+		Deadline:        c.Deadline.Time.Format(dateLayout),
+		Note:            textPtr(c.Note),
+	}
+
+	readinessWeek := platform.WeekStart(now.AddDate(0, 0, int(c.ReadinessLeadDays)))
+	deadlineWeek := platform.WeekStart(c.Deadline.Time)
+	if !readinessWeek.After(deadlineWeek) {
+		remaining, err := s.queries().RemainingCapacityForOffer(ctx, sqlcgen.RemainingCapacityForOfferParams{
+			ListingID:      c.ListingID,
+			ReadinessWeek:  pgdate(readinessWeek),
+			DeadlineWeek:   pgdate(deadlineWeek),
+			WeeklyCapacity: c.WeeklyCapacity,
+			HorizonUntil:   c.HorizonUntil,
+		})
+		if err != nil {
+			return incomingCandidateView{}, err
+		}
+		view.CapacityInRange = remaining
+		view.CanFulfill = int64(c.Quantity) <= remaining
+	}
+
+	offers, err := s.queries().ListOffersByCandidates(ctx, []pgtype.UUID{candidateID})
+	if err != nil {
+		return incomingCandidateView{}, err
+	}
+	if len(offers) > 0 {
+		view.Offers = make([]offerView, 0, len(offers))
+		for _, offer := range offers {
+			view.Offers = append(view.Offers, offerViewOf(offer))
+		}
+		last := view.Offers[len(view.Offers)-1]
+		view.LatestOffer = &last
+	}
+	return view, nil
+}
+
 // listIncoming returns one keyset page of candidates whose listing the
 // subcontractor account owns, newest request first (FR-030). An optional status
 // filter narrows to one candidate_status (FR-031). The cursor tuple is
@@ -250,7 +313,9 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 			Status:          string(c.Status),
 			RejectionReason: textPtr(c.RejectionReason),
 			Quantity:        c.Quantity,
+			Material:        c.Material,
 			Deadline:        c.Deadline.Time.Format(dateLayout),
+			Note:            textPtr(c.Note),
 		}
 
 		// Remaining capacity in the readiness..deadline window, keyed on the

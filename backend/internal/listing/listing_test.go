@@ -812,6 +812,46 @@ func TestEnsureHorizon_TidakMengubahCalendarUpdatedAt_FR021(t *testing.T) {
 	}
 }
 
+// TestUpdatePeriods_MingguBerjalanYangHilang_DibuatUlang_FR017 proves editing the
+// current week succeeds even when an older listing has a future horizon but its
+// current-week period row is missing.
+func TestUpdatePeriods_MingguBerjalanYangHilang_DibuatUlang_FR017(t *testing.T) {
+	h := newHarness(t, "periods_current_missing")
+	mustStatus(t, h.do("POST", "/api/listing/me", h.validCreate(500)), http.StatusCreated)
+	listingID := h.listingRow(t)
+	weekNow := platform.WeekStart(baseTime)
+
+	result, err := h.pool.Exec(context.Background(),
+		`DELETE FROM availability_period WHERE listing_id = $1 AND week_start = $2::date`, listingID, weekNow.Format(dateFmt))
+	if err != nil {
+		t.Fatalf("hapus periode minggu berjalan: %v", err)
+	}
+	if result.RowsAffected() != 1 {
+		t.Fatalf("baris minggu berjalan terhapus = %d, mau 1", result.RowsAffected())
+	}
+
+	rec := h.do("PUT", "/api/listing/me/periods", map[string]any{
+		"periods": []map[string]any{
+			{"week_start": weekNow.Format(dateFmt), "capacity": 100, "marked_full": true},
+		},
+	})
+	mustStatus(t, rec, http.StatusOK)
+
+	var periods []periodResp
+	decode(t, rec, &periods)
+	if len(periods) != 1 {
+		t.Fatalf("periode dikembalikan = %d, mau 1", len(periods))
+	}
+	var marked bool
+	if err := h.pool.QueryRow(context.Background(),
+		`SELECT marked_full FROM availability_period WHERE listing_id = $1 AND week_start = $2`, listingID, weekNow).Scan(&marked); err != nil {
+		t.Fatalf("baca periode minggu berjalan: %v", err)
+	}
+	if !marked {
+		t.Fatal("minggu berjalan tidak dibuat ulang dan ditandai penuh")
+	}
+}
+
 // TestUpdatePeriods_MenandaiMingguPenuh_FR017 proves marking a free week full
 // zeroes its remaining and sets marked_full.
 func TestUpdatePeriods_MenandaiMingguPenuh_FR017(t *testing.T) {
