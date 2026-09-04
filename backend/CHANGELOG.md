@@ -7,6 +7,7 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Pelaporan Sentry kini benar-benar menangkap panic HTTP dan galat internal 500, bukan hanya menginisialisasi SDK tanpa pernah mengirim event. Panic tetap dibalas sebagai `problem+json` generik, sementara event membawa `request_id` yang sama dengan log dan seluruh field sensitif tetap dibuang oleh allowlist (FR-082). Jalur capture memakai scope terisolasi per event agar request bersamaan tidak saling menukar korelasi.
 - `openapi.yaml` pada `POST /admin/disputes/{disputeId}/resolve` kini menyatakan
   syarat bersyarat yang selama ini hanya hidup di `mediation.go:301-319`:
   `liable_profile_id` dan `note` wajib saat `result` bernilai `cancelled`,
