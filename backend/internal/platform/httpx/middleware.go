@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fzrilsh/devotion/backend/internal/platform/cloudflare"
+	"github.com/fzrilsh/devotion/backend/internal/platform/observability"
 )
 
 // Middleware wraps an http.Handler with cross-cutting behavior.
@@ -60,9 +62,11 @@ func Recover(log *slog.Logger) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if p := recover(); p != nil {
+					stack := debug.Stack()
 					log.ErrorContext(r.Context(), "panic dipulihkan",
-						"panic", p, "stack", string(debug.Stack()))
-					WriteInternal(w)
+						"panic", p, "stack", string(stack))
+					observability.CapturePanic(p, RequestIDFromContext(r.Context()))
+					writeInternalResponse(w)
 				}
 			}()
 			next.ServeHTTP(w, r)
@@ -73,8 +77,13 @@ func Recover(log *slog.Logger) Middleware {
 // statusRecorder captures the status code written by a handler for the logger.
 type statusRecorder struct {
 	http.ResponseWriter
+	ctx    context.Context
 	status int
 }
+
+// RequestContext lets error helpers correlate a response with its request
+// without changing every existing handler signature.
+func (rec *statusRecorder) RequestContext() context.Context { return rec.ctx }
 
 func (rec *statusRecorder) WriteHeader(code int) {
 	rec.status = code
@@ -87,7 +96,7 @@ func Logger(log *slog.Logger) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+			rec := &statusRecorder{ResponseWriter: w, ctx: r.Context(), status: http.StatusOK}
 			next.ServeHTTP(rec, r)
 			log.InfoContext(r.Context(), "request",
 				"method", r.Method,
