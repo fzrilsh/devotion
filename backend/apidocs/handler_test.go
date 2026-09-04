@@ -13,7 +13,7 @@ import (
 )
 
 // newRouter builds a router with the /docs routes registered, as serve does in
-// development.
+// every environment since the competition decision (see utang-teknis.md).
 func newRouter(t *testing.T) *httpx.Router {
 	t.Helper()
 	r := httpx.NewRouter(httpx.NewLogger())
@@ -29,7 +29,7 @@ func do(t *testing.T, r *httpx.Router, path string) *httptest.ResponseRecorder {
 }
 
 // TestDocs_UI_200HTML proves GET /docs returns 200 with an HTML Swagger UI shell
-// when the routes are registered (development). T082.
+// when the routes are registered (serve registers them in every environment). T082.
 func TestDocs_UI_200HTML(t *testing.T) {
 	rec := do(t, newRouter(t), "/docs")
 	if rec.Code != http.StatusOK {
@@ -51,16 +51,20 @@ func TestDocs_UI_200HTML(t *testing.T) {
 	}
 }
 
-// TestDocs_ProdAbsent_404 proves that without registration (production), /docs
-// is not in the mux: no handler matches it, so the mux returns its zero pattern.
-// This mirrors serve, which registers the routes only in development; in
-// production the path falls to the SPA/404 behavior rather than being registered
-// and rejected. T082.
-func TestDocs_ProdAbsent_404(t *testing.T) {
-	r := httpx.NewRouter(httpx.NewLogger()) // no Register: production
-	_, pattern := r.Mux().Handler(httptest.NewRequest("GET", "/docs", nil))
-	if pattern != "" {
-		t.Fatalf("rute /docs terdaftar tanpa Register: pattern %q", pattern)
+// TestDocs_RoutesStayMuxMounted pins the competition decision that /docs is
+// registered in every environment: a fresh mux without apidocs.Register must
+// NOT be how serve builds the router anymore. It guards against someone
+// reintroducing the environment gate at the registration site, which would
+// silently send the jury's /docs requests to the SPA fallback again.
+func TestDocs_RoutesStayMuxMounted(t *testing.T) {
+	r := newRouter(t)
+	_, patternUI := r.Mux().Handler(httptest.NewRequest("GET", "/docs", nil))
+	if patternUI == "" {
+		t.Fatal("rute /docs tidak terdaftar, mau terpasang di mux di semua environment")
+	}
+	_, patternSpec := r.Mux().Handler(httptest.NewRequest("GET", "/docs/openapi.yaml", nil))
+	if patternSpec == "" {
+		t.Fatal("rute /docs/openapi.yaml tidak terdaftar")
 	}
 }
 

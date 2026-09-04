@@ -190,14 +190,13 @@ func runServe(ctx context.Context, args []string) error {
 	// (security:[] in the contract).
 	health.New(pool, wa, clock, cfg.UploadPath, buildVersion, cfg.UploadTotalLimitMB).Register(router)
 
-	// Swagger UI at /docs is a development-only aid for the frontend lane to read
-	// the contract without opening raw YAML. The routes are registered only in
-	// development, so in production they are absent and fall to the existing 404
-	// (T082). Registration is gated here, in one place, rather than registering
-	// then rejecting: a rejected route still leaks that the endpoint exists.
-	if cfg.IsDevelopment() {
-		apidocs.Register(router)
-	}
+	// Swagger UI at /docs serves the embedded contract. Since the competition
+	// decision recorded in docs/utang-teknis.md it is registered in every
+	// environment so the jury can read the API contract from the deployed site;
+	// APP_ENV stays production on the server and TLS is unaffected. The page
+	// carries no credentials or environment values, only a spec URL pointing
+	// back at this same binary.
+	apidocs.Register(router)
 
 	if uncovered := router.UncoveredAPIRoutes(); len(uncovered) > 0 {
 		return errors.New("rute /api tanpa keputusan peran: " + strings.Join(uncovered, ", "))

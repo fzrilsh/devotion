@@ -196,6 +196,12 @@ type Querier interface {
 	// waits, then sees the resolved status and is rejected by the resolve guard. Keyed
 	// on the dispute id from the path; a missing row is the handler's 404.
 	GetDisputeForAdmin(ctx context.Context, id pgtype.UUID) (Dispute, error)
+	// GetIncomingCandidate loads one candidate for its subcontractor owner. The
+	// account guard makes a copied detail link look like a missing candidate to a
+	// different subcontractor, rather than exposing whether the id exists (FR-030).
+	// It carries the same request and capacity fields as ListIncomingCandidates so a
+	// browser refresh does not need a cached list page.
+	GetIncomingCandidate(ctx context.Context, arg GetIncomingCandidateParams) (GetIncomingCandidateRow, error)
 	// GetItemProposalByID loads one proposal, joined with the proposer's account id
 	// so the decision path knows whom to notify. account_id is the business
 	// profile's owner, the recipient of the item_proposal_decision notification.
@@ -420,10 +426,10 @@ type Querier interface {
 	// subcontractor account owns, newest request first (FR-030). An optional status
 	// filter narrows to one candidate_status. The cursor tuple is (created_at, id)
 	// of the request, matching the buyer-side list. It also carries the request's
-	// quantity and deadline plus the listing's capacity shape (weekly_capacity,
-	// readiness_lead_days, horizon_until) so the read side can mark whether the
-	// subcontractor can fulfil each request within its readiness..deadline range
-	// (FR-035, FR-090) without a second query per row.
+	// quantity, material, note, and deadline plus the listing's capacity shape
+	// (weekly_capacity, readiness_lead_days, horizon_until) so the read side can mark
+	// whether the subcontractor can fulfil each request within its readiness..deadline
+	// range (FR-035, FR-090) without a second query per row.
 	ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error)
 	// ListItemProposalsPending returns the pending proposal queue oldest first, with
 	// the proposer's business name, keyset paginated by (created_at, id) for a stable

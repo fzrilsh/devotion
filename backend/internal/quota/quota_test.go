@@ -52,11 +52,19 @@ func (m *mockAuth) Authenticate(_ *http.Request) (httpx.Principal, error) {
 
 // recordNotifier records the account ids notified without touching a queue.
 type recordNotifier struct {
-	events []sqlcgen.EventType
+	events   []sqlcgen.EventType
+	accounts []pgtype.UUID
+	links    []*string
 }
 
-func (n *recordNotifier) Enqueue(_ context.Context, _ pgx.Tx, _ pgtype.UUID, event sqlcgen.EventType, _, _ string, _ *string) error {
+func (n *recordNotifier) Enqueue(_ context.Context, _ pgx.Tx, accountID pgtype.UUID, event sqlcgen.EventType, _, _ string, link *string) error {
 	n.events = append(n.events, event)
+	n.accounts = append(n.accounts, accountID)
+	if link != nil {
+		copy := *link
+		link = &copy
+	}
+	n.links = append(n.links, link)
 	return nil
 }
 
@@ -367,6 +375,38 @@ func TestQuotaRequest_HappyPath_SendsToSeveralCandidates_FR029_FR030(t *testing.
 	if len(h.notifier.events) != 3 {
 		t.Fatalf("mau 3 notifikasi, dapat %d", len(h.notifier.events))
 	}
+}
+
+// TestQuotaRequest_RejectsPastDeadline_FR029 proves a request deadline before the
+// injected current date is rejected before any request row is persisted.
+func TestQuotaRequest_RejectsPastDeadline_FR029(t *testing.T) {
+	h := newHarness(t, "quota_past_deadline")
+	l1, _ := seedListing(t, h, "alfa")
+	past := platform.WeekStart(baseTime).AddDate(0, 0, -7).Format(dateFmt)
+	body := map[string]any{
+		"listing_ids":     []string{uuidString(l1)},
+		"product_item_id": uuidString(h.productID),
+		"quantity":        50,
+		"material":        "Katun combed 30s",
+		"deadline":        past,
+	}
+
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("encode body: %v", err)
+	}
+	rec := h.doJSON(http.MethodPost, "/api/quota-requests", string(raw))
+	mustStatus(t, rec, http.StatusUnprocessableEntity)
+	problem := decodeProblem(t, rec)
+	if problem.Code != "VALIDATION_FAILED" {
+		t.Fatalf("code %q, mau VALIDATION_FAILED", problem.Code)
+	}
+	for _, field := range problem.Errors {
+		if field.Field == "deadline" {
+			return
+		}
+	}
+	t.Fatalf("errors = %+v, mau menyebut deadline", problem.Errors)
 }
 
 // TestQuotaRequest_SetsReplyDue72Hours_FR082 proves the system sets the reply

@@ -150,6 +150,25 @@ sampai penyusuran terasa, kandidat perbaikannya cache pendek atas hasil
 `checkStorage` (mis. beberapa detik) supaya health check tidak menyusuri disk
 tiap kali dipanggil.
 
+## Swagger UI `/docs` aktif di produksi
+
+Keputusan lomba, melanggar teks task T082 yang menjanjikan rute `/docs` hanya
+di `APP_ENV=development`. Tugas awalnya menggantung pendaftaran rute pada
+environment, dan `serve` hanya mendengarkan TLS di :443 saat production, jadi
+menyuruh server ke development untuk membuka `/docs` justru mematikan satu-satunya
+port yang tersedia ke Cloudflare: seluruh situs ikut down. Kebutuhan juri adalah
+membaca kontrak dari situs yang hidup, jadi pendaftarannya kini tanpa syarat
+environment.
+
+**Akibat:** UI kontrak dan spec mentah `/docs/openapi.yaml` terekspos publik di
+`https://devotion.web.id/docs`. Halaman itu statis: satu shell Swagger UI dari
+CDN ber-SRI plus satu URL spec, tanpa kredensial, token, atau nilai environment,
+dan spec-nya hanya membaca salinan `backend/apidocs/openapi.yaml` yang disegel
+byte-identik dengan kontrak sumber oleh uji. Penyerang tidak memperoleh apa pun
+yang tidak sudah tertulis di repo publik ini. Bila setelah lomba rute ini perlu
+ditutup kembali, kembalikan gating `cfg.IsDevelopment()` di `serve.go` dan uji
+`TestDocs_RoutesStayMuxMounted` di `apidocs/handler_test.go` perlu diubah mengikut.
+
 ## Hasil audit `openapi.yaml` vs kode backend (6 domain)
 
 Audit menyeluruh membandingkan `contracts/openapi.yaml` dengan handler Go

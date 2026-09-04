@@ -113,6 +113,9 @@ func (s *Service) counterOffer(ctx context.Context, accountID, offerID pgtype.UU
 		}
 
 		link := "/quota-requests/" + uuidString(prev.RequestID)
+		if caller == sqlcgen.OfferPartyBuyer {
+			link = "/requests/incoming/" + uuidString(prev.CandidateID)
+		}
 		return s.notifier.Enqueue(ctx, tx, target,
 			sqlcgen.EventTypeCounterOffer,
 			"Penawaran balik",
