@@ -51,11 +51,11 @@ const swaggerPage = `<!doctype html>
 
 // Register wires the Swagger UI at /docs and the raw contract at
 // /docs/openapi.yaml. Both sit outside /api/ so they are exempt from the
-// uncovered-route check; Public states the no-auth decision explicitly. The
-// caller registers these only in development (see serve), so in production the
-// routes are absent and fall to the existing SPA/404 behavior rather than being
-// registered and rejected: a rejected route still leaks that the endpoint
-// exists.
+// uncovered-route check; Public states the no-auth decision explicitly. Since
+// the competition decision recorded in docs/utang-teknis.md, these routes are
+// registered in every environment so the jury can read the contract from the
+// deployed site; the page carries no credentials or environment values, only a
+// spec URL pointing back at this same binary.
 func Register(r *httpx.Router) {
 	r.Public("GET /docs", serveUI)
 	r.Public("GET /docs/openapi.yaml", serveSpec)
