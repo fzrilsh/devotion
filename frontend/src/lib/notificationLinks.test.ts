@@ -54,6 +54,13 @@ describe("getNotificationLink", () => {
         expect(getNotificationLink(notification("counter_offer", link), false)?.to).toBe(link);
     });
 
+    it("FR-033: tautan detail kandidat masuk dipetakan ke rute request masuk", () => {
+        const link = "/requests/incoming/8ae07574-923d-40e4-b170-439bd238a9ed";
+
+        expect(getNotificationLink(notification("counter_offer", link), false)?.to).toBe(link);
+        expect(getNotificationLink(notification("counter_offer", link), false)?.label).toBe("Lihat request masuk");
+    });
+
     it("FR-051: path khusus pemberi order lain tetap diteruskan bila server mengirimkan path yang valid", () => {
         expect(getNotificationLink(notification("request_received", "/search?produk=kaos"), false)?.to).toBe("/search?produk=kaos");
         expect(getNotificationLink(notification("offer_received", "/quota-requests"), false)?.to).toBe("/quota-requests");

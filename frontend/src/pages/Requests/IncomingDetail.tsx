@@ -1,11 +1,11 @@
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
-import { CANDIDATE_LISTS_NOT_LOADED, useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useReloadIncomingCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
+import { useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useReloadIncomingCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
 import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { getProblem, getProblemMessage } from "@lib/problem";
 import { cn } from "@lib/utils";
 import { useState } from "react";
-import { LuArrowLeft, LuCircleCheck, LuHandshake, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
+import { LuArrowLeft, LuCircleCheck, LuCircleX, LuHandshake, LuHourglass, LuRefreshCw, LuSend, LuTriangleAlert, LuUser } from "react-icons/lu";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { candidateStatusMeta, formatDateShort, formatRupiah } from "./meta";
 import { formatDayTimeId as formatDateTimeId } from "@lib/datetime";
@@ -94,16 +94,11 @@ export default function IncomingDetail() {
     if (candidateQuery.isLoading) return <Loading />;
 
     if (candidateQuery.isError || !candidateQuery.data) {
-        // Two different failures, told apart by why the cache lookup failed
-        // rather than by guessing from the URL.
-        const listsNeverLoaded = candidateQuery.error instanceof Error && candidateQuery.error.message === CANDIDATE_LISTS_NOT_LOADED;
-        const directLinkMessage = listsNeverLoaded ? "Kandidat belum dibuka dari daftar request masuk. Buka daftar dulu, lalu pilih kandidat yang ingin Anda lihat." : "Kandidat tidak ditemukan atau sudah tidak tersedia untuk listing Anda.";
-
         return (
             <div className="space-y-6">
                 <h1 className="text-xl font-bold text-slate-900">Detail Request Masuk</h1>
                 <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-                    <p className="text-sm font-semibold text-red-700">{directLinkMessage}</p>
+                    <p className="text-sm font-semibold text-red-700">Kandidat tidak ditemukan atau sudah tidak tersedia untuk listing Anda.</p>
                     <Link to="/requests/incoming" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-red-800 underline underline-offset-2">
                         <LuArrowLeft className="size-4" aria-hidden />
                         Kembali ke request masuk
@@ -237,6 +232,44 @@ export default function IncomingDetail() {
 
                     <span className={cn("shrink-0 rounded-full px-3 py-1 text-[11px] font-bold", candidateStatusMeta[candidate.status].className)}>{candidateStatusMeta[candidate.status].label}</span>
                 </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Detail Permintaan</h2>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah &amp; Bahan</p>
+                        <p className="mt-1 text-lg font-extrabold text-slate-900">{candidate.quantity.toLocaleString("id-ID")} unit {candidate.material}</p>
+                    </div>
+
+                    <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tenggat Pesanan</p>
+                        <p className="mt-1 text-lg font-extrabold text-slate-900">{formatDateShort(candidate.deadline)}</p>
+                    </div>
+                </div>
+
+                {candidate.note ? <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">{candidate.note}</p> : null}
+
+                <div className={cn("mt-4 flex items-start gap-3 rounded-xl border p-4", candidate.can_fulfill ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
+                    {candidate.can_fulfill ? (
+                        <LuCircleCheck className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden />
+                    ) : (
+                        <LuCircleX className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden />
+                    )}
+                    <p className={cn("text-sm leading-6", candidate.can_fulfill ? "text-emerald-800" : "text-amber-800")}>
+                        {candidate.can_fulfill
+                            ? <>Kapasitas Anda mencukupi: {candidate.capacity_in_range.toLocaleString("id-ID")} potong tersisa dari minggu kesiapan sampai tenggat, untuk {candidate.quantity.toLocaleString("id-ID")} potong yang diminta.</>
+                            : <>Kapasitas Anda kurang: {candidate.capacity_in_range.toLocaleString("id-ID")} potong tersisa dari minggu kesiapan sampai tenggat, sementara diminta {candidate.quantity.toLocaleString("id-ID")} potong. Naikkan kapasitas mingguan di halaman Listing atau tolak request ini.</>}
+                    </p>
+                </div>
+
+                {candidate.rejection_reason ? (
+                    <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-red-500">Alasan Penolakan</p>
+                        <p className="mt-1 text-sm leading-6 text-red-700">{candidate.rejection_reason}</p>
+                    </div>
+                ) : null}
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-6">

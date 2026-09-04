@@ -27,7 +27,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Akun dibuat; kode verifikasi dikirim ke email dan nomor HP */
+                /** @description Akun dibuat; masuk terlebih dahulu lalu minta kode verifikasi untuk email dan nomor HP */
                 201: {
                     headers: {
                         [name: string]: unknown;
@@ -1497,6 +1497,48 @@ export interface paths {
                         "application/json": components["schemas"]["IncomingCandidateList"];
                     };
                 };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/{candidateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detail request kuota yang masuk ke kandidat saya
+         * @description Memuat detail kandidat dan seluruh riwayat penawarannya tanpa bergantung pada daftar yang sudah dibuka (FR-030, FR-031).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    candidateId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IncomingCandidate"];
+                    };
+                };
+                403: components["responses"]["Forbidden"];
+                404: components["responses"]["NotFound"];
             };
         };
         put?: never;
@@ -3624,6 +3666,10 @@ export interface components {
             profile_id: string;
             business_name?: string;
             status: components["schemas"]["CandidateStatus"];
+            /** @description Bahan yang diminta pemesan. */
+            material: string;
+            /** @description Catatan tambahan dari pemesan. */
+            note?: string | null;
             /** @description Alasan penolakan yang ditulis subkontraktor, hadir hanya bila status kandidat rejected (FR-035). */
             rejection_reason?: string | null;
             /** @description Jumlah potong yang diminta pemesan (FR-031). */
