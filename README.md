@@ -23,110 +23,104 @@
 
 ---
 
-## Daftar isi
+## 📋 Daftar Isi
 
-- [Tentang proyek](#tentang-proyek)
-- [Fitur unggulan](#fitur-unggulan)
-- [Demo dan screenshot](#demo-dan-screenshot)
-- [Teknologi](#teknologi)
-- [Arsitektur sistem](#arsitektur-sistem)
-- [Instalasi dan setup](#instalasi-dan-setup)
-- [Penggunaan](#penggunaan)
-- [Dokumentasi API](#dokumentasi-api)
-- [Testing](#testing)
-- [Tim developer](#tim-developer)
-- [Lisensi](#lisensi)
+- [Tentang Proyek](#-tentang-proyek)
+- [Fitur Unggulan](#-fitur-unggulan)
+- [Demo & Screenshot](#-demo--screenshot)
+- [Teknologi](#-teknologi)
+- [Arsitektur Sistem](#-arsitektur-sistem)
+- [Instalasi & Setup](#-instalasi--setup)
+- [Penggunaan](#-penggunaan)
+- [API Documentation](#-api-documentation)
+- [Testing](#-testing)
+- [Tim Developer](#-tim-developer)
+- [Lisensi](#-lisensi)
 
 ---
 
-## Tim developer
+## 👥 Tim Developer
 
 | Nama | Peran | GitHub |
 |---|---|---|
-| **Juan Kevin Utomo** | Project lead | [@TrygerZ](https://github.com/TrygerZ) |
-| **Fazril Syaveral Hillaby** | Backend developer | [@fzrilsh](https://github.com/fzrilsh) |
-| **Chiko Maulana Ahmad** | Frontend developer | [@ChikoID](https://github.com/ChikoID) |
+| **Juan Kevin Utomo** | Project Lead | [@TrygerZ](https://github.com/TrygerZ) |
+| **Fazril Syaveral Hillaby** | Backend Developer | [@fzrilsh](https://github.com/fzrilsh) |
+| **Chiko Maulana Ahmad** | Frontend Developer | [@ChikoID](https://github.com/ChikoID) |
 
 ---
 
-## Tentang proyek
+## 🎯 Tentang Proyek
 
-### Latar belakang
+### Latar Belakang
 
-Coba bayangkan pemilik konveksi kebanjiran order 5.000 potong, sementara kapasitasnya cuma 2.000. Yang biasanya terjadi: dia menelepon satu per satu kenalan yang nomornya masih tersimpan. Kalau semuanya penuh, sisa 3.000 potong itu dilepas, padahal di kota sebelah ada konveksi yang mesinnya menganggur minggu itu.
+Bayangkan pemilik konveksi kebanjiran order 5.000 potong, sementara kapasitasnya hanya 2.000. Yang biasanya terjadi: dia menelepon satu per satu kenalan yang nomornya masih tersimpan. Kalau semuanya penuh, sisa 3.000 potong itu dilepas, padahal di kota sebelah ada konveksi yang mesinnya menganggur minggu itu.
 
 Dua masalah bertemu di titik yang sama. Yang kelebihan order tidak tahu siapa yang sedang kosong, dan yang sedang kosong tidak punya cara memberi tahu siapa pun. Selama pencarian mitra hanya lewat relasi pribadi, jangkauannya berhenti di batas daftar kontak.
 
-Masalahnya bertambah karena kapasitas berubah cepat. Mitra yang minggu lalu longgar bisa penuh hari ini. Tanpa kalender ketersediaan yang bisa dilihat calon pemberi order, telepon demi telepon berakhir dengan jawaban "maaf, sedang penuh", dan waktu kedua pihak habis begitu saja.
+Masalahnya bertambah karena kapasitas berubah cepat. Mitra yang minggu lalu longgar bisa penuh hari ini. Tanpa kalender ketersediaan yang bisa dilihat calon pemberi order, telepon demi telepon berakhir dengan jawaban "maaf, sedang penuh".
 
-### Solusi yang ditawarkan
+### Solusi yang Ditawarkan
 
 Devotion mempertemukan dua sisi yang selama ini tidak saling melihat:
 
 - **Subkontraktor**, UMKM konveksi yang punya kapasitas produksi menganggur.
 - **Pemberi order**, UMKM atau brand yang ordernya melebihi kapasitas sendiri.
 
-Alurnya sederhana. Subkontraktor memasang profil usaha, mencantumkan produk dan mesin yang dikuasai, lalu mengisi kapasitas per minggu di kalender ketersediaan. Pemberi order mengisi kriteria yang dia butuhkan, produk apa, mesin apa, berapa banyak, kapan tenggatnya, sejauh mana wilayah yang masih masuk hitungan. Dari hasil pencarian dia bisa memilih beberapa kandidat sekaligus dan mengirim satu request kuota ke semuanya. Penawaran yang diterima langsung berubah jadi work order, dan kapasitas yang dipakai tercatat per minggu.
+Subkontraktor memasang profil usaha, mencantumkan produk dan mesin yang dikuasai, lalu mengisi kapasitas per minggu di kalender ketersediaan. Pemberi order mengisi kriteria yang dibutuhkan: produk apa, mesin apa, berapa banyak, kapan deadline-nya, sejauh mana wilayah yang masih masuk hitungan. Dari hasil pencarian dia memilih beberapa kandidat sekaligus dan mengirim satu request kuota ke semuanya. Offer yang diterima langsung menjadi work order, dan kapasitas yang dipakai tercatat per minggu.
 
-Yang membedakan Devotion dari daftar kontak biasa adalah cara hasil pencarian disusun. Setiap kandidat dinilai dengan empat kriteria keras dan skor 0 sampai 4: produk cocok atau tidak, mesin cocok atau tidak, jeda kesiapan masih terjangkau atau tidak, dan kapasitas kalau dijumlah sampai tenggat cukup atau tidak. Reputasi, lencana verifikasi, kebaruan kalender, dan jarak sengaja tidak dimasukkan ke skor. Konsekuensinya penting: urutan yang muncul selalu bisa dijelaskan alasannya, dan pencarian yang sama menghasilkan urutan yang sama. Pengguna melihat kriteria mana yang tidak terpenuhi, bukan sekadar angka yang muncul entah dari mana.
+Yang membedakan Devotion dari daftar kontak biasa adalah cara hasil pencarian disusun. Setiap kandidat dinilai dengan empat kriteria keras dan skor 0 sampai 4: produk cocok atau tidak, mesin cocok atau tidak, jeda kesiapan masih terjangkau atau tidak, dan kapasitas kalau dijumlah sampai deadline cukup atau tidak. Reputasi, badge verifikasi, kebaruan kalender, dan jarak sengaja tidak masuk skor. Konsekuensinya: urutan yang muncul selalu bisa dijelaskan alasannya, dan pencarian yang sama menghasilkan urutan yang sama.
 
-### Tujuan proyek
+### Tujuan Proyek
 
-- **Tujuan utama**: membuat kapasitas produksi yang menganggur bisa ditemukan lewat proses yang terbuka, bukan lewat kenalan.
-- **Target pengguna**: pemilik konveksi yang mau menerima subkontrak, pemilik brand atau UMKM yang perlu melimpahkan order, dan admin yang menjaga operasional platform.
-- **Yang didapat pengguna**: satu tempat untuk memasang, mencari, meminta, dan memantau kapasitas, dengan data yang sama dilihat kedua pihak. Tidak ada lagi versi kebenaran yang berbeda antara pemberi order dan subkontraktor.
-- **Kaitan tema**: kalender kapasitas membuat informasi produksi ikut bergerak setiap kali ketersediaan berubah, dan di situlah sifat adaptifnya. Devotion menyentuh SDG 8 lewat akses order dan pemanfaatan kapasitas kerja yang tadinya terbuang, serta SDG 9 lewat digitalisasi proses matching antar pelaku industri kecil.
+- 🎯 **Tujuan Utama**: membuat kapasitas produksi yang menganggur bisa ditemukan lewat proses terbuka, bukan lewat kenalan.
+- 📊 **Target Pengguna**: pemilik konveksi yang mau menerima subkontrak, pemilik brand atau UMKM yang perlu melimpahkan order, dan admin yang menjaga operasional platform.
+- 💡 **Value Proposition**: satu tempat untuk memasang, mencari, meminta, dan memantau kapasitas, dengan data yang sama dilihat kedua pihak. Tidak ada lagi versi kebenaran yang berbeda antara pemberi order dan subkontraktor.
+- 🌐 **Kaitan Tema dan SDG**: kalender kapasitas membuat informasi produksi ikut bergerak setiap kali ketersediaan berubah, dan di situlah sifat adaptifnya. Devotion menyentuh **SDG 8** lewat akses order dan pemanfaatan kapasitas kerja yang tadinya terbuang, serta **SDG 9** lewat digitalisasi proses matching antar pelaku industri kecil.
 
-### Batasan produk
+### Batasan Produk
 
-Ada dua hal yang sengaja tidak dikerjakan Devotion, dan keduanya keputusan sadar.
+Devotion tidak menyentuh uang siapa pun. Tidak menahan, tidak menyalurkan, tidak memproses. Pembayaran terjadi langsung antar pihak, dan platform hanya mencatat pernyataan keduanya bahwa pembayaran sudah dikirim atau diterima. Tidak ada kolom nominal sama sekali di catatan itu, karena begitu ada, platform mulai terlihat seperti perantara dana.
 
-Devotion tidak menyentuh uang siapa pun. Tidak menahan, tidak menyalurkan, tidak memproses. Pembayaran terjadi langsung antar pihak, dan platform hanya mencatat pernyataan keduanya bahwa pembayaran sudah dikirim atau diterima. Tidak ada kolom jumlah uang sama sekali di catatan itu, karena begitu ada, platform mulai terlihat seperti perantara dana, dan itu bukan yang ingin dibangun di sini.
-
-Antarmuka seluruhnya bahasa Indonesia, tanpa lapisan i18n. Sasarannya UMKM konveksi domestik, jadi menambah mekanisme multi-bahasa hanya akan menambah kerumitan tanpa ada yang memakainya.
+Antarmuka seluruhnya bahasa Indonesia, tanpa layer i18n. Sasarannya UMKM konveksi domestik, jadi menambah mekanisme multi-bahasa hanya menambah kerumitan tanpa ada yang memakainya.
 
 ---
 
-## Fitur unggulan
+## ✨ Fitur Unggulan
 
-### Fitur utama
+### Fitur Utama
 
-Sembilan hal di bawah ini yang membentuk alur utama Devotion, dari mendaftar sampai pesanan selesai dan diulas.
-
-| Fitur | Deskripsi | Kenapa ini penting |
+| Fitur | Deskripsi | Keunggulan |
 |---|---|---|
-| **Profil dan autentikasi usaha** | Registrasi dengan pilihan peran, login, sesi berbasis cookie `httpOnly`, verifikasi email dan nomor HP, pemulihan kata sandi, profil usaha dengan titik lokasi di peta. | Sebelum ada uang dan tenggat yang dipertaruhkan, kedua pihak sudah tahu sedang berhadapan dengan siapa. |
-| **Listing kapasitas dan kalender mingguan** | Subkontraktor mengatur kapasitas mingguan, jeda kesiapan, jenis produk, jenis mesin, visibilitas listing, dan periode ketersediaan 12 minggu ke depan. Minggu yang sudah punya alokasi terkunci dari perubahan. | Kapasitas kosong akhirnya terlihat tanpa perlu dikenal lebih dulu. Kunci pada minggu yang sudah terpakai mencegah kalender berubah di belakang pesanan yang sedang berjalan. |
-| **Pencarian dan skor kecocokan** | Filter produk, mesin, jumlah, tenggat, jeda maksimum, dan cakupan kota, provinsi, atau nasional. Skor 0 sampai 4 dari kriteria keras, kapasitas dijumlah lintas periode sampai tenggat, paginasi kursor dengan urutan deterministik. | Pengguna tidak cuma melihat siapa yang cocok, tapi juga kriteria mana yang tidak terpenuhi, jadi keputusannya bisa dipertanggungjawabkan. |
-| **Request kuota multi-kandidat dan penawaran** | Satu request dikirim ke beberapa listing. Tiap kandidat punya status sendiri dan batas balasan 72 jam. Subkontraktor mengirim penawaran, pemberi order dapat menawar balik, rantai penawaran tercatat per babak. | Menawar ke lima calon mitra tidak lagi berarti lima percakapan terpisah yang harus diingat sendiri. |
-| **Work order dengan alokasi kapasitas** | Penawaran yang diterima menjadi work order. Alokasi kapasitas ditulis dalam satu transaksi dengan penguncian baris terurut menurut minggu, sehingga dua kesepakatan berbarengan atas periode yang sama tidak dapat sama-sama berhasil. | Kapasitas yang sudah dijanjikan tidak pernah terjual dua kali, bahkan ketika dua pemberi order menekan tombol terima pada detik yang sama. |
-| **Mesin keadaan pesanan dan konfirmasi otomatis** | Tujuh status pesanan dengan transisi yang dikirim backend lewat `allowed_transitions`. Pesanan berstatus dikirim dianggap diterima otomatis setelah 7 hari, dengan pengingat 2 hari sebelumnya, dan berhenti bila ada sengketa. | Pesanan punya batas waktu sendiri, jadi subkontraktor tidak tersangkut menunggu konfirmasi yang tak pernah datang. |
-| **Pembatalan, sengketa, dan mediasi admin** | Pembatalan pra-produksi membalik seluruh baris alokasi. Sengketa menghentikan konfirmasi otomatis dan masuk ke antrean mediasi admin dengan hasil dilanjutkan, dikonfirmasi selesai, atau dibatalkan. | Kalau kesepakatan gagal sebelum produksi, kapasitasnya kembali bisa dijual. Kalau berselisih, ada jalur resmi, bukan saling telepon. |
-| **Reputasi dan tingkat penyelesaian** | Ulasan setelah pesanan selesai, nilai reputasi turunan, dan tingkat penyelesaian yang hanya ditampilkan sebagai persentase bila datanya cukup. Pembatalan membebani pihak yang membatalkan. | Usaha baru tidak dihukum angka reputasi yang dihitung dari dua transaksi. Kalau datanya belum cukup, yang muncul keterangannya, bukan persentase yang menyesatkan. |
-| **Panel admin** | Antrean verifikasi identitas, keputusan usulan item, pengelolaan daftar baku, pesanan telat, sengketa, moderasi ulasan, dan status sambungan WhatsApp beserta QR penyambungan ulang. | Semua urusan operasional bisa diselesaikan dari antarmuka, tanpa sekali pun membuka database. |
+| **Profil dan autentikasi usaha** | Registrasi dengan pilihan peran, login, session berbasis cookie `httpOnly`, verifikasi email dan nomor HP, password recovery, profil usaha dengan titik lokasi di peta. | Sebelum ada uang dan deadline yang dipertaruhkan, kedua pihak sudah tahu sedang berhadapan dengan siapa. |
+| **Listing kapasitas dan kalender mingguan** | Subkontraktor mengatur kapasitas mingguan, jeda kesiapan, jenis produk, jenis mesin, visibilitas listing, dan periode ketersediaan 12 minggu ke depan. Minggu yang sudah punya alokasi terkunci dari perubahan. | Kapasitas kosong akhirnya terlihat tanpa perlu dikenal lebih dulu, dan kalender tidak bisa berubah di belakang pesanan yang sedang berjalan. |
+| **Pencarian dan skor kecocokan** | Filter produk, mesin, jumlah, deadline, jeda maksimum, dan cakupan kota, provinsi, atau nasional. Skor 0 sampai 4 dari kriteria keras, kapasitas dijumlah lintas periode sampai deadline, pagination cursor dengan urutan deterministik. | Pengguna melihat kriteria mana yang tidak terpenuhi, bukan sekadar angka tanpa penjelasan. |
+| **Request kuota multi-kandidat dan offer** | Satu request dikirim ke beberapa listing. Tiap kandidat punya status sendiri dan batas balasan 72 jam. Subkontraktor mengirim offer, pemberi order dapat counter-offer, rantai offer tercatat per babak. | Menawar ke lima calon mitra tidak lagi berarti lima percakapan terpisah yang harus diingat sendiri. |
+| **Work order dengan alokasi kapasitas** | Offer yang diterima menjadi work order. Alokasi kapasitas ditulis dalam satu transaction dengan row lock terurut menurut minggu. | Kapasitas yang sudah dijanjikan tidak pernah terjual dua kali, bahkan ketika dua pemberi order menekan tombol terima pada detik yang sama. |
+| **State machine pesanan dan auto-confirm** | Tujuh status pesanan dengan transisi yang dikirim backend lewat `allowed_transitions`. Pesanan berstatus dikirim dianggap diterima otomatis setelah 7 hari, dengan reminder 2 hari sebelumnya, dan berhenti bila ada sengketa. | Pesanan punya batas waktu sendiri, jadi subkontraktor tidak tersangkut menunggu konfirmasi yang tak pernah datang. |
+| **Pembatalan, sengketa, dan mediasi admin** | Pembatalan pra-produksi membalik seluruh baris alokasi. Sengketa menghentikan auto-confirm dan masuk ke antrean mediasi admin dengan hasil dilanjutkan, dikonfirmasi selesai, atau dibatalkan. | Kalau kesepakatan gagal sebelum produksi, kapasitasnya kembali bisa dijual. Kalau berselisih, ada jalur resmi. |
+| **Reputasi dan completion rate** | Review setelah pesanan selesai, nilai reputasi turunan, dan completion rate yang hanya ditampilkan sebagai persentase bila datanya cukup. Pembatalan membebani pihak yang membatalkan. | Usaha baru tidak dihukum angka reputasi yang dihitung dari dua transaksi. |
+| **Panel admin** | Antrean verifikasi identitas, keputusan usulan item, pengelolaan master data, pesanan telat, sengketa, moderasi review, dan status koneksi WhatsApp beserta QR untuk menyambung ulang. | Semua urusan operasional bisa diselesaikan dari antarmuka, tanpa sekali pun membuka database. |
 
-### Fitur tambahan
+### Fitur Tambahan
 
-Yang di bawah ini tidak terlihat di alur utama, tapi ikut menentukan apakah aplikasi ini layak dipakai orang lain.
-
-- **Master data produk, mesin, dan wilayah** membuat istilah pencarian tetap seragam. Kalau setiap orang mengisi jenis produk dengan kata-katanya sendiri, pencarian berhenti berfungsi.
-- **Usulan item baru** untuk jenis produk atau mesin yang belum ada di daftar baku. Usulannya diputuskan admin, jadi daftar tetap rapi tanpa menutup pintu bagi kebutuhan yang belum terdaftar.
-- **Verifikasi identitas usaha** lewat unggahan dokumen dan foto lokasi. Tipe berkas diperiksa dari magic bytes, bukan dari header yang bisa dipalsukan. Nama berkas dibuat sistem, metadata lokasi pada gambar dibuang, dan berkasnya hanya bisa diakses pemiliknya serta admin.
-- **Notifikasi in-app** dengan penanda sudah dibaca, jumlah belum dibaca, dan pilihan kanal email atau WhatsApp. Notifikasi transaksional sengaja tidak bisa dimatikan.
-- **Rate limiting berbasis data domain** untuk percobaan login, kode verifikasi per nomor dan per alamat asal, serta request kuota per pengguna. Penegakannya di aplikasi, tidak diserahkan ke proxy tepi.
-- **Health check** untuk database, sambungan WhatsApp, dan ruang penyimpanan. Endpoint yang sama dipakai sebagai healthcheck container.
-- **Galat yang konsisten** dalam format `application/problem+json`, dengan 34 kode mesin yang stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
-- **Swagger UI** di `/docs` saat mode development, membaca kontrak OpenAPI yang sama dengan yang disematkan ke binary.
+- **Master data produk, mesin, dan wilayah** menjaga istilah pencarian tetap seragam. Kalau setiap orang mengisi jenis produk dengan kata-katanya sendiri, pencarian berhenti berfungsi.
+- **Usulan item baru** untuk produk atau mesin yang belum ada di master data. Usulannya diputuskan admin, jadi daftar tetap rapi tanpa menutup kebutuhan yang belum terdaftar.
+- **Verifikasi identitas usaha** lewat upload dokumen dan foto lokasi. Tipe file diperiksa dari magic bytes, bukan dari header yang bisa dipalsukan. Nama file dibuat sistem, metadata lokasi pada gambar dibuang, dan file hanya bisa diakses pemiliknya serta admin.
+- **Notifikasi in-app** dengan penanda sudah dibaca, jumlah belum dibaca, dan pilihan channel email atau WhatsApp. Notifikasi transaksional tidak bisa dimatikan.
+- **Rate limiting berbasis data domain** untuk percobaan login, kode verifikasi per nomor dan per alamat asal, serta request kuota per pengguna. Penegakannya di aplikasi, tidak diserahkan ke edge proxy.
+- **Health check** untuk database, koneksi WhatsApp, dan ruang penyimpanan. Endpoint yang sama dipakai sebagai healthcheck container.
+- **Error response konsisten** dalam format `application/problem+json` (RFC 9457), dengan 34 error code stabil dan `detail` bahasa Indonesia yang bisa dikutip penguji langsung ke laporan.
+- **Swagger UI** di `/docs` saat mode development, membaca kontrak OpenAPI yang sama dengan yang di-embed ke binary.
 
 ---
 
-## Demo dan screenshot
+## 📸 Demo & Screenshot
 
-### Live demo
+### Live Demo
 
-**[https://devotion.web.id/](https://devotion.web.id/)**
+🔗 **[https://devotion.web.id/](https://devotion.web.id/)**
 
-### Screenshot aplikasi
+### Screenshot Aplikasi
 
 link gist : [devotion-screenshots](https://gist.github.com/TrygerZ/f6601f096885e7307b7210a750f92f7e)
 
@@ -206,88 +200,95 @@ Operasional platform, seluruhnya lewat antarmuka tanpa menyentuh database.
 
 </details>
 
+### Video Demo
 
-### Video demo
-
-**Link video demo: belum tersedia.**
+📹 **Link video demo: belum tersedia.**
 
 ---
 
-## Teknologi
+## 🛠️ Teknologi
 
-### Tech stack
+### Tech Stack
 
 #### Frontend
 
 ```text
-Framework    : React 18.3.1, TypeScript 5.8.3
+Framework    : React 18.3.1, TypeScript 5.8
 Build tool   : Vite 8.2.0, hasil build di-embed ke binary Go
-Styling      : Tailwind CSS 4.3.3, tanpa component library kedua
-Server state : TanStack Query 5.102.1
-Form         : React Hook Form 7.86.0 + Zod 4.4.3
+UI Library   : Tailwind CSS 4.3.3
+State Mgmt   : TanStack Query 5.102.1
+Validation   : React Hook Form 7.86.0 + Zod 4.4.3
 Routing      : React Router 7.18.2
-Peta         : Leaflet 1.9.4 + tile OpenStreetMap, tanpa kunci API
-API client   : Fetch API, credentials include, tipe di-generate dari OpenAPI
+Peta         : Leaflet 1.9.4 + tile OpenStreetMap
+API client   : Fetch API, tipe di-generate dari OpenAPI
 ```
 
 #### Backend
 
 ```text
 Runtime      : Go 1.25.0
-HTTP         : net/http, router bawaan Go 1.22+
+Framework    : net/http, router bawaan Go 1.22+
 Database     : PostgreSQL 16, pgx/v5 5.7.5 + query hasil generate sqlc
 Migration    : golang-migrate, otomatis saat startup di bawah advisory lock
-Auth         : bcrypt, sesi cookie httpOnly, token disimpan sebagai hash
+Auth         : bcrypt, session cookie httpOnly, token disimpan sebagai hash
 Notifikasi   : net/smtp ke Mailjet, whatsmeow untuk WhatsApp
 Observability: log/slog JSON dengan request ID, Sentry opsional
 ```
 
-#### DevOps dan tools
+#### DevOps & Tools
 
 ```text
-Runtime      : Docker Compose, tepat 2 layanan (backend, postgres)
+Deployment   : Docker Compose, tepat 2 service (backend, postgres)
 CI/CD        : GitHub Actions, image ke GitHub Container Registry
 Edge dan TLS : Cloudflare Origin Certificate, TLS diselesaikan binary Go
-Testing      : go vet, go test, ESLint, tsc
+Testing      : go vet, go test, Jest, ESLint, tsc
 ```
 
-### Alasan pemilihan teknologi
+### Alasan Pemilihan Teknologi
 
-Satu batasan menentukan hampir semua pilihan: aturan panitia yang membatasi layanan runtime menjadi dua.
+Satu batasan menentukan hampir semua pilihan: aturan panitia yang membatasi service runtime menjadi dua.
 
-| Teknologi | Alasan pemilihan |
+| Teknologi | Alasan Pemilihan |
 |---|---|
-| **React + Vite** | Hasil build disematkan ke binary Go lewat `embed.FS`, sehingga frontend menjadi berkas statis, bukan layanan runtime ketiga. |
-| **Go + net/http** | Satu binary, router sudah ada di standard library sejak Go 1.22, jejak memori kecil. Framework HTTP tambahan tidak menyelesaikan masalah yang belum selesai. |
-| **PostgreSQL 16** | Alokasi kapasitas butuh transaksi, CHECK constraint, dan penguncian baris. Dua kesepakatan bersamaan diselesaikan database, bukan logika aplikasi. |
+| **React + Vite** | Hasil build di-embed ke binary Go lewat `embed.FS`, sehingga frontend menjadi file statis, bukan service runtime ketiga. |
+| **Go + net/http** | Satu binary, router sudah ada di standard library sejak Go 1.22, jejak memori kecil. |
+| **PostgreSQL 16** | Alokasi kapasitas butuh transaction, CHECK constraint, dan row lock. Dua kesepakatan bersamaan diselesaikan database, bukan logika aplikasi. |
 | **sqlc, bukan ORM** | Query pencarian dan skor kecocokan adalah inti produk. SQL ditulis eksplisit agar dapat dibaca dan diaudit. |
-| **OpenAPI + openapi-typescript** | Kontrak menjadi sumber tipe frontend. Perubahan bentuk respons memunculkan galat compiler, bukan bug runtime. |
-| **Tailwind CSS** | Cukup untuk antarmuka mobile-first tanpa menambah component library yang gaya visualnya harus diselaraskan ulang. |
-| **Leaflet + OpenStreetMap** | Peta tanpa kunci API dan tanpa tagihan. Jarak bersifat informatif dan tidak memengaruhi skor. |
+| **OpenAPI + openapi-typescript** | Kontrak menjadi sumber tipe frontend. Perubahan bentuk response memunculkan compile error, bukan runtime bug. |
+| **Tailwind CSS** | Cukup untuk antarmuka mobile-first tanpa menambah component library kedua. |
+| **Leaflet + OpenStreetMap** | Peta tanpa API key dan tanpa tagihan. Jarak bersifat informatif dan tidak memengaruhi skor. |
 
-### Dependencies utama
+### Dependencies Utama
+
+```json
+{
+  "dependencies": {
+    "react": "^18.3.1",
+    "@tanstack/react-query": "^5.102.1",
+    "react-hook-form": "^7.86.0",
+    "zod": "^4.4.3",
+    "react-router-dom": "^7.18.2",
+    "tailwindcss": "^4.3.3",
+    "leaflet": "^1.9.4"
+  }
+}
+```
 
 ```text
-Frontend  react, react-dom, vite, @tanstack/react-query,
-          react-hook-form, zod, @hookform/resolvers, react-router-dom,
-          tailwindcss, @tailwindcss/vite, leaflet, react-leaflet,
-          motion, react-icons, clsx, tailwind-merge, qrcode,
-          axios, react-compiler-runtime
-
-Backend   github.com/jackc/pgx/v5
-          github.com/golang-migrate/migrate/v4
-          golang.org/x/crypto, golang.org/x/term
-          go.mau.fi/whatsmeow
-          github.com/getsentry/sentry-go
+Backend  github.com/jackc/pgx/v5 v5.7.5
+         github.com/golang-migrate/migrate/v4 v4.18.3
+         golang.org/x/crypto v0.54.0
+         go.mau.fi/whatsmeow
+         github.com/getsentry/sentry-go v0.35.3
 ```
 
-Daftar backend pendek karena disengaja. Log terstruktur (`log/slog`), email (`net/smtp`), pembuangan metadata gambar (`image/jpeg`), token acak (`crypto/rand`), UUID (`gen_random_uuid()`), dan jarak haversine semuanya diselesaikan standard library.
+Daftar backend pendek karena disengaja. Structured logging (`log/slog`), email (`net/smtp`), pembuangan metadata gambar (`image/jpeg`), token acak (`crypto/rand`), UUID (`gen_random_uuid()`), dan jarak haversine semuanya diselesaikan standard library.
 
 ---
 
-## Arsitektur sistem
+## 🏗️ Arsitektur Sistem
 
-### System architecture
+### System Architecture
 
 Satu binary Go melayani API JSON dan React SPA dari proses yang sama. Cloudflare, Mailjet, WhatsApp, dan Sentry berstatus dependensi eksternal, bukan container.
 
@@ -340,18 +341,17 @@ flowchart TB
 
 | Properti | Penerapan | Konsekuensi |
 |---|---|---|
-| **Satu proses, dua peran** | Static handler membaca `embed.FS`; path selain `/api` jatuh ke SPA fallback, `/api` tak dikenal membalas 404 JSON. | Frontend bukan layanan runtime, dan salah tulis endpoint tetap menghasilkan galat JSON. |
-| **Gerbang peran wajib** | Setiap pola `/api` terdaftar publik atau bergerbang; `UncoveredAPIRoutes()` diperiksa saat `serve`. | Proses menolak menyala bila ada pola tanpa keputusan peran. |
-| **Penjadwal in process** | `time.Ticker` di binary yang sama, tiap pekerjaan dibungkus advisory lock, tenggat juga dievaluasi saat data dibaca. | Tanpa worker terpisah, dan pekerjaan tidak dieksekusi ganda. |
-| **Migrasi terkunci** | `golang-migrate` saat startup di bawah `pg_try_advisory_lock`. | Deployment tanpa langkah migrasi manual, dua instance tidak saling menimpa skema. |
+| **Satu proses, dua peran** | Static handler membaca `embed.FS`; path selain `/api` jatuh ke SPA fallback, `/api` tak dikenal membalas 404 JSON. | Frontend bukan service runtime, dan salah tulis endpoint tetap menghasilkan error JSON. |
+| **Role gate wajib** | Setiap pola `/api` terdaftar publik atau bergerbang; `UncoveredAPIRoutes()` diperiksa saat `serve`. | Proses menolak menyala bila ada pola tanpa keputusan peran. |
+| **Scheduler in-process** | `time.Ticker` di binary yang sama, tiap job dibungkus advisory lock, deadline juga dievaluasi saat data dibaca. | Tanpa worker terpisah, dan job tidak dieksekusi ganda. |
+| **Migrasi terkunci** | `golang-migrate` saat startup di bawah `pg_try_advisory_lock`. | Deployment tanpa langkah migrasi manual, dua instance tidak saling menimpa schema. |
 
-### Database schema
+### Database Schema
 
-**26 tabel domain**, plus `schema_migrations` dan tabel milik `whatsmeow`. ERD dipecah per konteks. Atribut dibatasi pada kunci dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
+**26 tabel domain**, plus `schema_migrations` dan tabel milik `whatsmeow`. ERD dipecah per konteks. Atribut dibatasi pada key dan kolom yang menentukan perilaku; `created_at` dan `updated_at` tidak diulang.
 
-Entitas tanpa daftar atribut sudah dirinci di diagram lain. Kolom aktor admin (`decided_by`, `handled_by`, `hidden_by`, `changed_by`) menunjuk `user_account.id` dan kosong selama keputusan belum diambil; panahnya tidak digambar.
-
-#### Identitas, wilayah, dan verifikasi
+<details>
+<summary><b>Identitas, wilayah, dan verifikasi (7 tabel)</b></summary>
 
 ```mermaid
 erDiagram
@@ -435,7 +435,10 @@ erDiagram
     }
 ```
 
-#### Katalog, listing, dan kalender kapasitas
+</details>
+
+<details>
+<summary><b>Katalog, listing, dan kalender kapasitas (6 tabel)</b></summary>
 
 ```mermaid
 erDiagram
@@ -495,7 +498,10 @@ erDiagram
     }
 ```
 
-#### Request kuota, penawaran, dan work order
+</details>
+
+<details>
+<summary><b>Request kuota, offer, dan work order (10 tabel)</b></summary>
 
 ```mermaid
 erDiagram
@@ -618,9 +624,12 @@ erDiagram
     }
 ```
 
-Tiga aturan di sini harus membaca tabel lain, jadi ditegakkan trigger, bukan `CHECK`: `trg_reject_self_request` menolak kandidat yang subkontraktornya sama dengan pembeli (FR-083), `trg_reject_allocation_before_readiness` menolak alokasi sebelum `readiness_week_start` (FR-087), `trg_reject_wrong_product_item` pada `listing_product` dan `trg_reject_wrong_machine_item` pada `listing_machine` mengikat setiap baris ke tipe item yang benar, keduanya memanggil fungsi `reject_wrong_item_type()` dengan argumen tipe yang berbeda.
+Tiga aturan harus membaca tabel lain, jadi ditegakkan trigger bukan `CHECK`: `trg_reject_self_request` (kandidat tidak boleh sama dengan pembeli), `trg_reject_allocation_before_readiness` (alokasi tidak boleh sebelum `readiness_week_start`), dan `trg_reject_wrong_product_item` / `trg_reject_wrong_machine_item` (setiap baris terikat ke tipe item yang benar).
 
-#### Notifikasi dan pembatasan laju
+</details>
+
+<details>
+<summary><b>Notifikasi dan rate limiting (3 tabel)</b></summary>
 
 ```mermaid
 erDiagram
@@ -656,22 +665,24 @@ erDiagram
     }
 ```
 
-`rate_limit` tanpa kunci asing. `key` menyimpan pengenal sasaran sebagai teks (id akun, nomor, atau alamat asal) sesuai `target`, sehingga pembatasan tetap berlaku bagi pihak yang belum punya akun.
+`rate_limit` tanpa foreign key. `key` menyimpan pengenal sasaran sebagai teks (id akun, nomor, atau alamat asal) sesuai `target`, sehingga pembatasan tetap berlaku bagi pihak yang belum punya akun.
 
-#### Keputusan skema
+</details>
+
+#### Keputusan Schema
 
 | Keputusan | Penerapan | Alasan |
 |---|---|---|
-| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` `bigint`, `CHECK (total_price > 0)`. | Rupiah tidak dipecah di B2B ini, dan tipe pecahan menimbulkan galat pembulatan. |
+| **Uang bilangan bulat** | `offer.total_price` dan `work_order.total_price` `bigint`, `CHECK (total_price > 0)`. | Rupiah tidak dipecah di B2B ini, dan tipe pecahan menimbulkan rounding error. |
 | **Minggu selalu Senin** | `week_start`, `horizon_until`, `readiness_week_start` `date` dengan `CHECK (EXTRACT(ISODOW ...) = 1)`. | Periode tidak jatuh di tengah minggu, jadi kapasitas tidak berkurang dari periode salah. |
-| **Platform tidak memegang dana** | `payment_record` tanpa kolom jumlah, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa jadi perantara dana. |
-| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`, `used_capacity <= total_capacity`, satu transaksi dengan `SELECT ... FOR UPDATE` terurut `week_start`. | Batas ditegakkan database, dan urutan kunci seragam mencegah deadlock. |
-| **Jejak keputusan lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan: kolom pendukung wajib terisi begitu status keluar dari pending. | Status terminal tidak tersimpan tanpa catatan admin, waktu, dan pelaku. |
-| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti pengambilalihan sesi. |
+| **Platform tidak memegang dana** | `payment_record` tanpa kolom nominal, hanya arah dan tanggal, unik per pesanan, pihak, dan arah. | Platform mencatat pernyataan kedua pihak tanpa jadi perantara dana. |
+| **Kapasitas tidak terjual dua kali** | `capacity_allocation` unik per `work_order_id` dan `period_id`, `used_capacity <= total_capacity`, satu transaction dengan `SELECT ... FOR UPDATE` terurut `week_start`. | Batas ditegakkan database, dan urutan lock seragam mencegah deadlock. |
+| **Audit trail lengkap** | `dispute`, `item_proposal`, `verification_request`, `review` memakai CHECK gabungan: kolom pendukung wajib terisi begitu status keluar dari pending. | Status terminal tidak tersimpan tanpa catatan admin, waktu, dan pelaku. |
+| **Token tidak disimpan mentah** | `session.token_hash` dan `verification_code.code_hash` `bytea` berisi hash. | Kebocoran isi tabel tidak langsung berarti session hijacking. |
 
-Definisi lengkap beserta indeks dan constraint ada di `docs/001-capacity-exchange-marketplace/data-model.md` dan `backend/db/migrations/`.
+Definisi lengkap beserta index dan constraint ada di [data-model.md](docs/001-capacity-exchange-marketplace/data-model.md) dan `backend/db/migrations/`.
 
-### Folder structure
+### Folder Structure
 
 ```text
 devotion/
@@ -681,33 +692,31 @@ devotion/
 │   ├── internal/
 │   │   ├── platform/       # clock, config, httpx, session, storage, scheduler,
 │   │   │                   # ratelimit, cloudflare, health, migrate, observability, tlsconf
-│   │   ├── account/        # akun, peran, profil, autentikasi, pemulihan
-│   │   ├── verification/   # unggahan berkas, pengajuan, keputusan admin
-│   │   ├── masterdata/     # daftar baku, wilayah, usulan item
+│   │   ├── account/        # akun, peran, profil, autentikasi, recovery
+│   │   ├── verification/   # upload file, pengajuan, keputusan admin
+│   │   ├── masterdata/     # master data, wilayah, usulan item
 │   │   ├── listing/        # listing kapasitas, kalender ketersediaan
-│   │   ├── search/         # kriteria keras, skor, pemecah seri, keyset
-│   │   ├── quota/          # request kuota, penawaran, counter-offer
+│   │   ├── search/         # kriteria keras, skor, tie-breaker, keyset pagination
+│   │   ├── quota/          # request kuota, offer, counter-offer
 │   │   ├── order/          # work order, alokasi, pembatalan, pembayaran, sengketa
-│   │   ├── reputation/     # ulasan, nilai turunan, moderasi
-│   │   ├── notification/   # antrean, pengiriman, percobaan ulang
-│   │   ├── admin/          # status dan penyambungan WhatsApp
-│   │   └── db/             # pool 15 koneksi, sqlcgen, testdb skema uji terpisah
+│   │   ├── reputation/     # review, nilai turunan, moderasi
+│   │   ├── notification/   # queue, pengiriman, retry
+│   │   ├── admin/          # status dan koneksi WhatsApp
+│   │   └── db/             # pool 15 koneksi, sqlcgen, testdb schema uji terpisah
 │   ├── db/migrations/      # 22 migrasi golang-migrate
-│   ├── db/queries/         # 15 berkas SQL sumber sqlc
-│   └── webdist/            # hasil build frontend, disematkan lewat embed.FS
+│   ├── db/queries/         # 15 file SQL sumber sqlc
+│   └── webdist/            # hasil build frontend, di-embed lewat embed.FS
 ├── frontend/src/
-│   ├── api/                # klien fetch dan tipe hasil generate dari OpenAPI
+│   ├── api/                # fetch client dan tipe hasil generate dari OpenAPI
 │   ├── components/         # layout, section, komponen bersama
 │   ├── pages/              # 38 halaman, dikelompokkan per user story
 │   ├── hooks/              # hook TanStack Query per domain
-│   ├── schemas/            # skema Zod
-│   ├── routes/             # GuestRoute, ProtectedRoute
+│   ├── schemas/            # schema Zod
+│   ├── routes/             # GuestRoute, ProtectedRoute, UnverifiedRoute
 │   ├── providers/          # QueryProvider
-│   ├── lib/                # helper murni, termasuk predikat penawaran di offers.ts
-│   ├── data/               # data statis bawaan antarmuka
+│   ├── lib/                # helper murni
 │   ├── test/               # setup dan utilitas Jest
-│   ├── styles/             # entri Tailwind dan gaya global
-│   └── assets/             # gambar dan ikon
+│   └── styles/             # entri Tailwind dan style global
 ├── docs/                   # spec, plan, data-model, contracts, tasks, panduan operasional
 ├── .github/workflows/ci.yml
 ├── docker-compose.yml
@@ -718,28 +727,32 @@ devotion/
 
 ---
 
-## Instalasi dan setup
+## ⚙️ Instalasi & Setup
 
-### Prasyarat
+### Prerequisites
 
-**Git**, **Docker Engine** dengan Compose v2, **Go 1.25.0** atau lebih baru, dan **Node.js 20** atau lebih baru.
+Pastikan Anda telah menginstall:
+- **Git**
+- **Docker Engine** dengan Compose v2
+- **Go** 1.25.0 atau lebih baru
+- **Node.js** 20 atau lebih baru
 
-### Langkah instalasi
+### Langkah Instalasi
 
-#### 1. Clone repository
+#### 1️⃣ Clone Repository
 
 ```bash
 git clone https://github.com/fzrilsh/devotion.git
 cd devotion
 ```
 
-#### 2. Siapkan environment variable
+#### 2️⃣ Setup Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-Wajib di semua lingkungan hanya empat: `APP_ENV`, `APP_BASE_URL`, `DATABASE_URL`, `UPLOAD_PATH`. Sisanya diwajibkan saat `APP_ENV=production`.
+Wajib di semua environment hanya empat: `APP_ENV`, `APP_BASE_URL`, `DATABASE_URL`, `UPLOAD_PATH`. Sisanya diwajibkan saat `APP_ENV=production`.
 
 ```env
 APP_ENV=development
@@ -753,9 +766,11 @@ UPLOAD_MAX_TOTAL_MB=500
 UPLOAD_MAX_FILE_MB=5
 ```
 
-Port `5434` bukan salah tulis: Compose menerbitkan Postgres di `127.0.0.1:5434` agar tidak bertabrakan dengan Postgres lain di 5432, dan ikatan loopback menjaganya tidak terekspos keluar mesin. Pengaturan TLS, Mailjet, WhatsApp, dan Sentry ada di `docs/001-capacity-exchange-marketplace/quickstart.md`. `.env` tidak pernah di-commit.
+> Port `5434` bukan salah tulis: Compose menerbitkan Postgres di `127.0.0.1:5434` agar tidak bertabrakan dengan Postgres lain di 5432, dan ikatan loopback menjaganya tidak terekspos keluar mesin.
 
-#### 3. Jalankan PostgreSQL
+Pengaturan TLS, Mailjet, WhatsApp, dan Sentry ada di [quickstart.md](docs/001-capacity-exchange-marketplace/quickstart.md). File `.env` tidak pernah di-commit.
+
+#### 3️⃣ Setup Database
 
 ```bash
 mkdir -p /absolute/path/to/devotion/backend/uploads
@@ -764,9 +779,9 @@ docker compose up -d postgres
 
 Tanpa langkah migrasi manual. Migrasi jalan saat backend menyala, di bawah advisory lock.
 
-#### 4. Jalankan backend
+#### 4️⃣ Run Backend
 
-Binary Go membaca environment shell, bukan berkas `.env`; yang membaca `.env` hanya Docker Compose. Tanpa ekspor, `serve` berhenti dengan `variabel lingkungan wajib belum diisi: APP_ENV`.
+Binary Go membaca environment shell, bukan file `.env`; yang membaca `.env` hanya Docker Compose. Tanpa export, `serve` berhenti dengan `variabel lingkungan wajib belum diisi: APP_ENV`.
 
 ```bash
 set -a; . ./.env; set +a
@@ -776,7 +791,7 @@ go run ./cmd/devotion serve
 
 Backend mendengarkan di `http://localhost:8080`. Swagger UI di `/docs`, hanya saat `APP_ENV=development`.
 
-#### 5. Isi data acuan dan buat akun
+#### 5️⃣ Seed Data dan Buat Akun Admin
 
 Sekali per database baru, dari `backend/` dengan environment yang sama.
 
@@ -787,9 +802,9 @@ go run ./cmd/devotion admin:create
 go run ./cmd/devotion seed:test-data      # menolak jalan bila APP_ENV=production
 ```
 
-Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar. Kredensial akun uji bisa dilihat pada bagian Testing atau [creedentials.txt](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d#file-creedentials-txt) di gist data dummy.
+Data wilayah dibaca dari salinan di repository, tanpa memanggil layanan luar.
 
-#### 6. Jalankan frontend
+#### 6️⃣ Run Development Server
 
 ```bash
 cd frontend
@@ -797,60 +812,69 @@ npm install
 npm run dev
 ```
 
-Vite jalan di `http://localhost:5173` dan memproksikan `/api` ke port 8080. Proxy ini wajib: tanpanya frontend dan backend terlihat sebagai origin berbeda, cookie `SameSite=Lax` tidak terkirim, dan setiap permintaan tampak belum login meski login berhasil.
+Aplikasi akan berjalan di `http://localhost:5173` dan memproksikan `/api` ke port 8080.
 
-> `npm run build` lolos di TypeScript 5.8.3, `tsconfig.app.json` dan `tsconfig.node.json` memakai `erasableSyntaxOnly` yang didukung sejak TypeScript 5.8.
+> Proxy ini wajib: tanpanya frontend dan backend terlihat sebagai origin berbeda, cookie `SameSite=Lax` tidak terkirim, dan setiap request tampak belum login meski login berhasil.
 
 ---
 
-## Penggunaan
+## 🚀 Penggunaan
 
-### Menjalankan aplikasi
+### Menjalankan Aplikasi
 
 ```bash
-# Backend
+# Development mode, backend
 cd backend && go run ./cmd/devotion serve
 
-# Frontend, terminal lain
+# Development mode, frontend (terminal lain)
 cd frontend && npm run dev
 
-# Build dan periksa kualitas kode frontend
+# Production build
 npm run build
+
+# Run tests
+npm run test
+
+# Linting
 npm run lint
 ```
 
-Untuk production, CI membangun frontend, menyalin hasilnya ke `backend/webdist/`, lalu membangun image; server hanya menarik dan menjalankan. Build tidak dilakukan di server produksi, supaya proses build tidak berebut sumber daya dengan Postgres yang sedang hidup.
+Untuk production, CI membangun frontend, menyalin hasilnya ke `backend/webdist/`, lalu membangun image. Server hanya menarik dan menjalankan, supaya proses build tidak berebut resource dengan Postgres yang sedang hidup.
 
-### Panduan pengguna
+### User Guide
 
-#### Untuk subkontraktor
+#### Untuk Subkontraktor
 
-1. Daftar sebagai **Subkontraktor** atau **Keduanya**, selesaikan verifikasi email dan nomor HP.
-2. Lengkapi profil usaha beserta titik lokasi di peta.
-3. Ajukan verifikasi identitas untuk mendapat lencana terverifikasi. Opsional, tapi menaikkan kepercayaan calon pemberi order.
-4. Buat listing: produk yang dikuasai, mesin dan jumlah unit, kapasitas per minggu, jeda kesiapan.
-5. Isi kalender ketersediaan 12 minggu ke depan, tandai minggu yang penuh.
-6. Terbitkan listing. Sebelum diterbitkan, listing tidak muncul di pencarian.
-7. Balas request kuota dengan harga total dan jeda kesiapan. Batas 72 jam, lewat itu dianggap tidak membalas.
-8. Jalankan pesanan lewat status produksi, selesai, dikirim. Catat pernyataan pembayaran, buka sengketa bila ada ketidaksesuaian.
+1. **Registrasi**: daftar sebagai **Subkontraktor** atau **Keduanya**, selesaikan verifikasi email dan nomor HP.
+2. **Profil usaha**: lengkapi profil beserta titik lokasi di peta.
+3. **Verifikasi identitas**: ajukan untuk mendapat badge terverifikasi. Opsional, tapi menaikkan kepercayaan calon pemberi order.
+4. **Buat listing**: produk yang dikuasai, mesin dan jumlah unit, kapasitas per minggu, jeda kesiapan.
+5. **Isi kalender**: ketersediaan 12 minggu ke depan, tandai minggu yang penuh.
+6. **Terbitkan listing**: sebelum diterbitkan, listing tidak muncul di pencarian.
+7. **Balas request kuota**: kirim offer berisi harga total dan jeda kesiapan. Batas 72 jam, lewat itu dianggap tidak membalas.
+8. **Jalankan pesanan**: lewat status produksi, selesai, dikirim. Catat pernyataan pembayaran, buka sengketa bila ada ketidaksesuaian.
 
-#### Untuk pemberi order
+#### Untuk Pemberi Order
 
-1. Masuk sebagai **Pemberi Order** atau **Keduanya**.
-2. Isi kriteria pencarian: produk, mesin, jumlah, tenggat, jeda maksimum, cakupan wilayah.
-3. Bandingkan kandidat lewat skor 0 sampai 4 beserta kriteria mana yang tidak terpenuhi.
-4. Pilih beberapa kandidat, kirim satu request kuota untuk semuanya.
-5. Bandingkan penawaran, tawar balik bila perlu, terima satu penawaran. Work order terbentuk dan kapasitas mitra langsung terpakai.
-6. Konfirmasi begitu barang diterima. Bila dibiarkan, pesanan dianggap diterima otomatis setelah 7 hari, dengan pengingat 2 hari sebelumnya.
-7. Beri ulasan setelah pesanan selesai.
+1. **Registrasi**: masuk sebagai **Pemberi Order** atau **Keduanya**.
+2. **Cari kapasitas**: isi kriteria produk, mesin, jumlah, deadline, jeda maksimum, cakupan wilayah.
+3. **Bandingkan kandidat**: lihat skor 0 sampai 4 beserta kriteria mana yang tidak terpenuhi.
+4. **Kirim request kuota**: pilih beberapa kandidat, satu request untuk semuanya.
+5. **Terima offer**: bandingkan, counter-offer bila perlu, terima satu offer. Work order terbentuk dan kapasitas mitra langsung terpakai.
+6. **Konfirmasi penerimaan**: bila dibiarkan, pesanan dianggap diterima otomatis setelah 7 hari, dengan reminder 2 hari sebelumnya.
+7. **Beri review** setelah pesanan selesai.
 
-#### Untuk admin
+#### Untuk Admin
 
-Akun admin pertama dibuat lewat `go run ./cmd/devotion admin:create`, bukan pendaftaran biasa. Panel `/admin` menampung antrean verifikasi identitas, keputusan usulan item, pengelolaan daftar baku, pesanan telat, sengketa beserta mediasi dan penyelesaiannya, moderasi ulasan, dan status sambungan WhatsApp dengan QR untuk menyambung ulang. Nomor layanan WhatsApp tidak pernah ditampilkan di antarmuka.
+1. **Akses Admin Panel**: akun admin pertama dibuat lewat `go run ./cmd/devotion admin:create`, bukan pendaftaran biasa. Panel ada di `/admin`.
+2. **Verifikasi dan master data**: antrean verifikasi identitas, keputusan usulan item, pengelolaan master data produk dan mesin.
+3. **Mediasi dan moderasi**: pesanan telat, sengketa beserta mediasi dan penyelesaiannya, moderasi review, status koneksi WhatsApp dengan QR untuk menyambung ulang.
+
+Nomor layanan WhatsApp tidak pernah ditampilkan di antarmuka.
 
 ---
 
-## Dokumentasi API
+## 📚 API Documentation
 
 ### Base URL
 
@@ -861,11 +885,13 @@ Health check : /api/health
 Swagger UI   : /docs, hanya saat APP_ENV=development
 ```
 
-Semua permintaan memakai cookie sesi `httpOnly`, tanpa token di badan respons. Path `/api` tak dikenal membalas 404 JSON, bukan `index.html`, sehingga salah tulis endpoint tetap dapat didiagnosis.
+Semua request memakai session cookie `httpOnly`, tanpa token di body response. Path `/api` tak dikenal membalas 404 JSON, bukan `index.html`, sehingga salah tulis endpoint tetap dapat didiagnosis.
 
 ### Endpoints
 
-#### Autentikasi, akun, dan profil
+Kontrak memuat **66 operasi pada 58 path**. Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
+
+#### Authentication
 
 ```http
 POST  /api/auth/register              POST  /api/auth/login
@@ -877,7 +903,7 @@ GET   /api/profile/me                 PUT   /api/profile/me
 GET   /api/profile/{profileId}        GET   /api/profile/{profileId}/reviews
 ```
 
-#### Berkas, verifikasi, dan master data
+#### Files, Verification, Master Data
 
 ```http
 POST /api/files                       GET  /api/files/{fileId}
@@ -887,7 +913,7 @@ GET  /api/regions/provinces           GET  /api/regions/cities
 POST /api/master/proposals
 ```
 
-#### Listing dan kalender kapasitas
+#### Listing & Capacity Calendar
 
 ```http
 GET /api/listing/me                   POST /api/listing/me
@@ -895,7 +921,7 @@ PUT /api/listing/me                   PUT  /api/listing/me/visibility
 GET /api/listing/me/periods           PUT  /api/listing/me/periods
 ```
 
-#### Pencarian, request kuota, dan penawaran
+#### Search, Quota Request, Offer
 
 ```http
 GET  /api/search
@@ -906,18 +932,19 @@ POST /api/candidates/{candidateId}/reject
 POST /api/offers/{offerId}/counter    POST /api/offers/{offerId}/accept
 ```
 
-#### Work order
+#### Work Order
 
 ```http
 GET  /api/work-orders                 GET  /api/work-orders/{workOrderId}
 POST /api/work-orders/{workOrderId}/status
+POST /api/work-orders/{workOrderId}/confirm
 POST /api/work-orders/{workOrderId}/cancel
 POST /api/work-orders/{workOrderId}/payments
 POST /api/work-orders/{workOrderId}/disputes
 POST /api/work-orders/{workOrderId}/reviews
 ```
 
-#### Notifikasi, operasional, dan admin
+#### Notification & Admin
 
 ```http
 GET  /api/notifications               POST /api/notifications/{notificationId}/read
@@ -935,125 +962,173 @@ POST  /api/admin/reviews/{reviewId}/hide
 GET   /api/admin/whatsapp
 ```
 
-Kontrak memuat 66 operasi pada 58 path, seluruhnya terdaftar di router termasuk `POST /api/work-orders/{workOrderId}/confirm` (`backend/internal/order/confirm.go:23`). Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
-
-### Contoh request
+### Example Request
 
 ```bash
+# Login, simpan session cookie
 curl -i -c cookies.txt \
   -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"user@example.com","password":"password123"}'
 
+# Pakai cookie untuk endpoint bergerbang
 curl -i -b cookies.txt http://localhost:8080/api/me
 ```
 
-Kredensial di atas hanya contoh. Pakai akun lokal sendiri saat menguji.
+### Error Format
 
-### Kontrak API lengkap
+Semua error memakai `application/problem+json` (RFC 9457) dengan **34 error code** stabil yang bisa di-switch klien.
 
-Kontrak OpenAPI 3.1 di [contracts/openapi.yaml](docs/001-capacity-exchange-marketplace/contracts/openapi.yaml), peta endpoint terhadap requirement di [contracts/README.md](docs/001-capacity-exchange-marketplace/contracts/README.md). Salinan yang di-embed disinkronkan lewat `backend/apidocs-sync.sh`, dan CI menggagalkan build bila salinannya basi.
+```json
+{
+  "type": "about:blank",
+  "title": "Kapasitas tidak mencukupi",
+  "status": 409,
+  "code": "INSUFFICIENT_CAPACITY",
+  "detail": "Kapasitas subkontraktor tidak cukup sampai tenggat yang diminta."
+}
+```
 
-### API eksternal
+### Dokumentasi Lengkap
 
-Satu API pihak ketiga: [wilayah.id](https://wilayah.id/), sumber wilayah administratif Indonesia. Tanpa kunci API. Seluruh pemanggilannya di `backend/internal/masterdata/regions.go`, satu-satunya `http.Client` keluar di backend.
+📖 Kontrak OpenAPI 3.1 di [contracts/openapi.yaml](docs/001-capacity-exchange-marketplace/contracts/openapi.yaml), peta endpoint terhadap requirement di [contracts/README.md](docs/001-capacity-exchange-marketplace/contracts/README.md). Salinan yang di-embed disinkronkan lewat `backend/apidocs-sync.sh`, dan CI menggagalkan build bila salinannya basi.
+
+### API Eksternal
+
+Satu API pihak ketiga: [wilayah.id](https://wilayah.id/), sumber wilayah administratif Indonesia. Tanpa API key. Seluruh pemanggilannya di `backend/internal/masterdata/regions.go`, satu-satunya `http.Client` keluar di backend.
 
 ```http
 GET https://wilayah.id/api/provinces.json          → 38 provinsi
 GET https://wilayah.id/api/regencies/{kode}.json   → kabupaten/kota per provinsi
 ```
 
-Respons dibungkus objek `data` berisi `code` dan `name`. Kecamatan dan desa tidak diambil, tidak ada requirement yang memakainya.
-
 | Hal | Keputusan |
 |---|---|
-| Kapan dipanggil | Hanya `seed:regions --refresh`, timeout 30 detik, satu galat membatalkan semuanya |
+| Kapan dipanggil | Hanya `seed:regions --refresh`, timeout 30 detik, satu error membatalkan semuanya |
 | Saat melayani pengguna | Tidak pernah, wilayah dibaca dari tabel `province` dan `city` |
 | Sumber bawaan | `docs/master-data/regions.json`, 38 provinsi dan 514 kabupaten/kota |
 | Idempotensi | Upsert pada kode wilayah, nama diperbarui, baris tidak pernah dihapus |
-| Normalisasi | `NormalizeCityCode` membuang titik, `32.73` menjadi `3273`, tanpa itu `city_code_format` dan `city_belongs_to_province` menolak |
 
 > Bila wilayah.id mati, aplikasi tetap jalan penuh. `seed:regions` tanpa `--refresh` membaca salinan JSON di repository.
 
-Bentuk respons dan kueri verifikasi di [docs/master-data/README.md](docs/master-data/README.md), alasannya di `research.md` R-02. Cloudflare, Mailjet, Sentry, dan WhatsApp bukan API data, dicatat di `docs/layanan-luar.md`.
+Cloudflare, Mailjet, Sentry, dan WhatsApp bukan API data, dicatat di [layanan-luar.md](docs/layanan-luar.md).
 
 ---
 
-## Testing
+## 🧪 Testing
 
-### Data dummy untuk pengujian
+### Data Dummy untuk Pengujian
 
 **[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**, disimpan di luar repository supaya dump besar tidak ikut ke riwayat kode. Isinya 60 usaha konveksi, 47 listing, dan 34 pesanan di tujuh status, plus antrean admin yang tidak kosong. Semua fiktif, tidak ada data pribadi orang sungguhan.
 
-| Berkas | Isi |
+| File | Isi |
 |---|---|
-| `dummy-data.sql` | seluruh data, satu transaksi |
-| `creedentials.txt` | 61 akun uji beserta sandinya |
-| `copy-files.sh` | penyalin 122 berkas unggahan tiruan, Linux dan macOS |
+| `dummy-data.sql` | seluruh data, satu transaction |
+| `creedentials.txt` | 61 akun uji beserta passwordnya |
+| `copy-files.sh` | penyalin 122 file upload tiruan, Linux dan macOS |
 | `copy-files.ps1` | penyalin yang sama untuk Windows |
 
-Prasyarat impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`. Tabel wilayah dan `catalog_item` tidak ikut di dump karena id-nya dibuat per database sedangkan profil dan listing menunjuknya lewat kunci asing. Bila belum ada, impor berhenti dengan pesan yang menyebut seed mana yang kurang.
+Prasyarat impor: migrasi sudah jalan lewat `serve`, lalu `seed:regions` dan `seed:master-data`.
 
 ```bash
 docker compose exec -T postgres psql -U devotion -d devotion < dummy-data.sql
 ```
 
-Keluaran terakhir harus `COMMIT`. Satu galat menggagalkan seluruh transaksi, jadi tidak ada risiko data separuh jadi, dan impor kedua gagal di pelanggaran UNIQUE alih-alih menghasilkan data ganda. Waktu di dalam dump dihitung relatif terhadap saat impor, jadi kalender kapasitas selalu terlihat baru. Jalankan salah satu skrip penyalin agar 122 baris `uploaded_file` punya berkas fisiknya di `UPLOAD_PATH`, tanpa itu halaman verifikasi admin menampilkan gambar rusak.
+Output terakhir harus `COMMIT`. Satu error menggagalkan seluruh transaction, jadi tidak ada risiko data separuh jadi. Jalankan salah satu script penyalin agar 122 baris `uploaded_file` punya file fisiknya di `UPLOAD_PATH`.
 
-> Hanya untuk pengembangan dan demo. Jangan diimpor ke database yang memuat data sungguhan.
+> Hanya untuk development dan demo. Jangan diimpor ke database yang memuat data sungguhan.
 
-### Menjalankan pengujian
+### Running Tests
 
 ```bash
+# Unit tests, backend
 cd backend
 go vet ./...
-go test ./... -p 1                    # -p 1 menjaga koneksi di bawah max_connections 20
+go test ./... -p 1
 
-# beserta uji integrasi database
+# Integration tests, backend (menjangkau PostgreSQL)
 DATABASE_URL_TEST=postgres://devotion:***@127.0.0.1:5434/devotion?sslmode=disable \
   go test ./... -p 1
 
+# Test coverage, backend
+go test ./... -p 1 -coverprofile=cover.out
+go tool cover -func=cover.out | tail -1
+
+# Unit tests, frontend
 cd ../frontend
+npm run test -- --testTimeout=30000
+
+# Test coverage, frontend
+npm run test:coverage -- --testTimeout=30000
+
+# Linting dan type check
 npm run lint
 npm run build
 ```
 
-`DATABASE_URL_TEST` wajib disebut eksplisit: bawaannya menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan uji yang tidak menjangkau database memilih `t.Skip` daripada gagal. Tanpa variabel itu seluruh uji database dilewati diam-diam dan hasilnya tetap hijau.
+> `DATABASE_URL_TEST` wajib disebut eksplisit: bawaannya menunjuk port 5432 sedangkan Compose menerbitkan 5434, dan test yang tidak menjangkau database memilih `t.Skip` daripada gagal. Tanpa variabel itu seluruh test database dilewati diam-diam dan hasilnya tetap hijau.
 
-Uji integrasi memakai skema terpisah pada layanan Postgres yang sama, bukan container tambahan. Uji bertenggat memakai `Clock` yang dapat digantikan, sehingga konfirmasi otomatis 7 hari diuji tanpa menunggu 7 hari.
+> `--testTimeout=30000` wajib untuk suite OTP (`VerifyEmail`, `VerifyPhone`). Test itu mensimulasikan pengetikan enam digit lewat `userEvent`, dan pada mesin yang lambat prosesnya melewati timeout default Jest 5000 ms. Tanpa flag ini dua suite gagal karena timeout, bukan karena logika salah.
 
-### Hasil eksekusi pada branch staging
+Integration test memakai schema terpisah pada service PostgreSQL yang sama, bukan container tambahan. Test berdeadline memakai `Clock` yang dapat digantikan, sehingga auto-confirm 7 hari diuji tanpa menunggu 7 hari.
 
-Go 1.25.0, tanpa `DATABASE_URL_TEST` (`npx tsc -b` exit 0, `vite build` lolos di TypeScript 5.8.3).
+---
+### Test Coverage
+
+Hasil eksekusi pada branch `staging`, commit `8f7bb51`, Go 1.25.0 dengan `DATABASE_URL_TEST` aktif.
+
+**Backend (Go)**
 
 ```text
-go vet ./...           lulus, tanpa temuan
-go test ./... -p 1     23 paket ok, 0 gagal
-                       79 lulus, 274 dilewati karena database tidak dijangkau
-apidocs-sync           salinan openapi.yaml identik dengan sumber
-npm run lint           lulus, tanpa galat
-npm run build          lolos (tsc -b + vite build, 723 modul)
-npm test               13 suite lulus, 89 uji lulus
+Statements   : 68.1% (kode aplikasi, 3.546/5.204)
+             : 55.4% (termasuk sqlcgen hasil generate)
+Packages     : 23 ok, 0 gagal
+Test files   : 75 file, 419 fungsi Test
+go vet       : lulus, tanpa temuan
 ```
 
-### Cakupan
+**Frontend (TypeScript)**
 
-Bukan persentase, tapi keterlacakan: **70 berkas uji Go**, **388 kasus uji**, setiap uji menyebut FR yang diverifikasinya di nama fungsinya (`TestPencarian_UrutanDapatDiulang_FR023_FR025_SC013`), sehingga **57 requirement** dapat ditelusuri dari nama uji ke spec.
+```text
+Statements   : 76.87% (768/999)
+Branches     : 58.42% (312/534)
+Functions    : 64.91% (161/248)
+Lines        : 77.31% (702/908)
+Test suites  : 26 lulus, 159 test lulus
+ESLint       : lulus, tanpa error
+tsc + build  : lulus (TypeScript 5.8, 723 modul)
+```
 
-Aturan yang paling mudah rusak diam-diam, karena itu diuji khusus: urutan hasil pencarian dapat diulang termasuk antar halaman; skor bebas dari pengaruh reputasi, verifikasi, kebaruan kalender, dan jarak; kapasitas terjumlah lintas periode sampai tenggat; dua kesepakatan berbarengan atas periode yang sama hanya satu berhasil; pembatalan pra-produksi membalik seluruh baris alokasi; request kuota ke listing sendiri ditolak; konfirmasi otomatis 7 hari dan penghentiannya oleh sengketa; tingkat penyelesaian membebani hanya pihak yang membatalkan; dokumen identitas tertutup selain bagi pemilik dan admin; validasi berkas dari magic bytes beserta batas ukuran, kuota storage, dan pembuangan metadata gambar; idempotensi horizon kalender; migrasi dan constraint PostgreSQL.
+Angka backend disajikan dua kali dengan alasan: `internal/db/sqlcgen` berisi 1.132 statement hasil generate sqlc yang tidak pernah dipanggil langsung oleh test, dan menyertakannya menurunkan angka tanpa menambah informasi. **68,1%** adalah coverage kode yang benar-benar ditulis tim.
 
-Uji end-to-end dijalankan manual oleh penguji di luar tim mengikuti `docs/001-capacity-exchange-marketplace/quickstart.md` bagian F, karena itu label dan pesan galat dibuat agar dapat dikutip apa adanya di laporan.
+**Coverage per paket backend, lima tertinggi dan tiga terendah**
+
+| Paket | Coverage |
+|---|---|
+| `apidocs` | 100,0% |
+| `platform/health` | 97,9% |
+| `platform/cloudflare` | 95,0% |
+| `platform/config` | 91,3% |
+| `platform/httpx` | 90,1% |
+| `internal/quota` | 81,9% |
+| `internal/search` | 80,2% |
+| ... | ... |
+| `internal/admin` | 50,9% |
+| `platform/scheduler` | 43,3% |
+| `cmd/devotion` | 34,7% |
+
+Tiga paket terbawah memang bukan target utama: `cmd/devotion` sebagian besar wiring subcommand, `scheduler` diverifikasi lewat integration test pada domain yang dipicunya, dan `admin` sebagian besar CRUD tipis di atas query yang sudah teruji di paketnya masing-masing.
 
 ---
 
-## Lisensi
+## 📄 Lisensi
 
-Proyek ini memakai [MIT License](LICENSE).
+Proyek ini dilisensikan di bawah [MIT License](LICENSE) - lihat file LICENSE untuk detail lebih lanjut.
 
 ---
 
 <div align="center">
 
-**Dibuat untuk ITECHNO CUP 2026**
+**Made with ❤️ by Indonesia Emas 74 Kg for ITECHNO CUP 2026**
 
 </div>
