@@ -87,6 +87,7 @@ func (s *Service) Register(r *httpx.Router, auth httpx.Authenticator) {
 	// The incoming list is the subcontractor's side of FR-030; it must be
 	// registered before the {requestId} detail route so the literal path wins.
 	r.Gated("GET /api/quota-requests/incoming", subGate, s.handleIncoming)
+	r.Gated("GET /api/candidates/{candidateId}", subGate, s.handleIncomingDetail)
 	r.Gated("GET /api/quota-requests/{requestId}", gate, s.handleDetail)
 }
 
@@ -125,6 +126,27 @@ func (s *Service) handleIncoming(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	view, err := s.listIncoming(r.Context(), acc.ID, q)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// handleIncomingDetail returns one incoming candidate for its subcontractor
+// owner. Unlike the paginated list, this endpoint is usable from a copied link
+// or after a browser refresh because it does not depend on a client-side cache.
+func (s *Service) handleIncomingDetail(w http.ResponseWriter, r *http.Request) {
+	acc, ok := principalAccount(w, r)
+	if !ok {
+		return
+	}
+	candidateID, ok := parseUUID(r.PathValue("candidateId"))
+	if !ok {
+		httpx.WriteProblem(w, httpx.CodeValidationFailed, "Id kandidat tidak sah.")
+		return
+	}
+	view, err := s.incomingDetail(r.Context(), acc.ID, candidateID)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -292,10 +314,13 @@ type validatedInput struct {
 
 // validateRequestInput enforces the QuotaRequestCreate field rules (all 422 with
 // a field name): at least one listing id and every id a valid UUID, product id
-// required uuid, quantity >= 1, material non-empty, deadline required date.
-func validateRequestInput(in requestInput) (validatedInput, *validationError) {
+// required uuid, quantity >= 1, material non-empty, deadline required date and
+// not earlier than the current Jakarta date.
+func (s *Service) validateRequestInput(in requestInput) (validatedInput, *validationError) {
 	var fields []httpx.FieldError
 	var v validatedInput
+	now := s.clock.Now().In(platform.Jakarta)
+	currentDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, platform.Jakarta)
 
 	if len(in.ListingIDs) == 0 {
 		fields = append(fields, httpx.FieldError{Field: "listing_ids", Message: "Pilih minimal satu kandidat."})
@@ -333,6 +358,8 @@ func validateRequestInput(in requestInput) (validatedInput, *validationError) {
 		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Isi tenggat pesanan."})
 	} else if t, err := platform.ParseDate(in.Deadline); err != nil {
 		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Tenggat harus berformat YYYY-MM-DD."})
+	} else if t.Before(currentDate) {
+		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Tenggat tidak boleh berada di masa lampau."})
 	} else {
 		v.deadline = t
 	}

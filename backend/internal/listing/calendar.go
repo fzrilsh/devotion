@@ -43,27 +43,23 @@ func (s *Service) EnsureHorizon(ctx context.Context, tx pgx.Tx, listingID pgtype
 		horizon = platform.WeekStart(l.HorizonUntil.Time)
 	}
 
-	// Nothing to do when the calendar already reaches untilWeek. The horizon
-	// never moves backward.
+	// Fill the requested range even when the stored horizon already reaches it.
+	// A prior write may have removed a period row while leaving horizon_until ahead;
+	// ON CONFLICT in InsertPeriodsUpToWeek makes this repair idempotent and preserves
+	// values on periods that already exist.
+	start := weekNow
+	if !start.After(untilWeek) {
+		if err := q.InsertPeriodsUpToWeek(ctx, sqlcgen.InsertPeriodsUpToWeekParams{
+			ListingID:     listingID,
+			Column2:       pgdate(start),
+			Column3:       pgdate(untilWeek),
+			TotalCapacity: l.WeeklyCapacity,
+			CreatedAt:     tstz(now),
+		}); err != nil {
+			return time.Time{}, err
+		}
+	}
 	if !l.HorizonUntil.Valid || untilWeek.After(horizon) {
-		// Series starts one week past the current horizon, but never before the
-		// current week, so past weeks are never generated. When there is no
-		// horizon yet, start at the current week.
-		start := horizon.AddDate(0, 0, 7)
-		if !l.HorizonUntil.Valid || start.Before(weekNow) {
-			start = weekNow
-		}
-		if !start.After(untilWeek) {
-			if err := q.InsertPeriodsUpToWeek(ctx, sqlcgen.InsertPeriodsUpToWeekParams{
-				ListingID:     listingID,
-				Column2:       pgdate(start),
-				Column3:       pgdate(untilWeek),
-				TotalCapacity: l.WeeklyCapacity,
-				CreatedAt:     tstz(now),
-			}); err != nil {
-				return time.Time{}, err
-			}
-		}
 		if err := q.RaiseHorizonUntil(ctx, sqlcgen.RaiseHorizonUntilParams{
 			ID:           listingID,
 			HorizonUntil: pgdate(untilWeek),
@@ -159,9 +155,9 @@ func (s *Service) updatePeriods(ctx context.Context, accountID pgtype.UUID, item
 				WeekStart: pgdate(p.week),
 			})
 			if err != nil {
-				if isNoRows(err) {
-					return errPeriodOutsideCal
-				}
+				// EnsureHorizon inserts every requested week while the listing row is
+				// locked. A missing row here is therefore an invariant failure, not a
+				// user-facing "outside calendar" condition.
 				return err
 			}
 			if p.capacity < period.UsedCapacity {

@@ -150,6 +150,66 @@ func (q *Queries) GetCandidateListings(ctx context.Context, dollar_1 []pgtype.UU
 	return items, nil
 }
 
+const getIncomingCandidate = `-- name: GetIncomingCandidate :one
+SELECT c.id AS candidate_id, c.listing_id, c.subcontractor_id,
+       c.status, c.rejection_reason, p.business_name,
+       r.quantity, r.material, r.deadline, r.note,
+       l.weekly_capacity, l.readiness_lead_days, l.horizon_until
+FROM request_candidate c
+JOIN capacity_listing l ON l.id = c.listing_id
+JOIN business_profile owner ON owner.id = l.profile_id
+JOIN quota_request r ON r.id = c.request_id
+JOIN business_profile p ON p.id = r.buyer_id
+WHERE c.id = $1 AND owner.account_id = $2
+`
+
+type GetIncomingCandidateParams struct {
+	ID        pgtype.UUID
+	AccountID pgtype.UUID
+}
+
+type GetIncomingCandidateRow struct {
+	CandidateID       pgtype.UUID
+	ListingID         pgtype.UUID
+	SubcontractorID   pgtype.UUID
+	Status            CandidateStatus
+	RejectionReason   pgtype.Text
+	BusinessName      string
+	Quantity          int32
+	Material          string
+	Deadline          pgtype.Date
+	Note              pgtype.Text
+	WeeklyCapacity    int32
+	ReadinessLeadDays int32
+	HorizonUntil      pgtype.Date
+}
+
+// GetIncomingCandidate loads one candidate for its subcontractor owner. The
+// account guard makes a copied detail link look like a missing candidate to a
+// different subcontractor, rather than exposing whether the id exists (FR-030).
+// It carries the same request and capacity fields as ListIncomingCandidates so a
+// browser refresh does not need a cached list page.
+func (q *Queries) GetIncomingCandidate(ctx context.Context, arg GetIncomingCandidateParams) (GetIncomingCandidateRow, error) {
+	row := q.db.QueryRow(ctx, getIncomingCandidate, arg.ID, arg.AccountID)
+	var i GetIncomingCandidateRow
+	err := row.Scan(
+		&i.CandidateID,
+		&i.ListingID,
+		&i.SubcontractorID,
+		&i.Status,
+		&i.RejectionReason,
+		&i.BusinessName,
+		&i.Quantity,
+		&i.Material,
+		&i.Deadline,
+		&i.Note,
+		&i.WeeklyCapacity,
+		&i.ReadinessLeadDays,
+		&i.HorizonUntil,
+	)
+	return i, err
+}
+
 const getOfferForCounter = `-- name: GetOfferForCounter :one
 SELECT
     o.id            AS offer_id,
@@ -461,7 +521,7 @@ func (q *Queries) ListCandidatesToExpire(ctx context.Context, beforeCutoff pgtyp
 const listIncomingCandidates = `-- name: ListIncomingCandidates :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.created_at, r.quantity, r.deadline,
+       r.created_at, r.quantity, r.material, r.note, r.deadline,
        l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
@@ -493,6 +553,8 @@ type ListIncomingCandidatesRow struct {
 	BusinessName      string
 	CreatedAt         pgtype.Timestamptz
 	Quantity          int32
+	Material          string
+	Note              pgtype.Text
 	Deadline          pgtype.Date
 	WeeklyCapacity    int32
 	ReadinessLeadDays int32
@@ -503,10 +565,10 @@ type ListIncomingCandidatesRow struct {
 // subcontractor account owns, newest request first (FR-030). An optional status
 // filter narrows to one candidate_status. The cursor tuple is (created_at, id)
 // of the request, matching the buyer-side list. It also carries the request's
-// quantity and deadline plus the listing's capacity shape (weekly_capacity,
-// readiness_lead_days, horizon_until) so the read side can mark whether the
-// subcontractor can fulfil each request within its readiness..deadline range
-// (FR-035, FR-090) without a second query per row.
+// quantity, material, note, and deadline plus the listing's capacity shape
+// (weekly_capacity, readiness_lead_days, horizon_until) so the read side can mark
+// whether the subcontractor can fulfil each request within its readiness..deadline
+// range (FR-035, FR-090) without a second query per row.
 func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCandidatesParams) ([]ListIncomingCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listIncomingCandidates,
 		arg.AccountID,
@@ -532,6 +594,8 @@ func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCa
 			&i.BusinessName,
 			&i.CreatedAt,
 			&i.Quantity,
+			&i.Material,
+			&i.Note,
 			&i.Deadline,
 			&i.WeeklyCapacity,
 			&i.ReadinessLeadDays,

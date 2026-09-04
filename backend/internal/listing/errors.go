@@ -10,10 +10,9 @@ import (
 // Sentinel errors the service layer returns and http.go translates to problem
 // codes. They are package-private and lowercase, matching the account package.
 var (
-	errListingNotFound  = errors.New("listing: listing tidak ditemukan")
-	errListingExists    = errors.New("listing: profil sudah punya listing")
-	errProfileMissing   = errors.New("listing: profil tidak ditemukan")
-	errPeriodOutsideCal = errors.New("listing: periode di luar kalender")
+	errListingNotFound = errors.New("listing: listing tidak ditemukan")
+	errListingExists   = errors.New("listing: profil sudah punya listing")
+	errProfileMissing  = errors.New("listing: profil tidak ditemukan")
 )
 
 // conflictError carries the code and the already-composed Indonesian detail a
