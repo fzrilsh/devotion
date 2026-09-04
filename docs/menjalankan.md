@@ -136,15 +136,18 @@ Bentuk plugin (`docker compose config --services | wc -l`) setara; pakai yang
 tersedia di mesin. Vite dev server tidak dihitung karena ia tidak pernah masuk
 `docker-compose.yml`.
 
-## Kontrak API di /docs (hanya pengembangan)
+## Kontrak API di /docs
 
-Saat `APP_ENV=development`, `serve` menyajikan Swagger UI di `/docs`. Buka
-`http://localhost:8080/docs` untuk membaca kontrak tanpa membuka YAML mentah;
-spec-nya juga tersedia di `/docs/openapi.yaml`. Halaman ini membaca salinan
+`serve` menyajikan Swagger UI di `/docs` di semua environment, termasuk di server
+`https://devotion.web.id/docs`. Buka `http://localhost:8080/docs` saat
+pengembangan untuk membaca kontrak tanpa membuka YAML mentah; spec-nya juga
+tersedia di `/docs/openapi.yaml`. Halaman ini membaca salinan
 `backend/apidocs/openapi.yaml` yang disematkan, yang disegel byte-identik dengan
 `docs/001-capacity-exchange-marketplace/contracts/openapi.yaml`. Setelah kontrak
 sumber berubah, jalankan `./backend/apidocs-sync.sh` lalu commit.
 
-Rute `/docs` didaftarkan hanya di pengembangan. Di produksi ia absen dan
-alamatnya jatuh ke 404 yang sama seperti path tak dikenal lain, jadi UI ini tidak
-pernah terekspos ke publik.
+Ketersediaan di produksi adalah keputusan lomba yang dicatat di
+`docs/utang-teknis.md`: teks T082 yang lama menyebut rute ini hanya di
+pengembangan, tetapi juri membaca kontrak dari situs yang hidup. Halaman itu
+statis dan tanpa kredensial, jadi tidak membuka apa pun yang tidak sudah ada di
+repo publik.
