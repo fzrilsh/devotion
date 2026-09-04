@@ -8,6 +8,7 @@ jest.mock("@api/search", () => ({
     acceptOffer: jest.fn(),
     counterOffer: jest.fn(),
     createQuotaRequest: jest.fn(),
+    getIncomingCandidate: jest.fn(),
     getIncomingCandidates: jest.fn(),
     getQuotaRequest: jest.fn(),
     getSentQuotaRequests: jest.fn(),
@@ -16,8 +17,8 @@ jest.mock("@api/search", () => ({
     sendOffer: jest.fn(),
 }));
 
-import type { CandidateStatus, IncomingCandidate } from "@api/search";
-import { CANDIDATE_LISTS_NOT_LOADED, CANDIDATE_NOT_IN_LOADED_LISTS, quotaKeys, useIncomingCandidate } from "./useQuota";
+import { getIncomingCandidate, rejectCandidate, type CandidateStatus, type IncomingCandidate } from "@api/search";
+import { quotaKeys, useIncomingCandidate, useRejectCandidate } from "./useQuota";
 
 function candidate(id: string, status: CandidateStatus): IncomingCandidate {
     return {
@@ -26,19 +27,13 @@ function candidate(id: string, status: CandidateStatus): IncomingCandidate {
         profile_id: "22222222-2222-4222-8222-222222222222",
         business_name: "Konveksi Contoh",
         status,
+        material: "Katun combed 30s",
         quantity: 500,
         deadline: "2026-10-05",
+        note: "Catatan dari pembeli",
         capacity_in_range: 800,
         can_fulfill: true,
     };
-}
-
-/** Mirrors what useIncomingCandidates writes: one infinite-query entry per status filter. */
-function seedList(client: QueryClient, status: CandidateStatus | undefined, items: IncomingCandidate[]) {
-    client.setQueryData(quotaKeys.incoming(status), {
-        pages: [{ items, pagination: { has_next: false, next_cursor: null } }],
-        pageParams: [undefined],
-    });
 }
 
 function renderCandidateHook(client: QueryClient, candidateId: string) {
@@ -56,51 +51,25 @@ describe("useIncomingCandidate", () => {
         client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     });
 
-    it("FR-030: menemukan kandidat dari daftar tanpa filter", async () => {
-        seedList(client, undefined, [candidate("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "awaiting_reply")]);
+    it("FR-030: memuat kandidat langsung dari server tanpa daftar yang tersimpan", async () => {
+        const direct = candidate("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "awaiting_reply");
+        (getIncomingCandidate as jest.Mock).mockResolvedValueOnce(direct);
 
-        const { result } = renderCandidateHook(client, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-
-        await waitFor(() => expect(result.current.isSuccess).toBe(true));
-        expect(result.current.data?.candidate_id).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
-    });
-
-    // The regression this test pins: the writer keys each list by its status
-    // filter, so a reader that only looks at the "all" entry finds nothing for
-    // any candidate opened from a filtered list.
-    it("FR-031: menemukan kandidat yang dibuka dari daftar yang difilter status", async () => {
-        seedList(client, "offered", [candidate("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "offered")]);
-
-        const { result } = renderCandidateHook(client, "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
+        const { result } = renderCandidateHook(client, direct.candidate_id);
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
-        expect(result.current.data?.status).toBe("offered");
+        expect(result.current.data).toEqual(direct);
+        expect(getIncomingCandidate).toHaveBeenCalledWith(direct.candidate_id);
     });
 
-    it("FR-031: mencari di seluruh entri daftar, bukan hanya yang pertama", async () => {
-        seedList(client, undefined, [candidate("cccccccc-cccc-4ccc-8ccc-cccccccccccc", "awaiting_reply")]);
-        seedList(client, "rejected", [candidate("dddddddd-dddd-4ddd-8ddd-dddddddddddd", "rejected")]);
+    it("FR-030: tidak lagi gagal saat daftar incoming belum pernah dibuka", async () => {
+        const direct = candidate("ffffffff-ffff-4fff-8fff-ffffffffffff", "awaiting_reply");
+        (getIncomingCandidate as jest.Mock).mockResolvedValueOnce(direct);
 
-        const { result } = renderCandidateHook(client, "dddddddd-dddd-4ddd-8ddd-dddddddddddd");
+        const { result } = renderCandidateHook(client, direct.candidate_id);
 
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
-        expect(result.current.data?.status).toBe("rejected");
-    });
-
-    it("FR-030: membedakan daftar yang belum dimuat dari kandidat yang tidak ada", async () => {
-        const { result } = renderCandidateHook(client, "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
-
-        await waitFor(() => expect(result.current.isError).toBe(true));
-        expect((result.current.error as Error).message).toBe(CANDIDATE_LISTS_NOT_LOADED);
-    });
-
-    it("FR-030: melaporkan kandidat tidak ada bila daftar sudah dimuat tanpa kandidat itu", async () => {
-        seedList(client, undefined, [candidate("ffffffff-ffff-4fff-8fff-ffffffffffff", "awaiting_reply")]);
-
-        const { result } = renderCandidateHook(client, "99999999-9999-4999-8999-999999999999");
-
-        await waitFor(() => expect(result.current.isError).toBe(true));
-        expect((result.current.error as Error).message).toBe(CANDIDATE_NOT_IN_LOADED_LISTS);
+        expect(result.current.error).toBeNull();
     });
 
     // A prefix read of the lists must not pick up detail entries, or a stale
@@ -111,5 +80,25 @@ describe("useIncomingCandidate", () => {
         const entries = client.getQueriesData({ queryKey: quotaKeys.incomingLists });
 
         expect(entries).toHaveLength(0);
+    });
+});
+
+describe("useRejectCandidate", () => {
+    it("FR-031: memperbarui daftar dan detail setelah kandidat ditolak", async () => {
+        const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const candidateId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        (rejectCandidate as jest.Mock).mockResolvedValueOnce(undefined);
+        const refetchQueries = jest.spyOn(client, "refetchQueries").mockResolvedValue(undefined);
+
+        function wrapper({ children }: { children: ReactNode }) {
+            return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+        }
+
+        const { result } = renderHook(() => useRejectCandidate(candidateId), { wrapper });
+        await result.current.mutateAsync("Kapasitas sudah penuh.");
+
+        expect(rejectCandidate).toHaveBeenCalledWith(candidateId, "Kapasitas sudah penuh.");
+        expect(refetchQueries).toHaveBeenNthCalledWith(1, { queryKey: quotaKeys.incomingLists });
+        expect(refetchQueries).toHaveBeenNthCalledWith(2, { queryKey: quotaKeys.incomingDetail(candidateId) });
     });
 });

@@ -65,6 +65,10 @@ export async function getIncomingCandidates(params?: { status?: CandidateStatus;
     return apiClient<IncomingCandidateList>(`/quota-requests/incoming${query ? `?${query}` : ""}`);
 }
 
+export async function getIncomingCandidate(candidateId: string): Promise<IncomingCandidate> {
+    return apiClient<IncomingCandidate>(`/candidates/${candidateId}`);
+}
+
 export async function sendOffer(candidateId: string, data: { total_price: number; readiness_lead_days: number; note?: string }): Promise<Offer> {
     return apiClient<Offer>(`/candidates/${candidateId}/offers`, { method: "POST", body: JSON.stringify(data) });
 }
