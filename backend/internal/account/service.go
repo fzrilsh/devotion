@@ -40,12 +40,11 @@ type registerInput struct {
 	Buyer         bool
 }
 
-// register creates the account and its business profile in one transaction,
-// then mints and delivers an email code and a phone code. A duplicate email or
-// phone is a 409; an unknown city is errCityUnknown so the handler answers 422
-// rather than surfacing a foreign key violation as a 500. Code delivery runs
-// after the commit and is best effort: a send failure must not roll back a
-// registration that already succeeded, since the codes can be resent.
+// register creates the account and its business profile in one transaction. A
+// duplicate email or phone is a 409; an unknown city is errCityUnknown so the
+// handler answers 422 rather than surfacing a foreign key violation as a 500.
+// Verification codes are issued after the user logs in through the resend flow,
+// not as a side effect of registration.
 func (s *Service) register(ctx context.Context, in registerInput) (sqlcgen.UserAccount, error) {
 	q := s.queries()
 	emailExists, err := q.EmailExists(ctx, in.Email)
@@ -105,18 +104,12 @@ func (s *Service) register(ctx context.Context, in registerInput) (sqlcgen.UserA
 		return sqlcgen.UserAccount{}, err
 	}
 
-	// Both codes are best effort and run only after the account and profile are
-	// committed; a flaky mail or WhatsApp channel never blocks registration and
-	// never rolls back a row that already landed.
-	s.issueAndSend(ctx, acc, sqlcgen.VerificationPurposeEmail)
-	s.issueAndSend(ctx, acc, sqlcgen.VerificationPurposePhone)
 	return acc, nil
 }
 
 // issueAndSend mints a fresh code for the purpose, invalidates any outstanding
 // codes for it, stores the new hash, and hands the plaintext to the delivery
-// channel exactly once. Errors are returned so callers that care (register does
-// not) can react; the plaintext is never persisted.
+// channel exactly once. The plaintext is never persisted.
 func (s *Service) issueAndSend(ctx context.Context, acc sqlcgen.UserAccount, purpose sqlcgen.VerificationPurpose) {
 	code, err := newCode()
 	if err != nil {
@@ -145,8 +138,8 @@ func (s *Service) issueAndSend(ctx context.Context, acc sqlcgen.UserAccount, pur
 
 // deliver routes a plaintext code to its channel. The send runs in its own
 // goroutine so the HTTP response never waits on SMTP or WhatsApp (R-09), and a
-// send failure only lands in the log: registration, resend, and recover all
-// treat delivery as best effort and never fail on it. Email failure is silent
+// send failure only lands in the log: resend and recover treat delivery as best
+// effort and never fail on it. Email failure is silent
 // at the protocol level, so this log line is the only trace that a code did not
 // go out. In development the plaintext code is logged too, because codes are
 // stored only as a hash and local dev has no other way to read one; devMode is

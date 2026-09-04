@@ -74,7 +74,7 @@ paths:
             schema: { $ref: '#/components/schemas/RegisterRequest' }
       responses:
         '201':
-          description: Akun dibuat; kode verifikasi dikirim ke email dan nomor HP
+          description: Akun dibuat; masuk terlebih dahulu lalu minta kode verifikasi untuk email dan nomor HP
           content:
             application/json:
               schema: { $ref: '#/components/schemas/RegisterResponse' }

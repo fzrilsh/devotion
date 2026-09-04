@@ -5,12 +5,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
@@ -149,7 +147,8 @@ func sessionCookie(rec *httptest.ResponseRecorder) string {
 	return ""
 }
 
-// registerAndLogin creates an account and returns a live session cookie.
+// registerAndLogin creates an account, logs in, requests both verification codes,
+// and returns the live session cookie.
 func (h *harness) registerAndLogin(t *testing.T, email, phone, password string) string {
 	t.Helper()
 	rec := h.do("POST", "/api/auth/register", map[string]any{
@@ -167,7 +166,22 @@ func (h *harness) registerAndLogin(t *testing.T, email, phone, password string) 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("login: status %d, body %s", rec.Code, rec.Body.String())
 	}
-	return sessionCookie(rec)
+	cookie := sessionCookie(rec)
+	for _, tc := range []struct {
+		target  string
+		channel string
+	}{
+		{target: email, channel: "email"},
+		{target: normalizePhone(phone), channel: "whatsapp"},
+	} {
+		rec = h.do("POST", "/api/auth/resend-code", map[string]any{
+			"target": tc.target, "channel": tc.channel,
+		}, cookie)
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("resend %s setelah login: status %d, body %s", tc.channel, rec.Code, rec.Body.String())
+		}
+	}
+	return cookie
 }
 
 // createAdminAndLogin creates an admin account through the same CreateAdmin path
@@ -224,99 +238,85 @@ func TestGetMe_NoSession_Unauthorized(t *testing.T) {
 	}
 }
 
-// failingDelivery reports every send as failed so a test can prove a broken
-// email or WhatsApp channel never rolls back a registration that already
-// committed. It records that it was called so the test can assert both channels
-// were attempted.
-type failingDelivery struct {
-	mu               sync.Mutex
-	emailCalls       int
-	phoneCalls       int
-	emailTo, phoneTo string
-}
-
-func (d *failingDelivery) SendEmailCode(_ context.Context, to, _ string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.emailCalls++
-	d.emailTo = to
-	return errors.New("email channel down")
-}
-
-func (d *failingDelivery) SendPhoneCode(_ context.Context, to, _ string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.phoneCalls++
-	d.phoneTo = to
-	return errors.New("whatsapp channel down")
-}
-
-func (d *failingDelivery) SendRecoveryCode(_ context.Context, _, _ string) error {
-	return errors.New("email channel down")
-}
-
-func (d *failingDelivery) snapshot() (int, int, string, string) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.emailCalls, d.phoneCalls, d.emailTo, d.phoneTo
-}
-
-// TestRegister_SendsBothCodes_AndSurvivesDeliveryFailure_FR001_FR002 proves
-// registration hands the email code to SendEmailCode and the phone code to
-// SendPhoneCode (the FR-002 gate needs both channels to receive a code), and
-// that a delivery failure on either channel does not cancel the registration:
-// the account is created, GET /me works, and the codes are still resendable.
-// FR-001, FR-002, R-09.
-func TestRegister_SendsBothCodes_AndSurvivesDeliveryFailure_FR001_FR002(t *testing.T) {
-	pool := testdb.New(t, "register_delivery_fail")
-	clock := platform.NewTestClock(baseTime)
-	sessions := session.New(pool, clock, false)
-	limiter := ratelimit.New(pool, clock)
-	delivery := &failingDelivery{}
-	svc := New(pool, clock, sessions, limiter, delivery, quietLogger(), false)
-	seedCity(t, pool)
-
-	r := httpx.NewRouter(quietLogger())
-	svc.Register(r)
-	h := &harness{svc: svc, handler: r.Handler(), pool: pool, clock: clock}
-
+// TestRegister_DoesNotSendVerificationCodes_FR001_FR002 proves registration
+// only creates the account and profile. Verification codes are requested after
+// login, so neither channel receives a code and no verification row is created
+// as a side effect of POST /auth/register. FR-001, FR-002.
+func TestRegister_DoesNotSendVerificationCodes_FR001_FR002(t *testing.T) {
+	h := newHarness(t, "register_no_delivery")
 	rec := h.do("POST", "/api/auth/register", map[string]any{
-		"email": "gagal@example.com", "phone": "+6281311112222", "password": "rahasia123",
+		"email": "tanpa-kode@example.com", "phone": "+6281311112222", "password": "rahasia123",
 		"business_name": "Konveksi Contoh",
 		"city_code":     testCityCode,
 		"roles":         map[string]any{"buyer": true},
 	}, "")
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("register: status %d, body %s (kegagalan kirim tidak boleh membatalkan registrasi)", rec.Code, rec.Body.String())
+		t.Fatalf("register: status %d, body %s", rec.Code, rec.Body.String())
 	}
 
-	// The sends run in goroutines (R-09), so poll briefly for both attempts.
-	deadline := time.Now().Add(2 * time.Second)
-	for {
-		emailCalls, phoneCalls, emailTo, phoneTo := delivery.snapshot()
-		if emailCalls >= 1 && phoneCalls >= 1 {
-			if emailTo != "gagal@example.com" {
-				t.Fatalf("email dikirim ke %q, mau gagal@example.com", emailTo)
-			}
-			// Registration normalizes the phone (drops the '+') before insert to
-			// satisfy phone_format, and delivery sends the stored value.
-			if phoneTo != "6281311112222" {
-				t.Fatalf("kode HP dikirim ke %q", phoneTo)
-			}
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("registrasi tidak memicu kedua kanal: email=%d phone=%d", emailCalls, phoneCalls)
-		}
-		time.Sleep(10 * time.Millisecond)
+	ctx := context.Background()
+	var codeRows int
+	if err := h.pool.QueryRow(ctx,
+		`SELECT count(*) FROM verification_code vc
+		 JOIN user_account ua ON ua.id = vc.account_id
+		 WHERE ua.email = $1`, "tanpa-kode@example.com").Scan(&codeRows); err != nil {
+		t.Fatalf("hitung kode verifikasi: %v", err)
+	}
+	if codeRows != 0 {
+		t.Fatalf("baris kode verifikasi = %d, mau 0 sebelum login", codeRows)
 	}
 
-	// The account survived the failed sends: login and GET /me work.
+	select {
+	case code := <-h.delivery.emailCh:
+		t.Fatalf("kode email terkirim setelah register: %q", code)
+	case <-time.After(250 * time.Millisecond):
+	}
+	select {
+	case code := <-h.delivery.phoneCh:
+		t.Fatalf("kode WhatsApp terkirim setelah register: %q", code)
+	case <-time.After(250 * time.Millisecond):
+	}
+}
+
+// TestLoginThenResendCode_SendsVerificationCodes_FR002 proves the verification
+// flow starts after login: resend-code issues and delivers both channel codes
+// only once the account has a session. FR-002.
+func TestLoginThenResendCode_SendsVerificationCodes_FR002(t *testing.T) {
+	h := newHarness(t, "login_resend_delivery")
+	rec := h.do("POST", "/api/auth/register", map[string]any{
+		"email": "setelah-login@example.com", "phone": "+6281311113333", "password": "rahasia123",
+		"business_name": "Konveksi Contoh",
+		"city_code":     testCityCode,
+		"roles":         map[string]any{"buyer": true},
+	}, "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("register: status %d, body %s", rec.Code, rec.Body.String())
+	}
 	rec = h.do("POST", "/api/auth/login", map[string]any{
-		"email": "gagal@example.com", "password": "rahasia123",
+		"email": "setelah-login@example.com", "password": "rahasia123",
 	}, "")
 	if rec.Code != http.StatusOK {
-		t.Fatalf("login setelah kirim gagal: status %d, body %s", rec.Code, rec.Body.String())
+		t.Fatalf("login: status %d, body %s", rec.Code, rec.Body.String())
+	}
+	cookie := sessionCookie(rec)
+
+	for _, tc := range []struct {
+		target  string
+		channel string
+		wait    func(*testing.T) string
+	}{
+		{target: "setelah-login@example.com", channel: "email", wait: h.delivery.waitEmail},
+		{target: "6281311113333", channel: "whatsapp", wait: h.delivery.waitPhone},
+	} {
+		rec = h.do("POST", "/api/auth/resend-code", map[string]any{
+			"target": tc.target, "channel": tc.channel,
+		}, cookie)
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("resend %s: status %d, body %s", tc.channel, rec.Code, rec.Body.String())
+		}
+		if code := tc.wait(t); !codeRe.MatchString(code) {
+			t.Fatalf("kode %s = %q, mau enam digit", tc.channel, code)
+		}
 	}
 }
 

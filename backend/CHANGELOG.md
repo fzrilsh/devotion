@@ -7,6 +7,7 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Registrasi kini hanya membuat akun dan profil tanpa menerbitkan atau mengirim OTP. Kode verifikasi diminta setelah pengguna masuk melalui alur kirim ulang, sehingga sesi login sudah tersedia saat email dan WhatsApp diverifikasi (FR-001, FR-002).
 - Pelaporan Sentry kini benar-benar menangkap panic HTTP dan galat internal 500, bukan hanya menginisialisasi SDK tanpa pernah mengirim event. Panic tetap dibalas sebagai `problem+json` generik, sementara event membawa `request_id` yang sama dengan log dan seluruh field sensitif tetap dibuang oleh allowlist (FR-082). Jalur capture memakai scope terisolasi per event agar request bersamaan tidak saling menukar korelasi.
 - `openapi.yaml` pada `POST /admin/disputes/{disputeId}/resolve` kini menyatakan
   syarat bersyarat yang selama ini hanya hidup di `mediation.go:301-319`:
@@ -462,16 +463,13 @@ perubahannya.
   `APP_ENV=development` saja, kode verifikasi plaintext ikut dicatat ke `slog`
   karena kode hanya disimpan sebagai hash dan pengembangan lokal tidak punya
   cara lain membacanya; ini tidak pernah aktif di produksi. (FR-001, FR-002, R-09)
-- `POST /api/auth/register` sekarang benar-benar mengirim kode verifikasi email
-  dan nomor. Sebelumnya `account.New` dipasang dengan `delivery` nil di
-  `serve.go`, jadi kode dibuat dan di-hash tapi tidak pernah diserahkan ke
-  transport mana pun, sehingga email lewat Mailjet tidak keluar meski kredensial
-  sudah diatur. Ditambahkan adapter `notification.CodeDelivery` yang memakai
-  transport email (SMTP Mailjet) dan WhatsApp yang sama dengan job notifikasi,
-  tapi di luar antrean (kode sekali pakai tidak menulis baris notifikasi in-app).
-  Pengiriman tetap best effort: transport nil atau gagal kirim tidak menggagalkan
-  registrasi yang sudah tersimpan. Manajer WhatsApp dan sender email kini dibangun
-  sebelum `account.New` agar bisa dibagi. (FR-001)
+- Adapter `notification.CodeDelivery` ditambahkan untuk mengirim kode verifikasi
+  melalui transport email (SMTP Mailjet) dan WhatsApp yang sama dengan job
+  notifikasi, tetapi di luar antrean karena kode sekali pakai tidak menulis baris
+  notifikasi in-app. Pengiriman dipakai oleh alur kirim ulang setelah pengguna
+  masuk dan pemulihan kata sandi, tetap best effort sehingga transport nil atau
+  gagal kirim tidak menggagalkan permintaan yang sudah diterima. Manajer WhatsApp
+  dan sender email dibangun sebelum `account.New` agar dapat dibagi. (FR-001)
 
 ### Ditambahkan
 - Subcommand `seed:test-data` dan `reset:test-data` (T075). `seed:test-data`
