@@ -657,7 +657,7 @@ sehingga jangkauannya terbatas dan tidak ada mekanisme matching sistematis [1].
 
 | # | Akun | Langkah | Hasil yang diharapkan | Apa yang terjadi |
 |---|------|---------|-----------------------|------------------|
-| 1.1 | publik | Daftar akun baru sebagai subkontraktor dengan email dan nomor HP Anda sendiri | Muncul permintaan memasukkan kode verifikasi untuk email dan nomor HP | |
+| 1.1 | publik | Daftar akun baru sebagai subkontraktor dengan email dan nomor HP Anda sendiri, lalu masuk | Setelah masuk, minta kode verifikasi email dan nomor HP | |
 | 1.2 | akun baru | Coba buka halaman pembuatan listing sebelum verifikasi selesai | Ditolak dengan penjelasan bahwa email dan nomor HP harus diverifikasi lebih dulu | |
 | 1.3 | `budi@contoh.test` | Buka halaman listing kapasitas | Terlihat kapasitas mingguan, jeda kesiapan mulai, jenis produk, dan jenis mesin | |
 | 1.4 | `budi@contoh.test` | Perhatikan kolom jenis produk | Hanya dapat memilih dari daftar yang tersedia; tidak dapat menaip nama sendiri | |
