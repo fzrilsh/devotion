@@ -16,6 +16,7 @@ type incomingResp struct {
 		CandidateID     string      `json:"candidate_id"`
 		ListingID       string      `json:"listing_id"`
 		ProfileID       string      `json:"profile_id"`
+		ProductItemID   string      `json:"product_item_id"`
 		BusinessName    string      `json:"business_name"`
 		Status          string      `json:"status"`
 		Quantity        int32       `json:"quantity"`
@@ -57,6 +58,9 @@ func TestIncoming_ListsOwnCandidates_FR030(t *testing.T) {
 	if d.Items[0].CandidateID != uuidString(f.candidateID) {
 		t.Fatalf("candidate_id %q, mau %q", d.Items[0].CandidateID, uuidString(f.candidateID))
 	}
+	if d.Items[0].ProductItemID == "" {
+		t.Fatal("product_item_id kosong pada kandidat masuk")
+	}
 	if d.Items[0].Status != "awaiting_reply" {
 		t.Fatalf("status %q, mau awaiting_reply", d.Items[0].Status)
 	}
@@ -74,11 +78,12 @@ func TestIncomingDetail_LoadsWithoutListCache_FR030(t *testing.T) {
 	mustStatus(t, rec, http.StatusOK)
 
 	var got struct {
-		CandidateID string  `json:"candidate_id"`
-		Quantity    int32   `json:"quantity"`
-		Material    string  `json:"material"`
-		Deadline    string  `json:"deadline"`
-		Note        *string `json:"note"`
+		CandidateID   string  `json:"candidate_id"`
+		ProductItemID string  `json:"product_item_id"`
+		Quantity      int32   `json:"quantity"`
+		Material      string  `json:"material"`
+		Deadline      string  `json:"deadline"`
+		Note          *string `json:"note"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode candidate detail %q: %v", rec.Body.String(), err)
@@ -88,6 +93,9 @@ func TestIncomingDetail_LoadsWithoutListCache_FR030(t *testing.T) {
 	}
 	if got.Quantity != 50 || got.Deadline != deadlineParam(4) {
 		t.Fatalf("detail quantity/deadline = %d/%q, mau 50/%q", got.Quantity, got.Deadline, deadlineParam(4))
+	}
+	if got.ProductItemID == "" {
+		t.Fatal("product_item_id kosong pada detail kandidat")
 	}
 	if got.Material != "Katun combed 30s" {
 		t.Fatalf("material %q, mau Katun combed 30s", got.Material)
