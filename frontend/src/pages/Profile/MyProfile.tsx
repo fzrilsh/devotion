@@ -56,40 +56,36 @@ function AccountCard({ admin }: { admin?: boolean }) {
     ];
 
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Akun</h3>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-3 divide-y divide-slate-100">
                 {channels.map((channel) => (
-                    <div key={channel.key} className="rounded-xl border border-slate-200 bg-white p-4">
-                        <div className="flex items-center gap-3">
-                            <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
-                                <channel.icon className="size-4.5" aria-hidden />
+                    <div key={channel.key} className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
+                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-500">
+                            <channel.icon className="size-4" aria-hidden />
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-slate-800">{channel.title}</p>
+                            <p className="truncate text-xs text-slate-400">{channel.value || "Belum diisi"}</p>
+                        </div>
+
+                        {channel.verified ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-emerald-700">
+                                <LuCircleCheck className="size-3.5" aria-hidden />
+                                Terverifikasi
                             </span>
-
-                            <div className="min-w-0">
-                                <p className="text-sm font-bold text-slate-800">{channel.title}</p>
-                                <p className="truncate text-xs text-slate-400">{channel.value || "Belum diisi"}</p>
-                            </div>
-                        </div>
-
-                        <div className="mt-3 border-t border-slate-100 pt-3">
-                            {channel.verified ? (
-                                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
-                                    <LuCircleCheck className="size-3.5 shrink-0" aria-hidden />
-                                    Terverifikasi
-                                </span>
-                            ) : (
-                                <Link to={channel.to} state={channel.state} className="inline-flex w-full items-center justify-center rounded-lg bg-industrial-blue-500 px-4 py-2 text-xs font-bold text-white transition hover:bg-industrial-blue-600">
-                                    Verifikasi
-                                </Link>
-                            )}
-                        </div>
+                        ) : (
+                            <Link to={channel.to} state={channel.state} className="inline-flex shrink-0 items-center justify-center rounded-lg bg-industrial-blue-500 px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-industrial-blue-600">
+                                Verifikasi
+                            </Link>
+                        )}
                     </div>
                 ))}
             </div>
 
-            {admin ? <p className="mt-4 text-xs leading-5 text-slate-400">Akun admin tidak memiliki profil usaha. Verifikasi email dan nomor HP tetap diperlukan untuk keamanan akun.</p> : null}
+            {admin ? <p className="mt-3 text-xs leading-5 text-slate-400">Akun admin tidak memiliki profil usaha. Verifikasi email dan nomor HP tetap diperlukan untuk keamanan akun.</p> : null}
         </div>
     );
 }
@@ -511,51 +507,52 @@ export default function MyProfile() {
                     </form>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="grid grid-cols-1 gap-6 lg:col-span-3 lg:grid-cols-3">
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 items-start gap-6 lg:col-span-3 lg:grid-cols-3">
                         <AccountCard />
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Reputasi</h3>
 
                             {profile?.reputation ? (
-                                <div className="mt-4 space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <span className="grid size-11 place-items-center rounded-xl bg-amber-50 text-amber-500">
-                                            <LuStar className="size-5" aria-hidden />
+                                <div className="mt-3 grid grid-cols-2 gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-500">
+                                            <LuStar className="size-4" aria-hidden />
                                         </span>
 
                                         <div>
-                                            <p className="text-lg font-extrabold text-slate-900">{profile.reputation.average_rating != null ? Number(profile.reputation.average_rating).toFixed(1) : "-"}</p>
-                                            <p className="text-xs text-slate-400">{profile.reputation.review_count ?? 0} ulasan</p>
+                                            <p className="text-base font-extrabold text-slate-900">{profile.reputation.average_rating != null ? Number(profile.reputation.average_rating).toFixed(1) : "-"}</p>
+                                            <p className="text-[11px] text-slate-400">{profile.reputation.review_count ?? 0} ulasan</p>
                                         </div>
                                     </div>
 
-                                    <div className="rounded-xl bg-slate-50 p-3">
-                                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tingkat penyelesaian</p>
+                                    <div className="border-l border-slate-100 pl-3">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Penyelesaian</p>
 
                                         {profile.reputation.enough_data && profile.reputation.completion_rate != null ? (
-                                            <p className="mt-1 text-sm font-bold text-slate-800">{Math.round(profile.reputation.completion_rate)}%</p>
+                                            <p className="mt-1 text-base font-extrabold text-slate-800">{Math.round(profile.reputation.completion_rate)}%</p>
                                         ) : (
-                                            <p className="mt-1 text-sm text-slate-500">Belum cukup data untuk menampilkan tingkat penyelesaian.</p>
+                                            <p className="mt-1 text-xs leading-4 text-slate-500">Belum cukup data</p>
                                         )}
                                     </div>
                                 </div>
                             ) : (
-                                <p className="mt-3 text-sm text-slate-500">Belum ada reputasi. Selesaikan pesanan pertama Anda untuk mulai membangun reputasi.</p>
+                                <p className="mt-3 text-sm text-slate-500">Belum ada reputasi. Selesaikan pesanan pertama untuk mulai membangun reputasi.</p>
                             )}
                         </div>
 
-                        <div className="rounded-2xl border border-industrial-blue-500/20 bg-industrial-blue-500/5 p-6">
-                            <div className="flex items-center gap-3">
-                                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-industrial-blue-500 shadow-sm">
-                                    <LuShieldCheck className="size-5" aria-hidden />
+                        <div className="rounded-2xl border border-industrial-blue-500/20 bg-industrial-blue-500/5 p-5">
+                            <div className="flex items-start gap-3">
+                                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white text-industrial-blue-500 shadow-sm">
+                                    <LuShieldCheck className="size-4" aria-hidden />
                                 </span>
 
-                                <h3 className="text-sm font-bold text-slate-800">Profil yang lengkap lebih dipercaya</h3>
+                                <div>
+                                    <h3 className="text-sm font-bold leading-5 text-slate-800">Profil yang lengkap lebih dipercaya</h3>
+                                    <p className="mt-1.5 text-xs leading-5 text-slate-500">Isi deskripsi dan lokasi usaha agar calon mitra lebih yakin.</p>
+                                </div>
                             </div>
-
-                            <p className="mt-3 text-xs leading-5 text-slate-500">Isi deskripsi dan lokasi usaha Anda dengan lengkap. Mitra potensial melihat profil ini sebelum mengirim request kuota.</p>
                         </div>
                     </div>
 
