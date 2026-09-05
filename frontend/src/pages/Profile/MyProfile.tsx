@@ -512,38 +512,8 @@ export default function MyProfile() {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-2">
-                        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tentang Usaha</h3>
-
-                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{profile?.description || "Belum ada deskripsi. Ceritakan keahlian, jenis produk, dan kapasitas produksi usaha Anda agar calon mitra lebih percaya."}</p>
-
-                        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kota / Kabupaten</p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">{profile?.city_name || "-"}</p>
-                            </div>
-
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Provinsi</p>
-                                <p className="mt-1 text-sm font-semibold text-slate-800">{profile?.province_name || "-"}</p>
-                            </div>
-
-                            <div className="col-span-2">
-                                {profile?.latitude != null && profile?.longitude != null ? (
-                                    <LocationMap latitude={profile.latitude} longitude={profile.longitude} label={profile.business_name} />
-                                ) : (
-                                    <div className="flex h-80 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500">
-                                        Lokasi usaha belum ditandai. Tambahkan titik lokasi pada form edit profil agar calon mitra dapat melihat area usaha Anda.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 lg:col-span-3 lg:grid-cols-3">
                         <AccountCard />
-
-                        <RolesCard />
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-6">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Reputasi</h3>
@@ -587,6 +557,38 @@ export default function MyProfile() {
 
                             <p className="mt-3 text-xs leading-5 text-slate-500">Isi deskripsi dan lokasi usaha Anda dengan lengkap. Mitra potensial melihat profil ini sebelum mengirim request kuota.</p>
                         </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-6 lg:col-span-2">
+                        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Tentang Usaha</h3>
+
+                        <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{profile?.description || "Belum ada deskripsi. Ceritakan keahlian, jenis produk, dan kapasitas produksi usaha Anda agar calon mitra lebih percaya."}</p>
+
+                        <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kota / Kabupaten</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800">{profile?.city_name || "-"}</p>
+                            </div>
+
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Provinsi</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800">{profile?.province_name || "-"}</p>
+                            </div>
+
+                            <div className="col-span-2">
+                                {profile?.latitude != null && profile?.longitude != null ? (
+                                    <LocationMap latitude={profile.latitude} longitude={profile.longitude} label={profile.business_name} />
+                                ) : (
+                                    <div className="flex h-80 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 text-center text-sm text-slate-500">
+                                        Lokasi usaha belum ditandai. Tambahkan titik lokasi pada form edit profil agar calon mitra dapat melihat area usaha Anda.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <RolesCard />
                     </div>
                 </div>
             )}

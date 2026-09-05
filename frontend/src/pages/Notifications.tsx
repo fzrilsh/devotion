@@ -54,24 +54,24 @@ function NotificationItem({ notification, isBuyer }: { notification: Notificatio
     const link = getNotificationLink(notification, isBuyer);
 
     return (
-        <li className={cn("flex gap-4 rounded-2xl border p-4 transition-colors", notification.read ? "border-slate-200 bg-white" : "border-industrial-blue-500/20 bg-industrial-blue-500/5")}>
+        <li className={cn("flex min-w-0 gap-3 overflow-hidden rounded-2xl border p-4 transition-colors sm:gap-4", notification.read ? "border-slate-200 bg-white" : "border-industrial-blue-500/20 bg-industrial-blue-500/5")}>
             <span className={cn("grid size-11 shrink-0 place-items-center rounded-xl", meta.className)}>
                 <Icon className="size-5" aria-hidden />
             </span>
 
             <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+                    <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{meta.label}</p>
-                        <h3 className={cn("mt-0.5 truncate text-sm", notification.read ? "font-semibold text-slate-700" : "font-bold text-slate-900")}>{notification.title || meta.label}</h3>
+                        <h3 className={cn("mt-0.5 break-words text-sm", notification.read ? "font-semibold text-slate-700" : "font-bold text-slate-900")}>{notification.title || meta.label}</h3>
                     </div>
 
                     <span className="shrink-0 text-xs text-slate-400">{formatRelativeTime(notification.created_at)}</span>
                 </div>
 
-                {notification.body ? <p className="mt-1 text-sm leading-6 text-slate-500">{notification.body}</p> : null}
+                {notification.body ? <p className="mt-1 break-words text-sm leading-6 text-slate-500">{notification.body}</p> : null}
 
-                <div className="mt-3 flex items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                     {link ? (
                         <Link to={link.to} className="text-xs font-bold text-industrial-blue-500 transition-colors hover:text-industrial-blue-600">
                             {link.label}
