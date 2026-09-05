@@ -2,6 +2,7 @@ package search
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/fzrilsh/devotion/backend/internal/platform"
 	"github.com/fzrilsh/devotion/backend/internal/platform/httpx"
@@ -24,7 +25,7 @@ func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	q, verr := parseSearchQuery(r)
+	q, verr := parseSearchQuery(r, s.clock.Now())
 	if verr != nil {
 		httpx.WriteValidation(w, "Masukan tidak sah.", verr.fields)
 		return
@@ -37,13 +38,19 @@ func (s *Service) handleSearch(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+func calendarDate(now time.Time) time.Time {
+	year, month, day := now.In(platform.Jakarta).Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, platform.Jakarta)
+}
+
 // parseSearchQuery validates the raw query string into a searchQuery. It follows
 // the /search contract: product_item_id required uuid, machine_item_id optional
-// uuid, quantity >= 1, deadline required date, max_lead_days >= 0 default unset,
+// uuid, quantity >= 1, deadline required date that is today or later,
+// max_lead_days >= 0 default unset,
 // region_level enum with city_code/province_code required for their level,
 // cursor opaque, size 1..50 default 20. Every failure names its field so the
 // buyer sees which parameter to fix.
-func parseSearchQuery(r *http.Request) (searchQuery, *validationError) {
+func parseSearchQuery(r *http.Request, now time.Time) (searchQuery, *validationError) {
 	qv := r.URL.Query()
 	var fields []httpx.FieldError
 	var q searchQuery
@@ -76,6 +83,8 @@ func parseSearchQuery(r *http.Request) (searchQuery, *validationError) {
 		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Isi tenggat pesanan."})
 	} else if t, err := platform.ParseDate(raw); err != nil {
 		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Tenggat harus berformat YYYY-MM-DD."})
+	} else if t.Before(calendarDate(now)) {
+		fields = append(fields, httpx.FieldError{Field: "deadline", Message: "Tenggat tidak boleh berada di masa lampau."})
 	} else {
 		q.deadline = t
 	}
