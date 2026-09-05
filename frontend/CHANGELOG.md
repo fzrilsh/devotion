@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Melengkapi detail request masuk dengan jenis produk dari master data, jumlah, bahan, deadline produksi, kapasitas tersedia, dan catatan kebutuhan dalam field berlabel. Respons IncomingCandidate kini membawa `product_item_id`, lalu halaman menyelesaikan id tersebut ke nama produk melalui daftar master.
+
 * Melengkapi halaman detail pesanan dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Sebelumnya header hanya menampilkan jumlah dan deadline, sementara bahan belum tersedia pada respons pesanan. Tipe API diregenerasi setelah kontrak WorkOrderDetail diperluas.
 
 * Memperjelas halaman detail request terkirim. Jenis produk kini dicari dari daftar master, lalu jenis produk, jumlah, bahan, deadline produksi, waktu kirim, batas balasan, jumlah kandidat, dan catatan kebutuhan ditampilkan sebagai field berlabel, bukan digabung dalam judul atau teks kecil. Kartu kandidat juga menyebut "Jeda kesiapan" secara eksplisit dan menjelaskan ketika belum ada penawaran.
