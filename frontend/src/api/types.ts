@@ -3651,6 +3651,11 @@ export interface components {
             profile_id: string;
             business_name?: string;
             status: components["schemas"]["CandidateStatus"];
+            /**
+             * Format: uuid
+             * @description Produk dari daftar baku yang diminta pemesan.
+             */
+            product_item_id: string;
             /** @description Bahan yang diminta pemesan. */
             material: string;
             /** @description Catatan tambahan dari pemesan. */

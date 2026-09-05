@@ -1,5 +1,6 @@
 import type { Offer } from "@api/search";
 import Loading from "@components/common/Loading";
+import { useMasterProducts } from "@hooks/useListing";
 import { useAcceptOffer, useCounterOffer, useIncomingCandidate, useRejectCandidate, useReloadIncomingCandidate, useSendOffer, useSessionOffers } from "@hooks/useQuota";
 import { canAcceptOffer, canCounterOffer, canSendFirstOffer, isChainFromSessionOnly, isOfferChainMissing, isTerminalCandidate, isWaitingBuyer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { getProblem, getProblemMessage } from "@lib/problem";
@@ -58,6 +59,7 @@ export default function IncomingDetail() {
     const candidateId = stateCandidateId ?? paramCandidateId;
 
     const candidateQuery = useIncomingCandidate(candidateId);
+    const productsQuery = useMasterProducts();
     const reloadCandidate = useReloadIncomingCandidate(candidateId);
     const sessionOffers = useSessionOffers(candidateId);
 
@@ -109,6 +111,9 @@ export default function IncomingDetail() {
     }
 
     const candidate = candidateQuery.data;
+    const productName = productsQuery.isLoading
+        ? "Memuat jenis produk..."
+        : productsQuery.data?.find((product) => product.item_id === candidate.product_item_id)?.name ?? "Jenis produk tidak tersedia";
 
     const offers = resolveOfferChain(candidate, sessionOffers);
     const latest = latestOffer(offers);
@@ -237,19 +242,39 @@ export default function IncomingDetail() {
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">Detail Permintaan</h2>
 
-                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah &amp; Bahan</p>
-                        <p className="mt-1 text-lg font-extrabold text-slate-900">{candidate.quantity.toLocaleString("id-ID")} unit {candidate.material}</p>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jenis Produk</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{productName}</dd>
                     </div>
-
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Tenggat Pesanan</p>
-                        <p className="mt-1 text-lg font-extrabold text-slate-900">{formatDateShort(candidate.deadline)}</p>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{candidate.quantity.toLocaleString("id-ID")} unit</dd>
                     </div>
-                </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bahan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{candidate.material}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Deadline Produksi</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateShort(candidate.deadline)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Kapasitas Tersedia</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{candidate.capacity_in_range.toLocaleString("id-ID")} unit</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Kandidat</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{candidate.business_name || "Pemberi order"}</dd>
+                    </div>
+                </dl>
 
-                {candidate.note ? <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">{candidate.note}</p> : null}
+                {candidate.note ? (
+                    <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Catatan Kebutuhan</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{candidate.note}</p>
+                    </div>
+                ) : null}
 
                 <div className={cn("mt-4 flex items-start gap-3 rounded-xl border p-4", candidate.can_fulfill ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
                     {candidate.can_fulfill ? (
