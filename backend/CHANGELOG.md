@@ -7,6 +7,7 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Salinan OpenAPI yang disematkan kini disinkronkan kembali dengan kontrak utama setelah rilis. Perubahan ini menutup kegagalan pemeriksaan CI pada job verifikasi salinan `/docs`; tidak ada perubahan perilaku endpoint.
 - Endpoint pencarian kini menolak deadline produksi yang sudah lewat menurut tanggal Asia/Jakarta. Validasi memakai Clock yang diinjeksikan agar aturan dapat diuji deterministik, kontrak `/search` menjelaskan batasnya, dan test input invalid mencakup deadline lampau.
 - Detail request masuk kini membawa `product_item_id` dari request kuota pada endpoint daftar dan detail kandidat. Query sqlc, serializer, kontrak OpenAPI, salinan `/docs`, dan uji HTTP diperbarui agar subcontractor dapat menampilkan jenis produk yang diminta.
 - Detail pesanan kini membawa `material` dari request kuota. Query detail dan pembentukan work order saat kesepakatan diperbarui, kontrak OpenAPI serta salinan kontrak embedded disinkronkan, dan uji HTTP memastikan field bahan dikirim pada `WorkOrderDetail` (FR-038).
