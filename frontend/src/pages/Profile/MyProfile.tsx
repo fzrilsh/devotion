@@ -515,7 +515,7 @@ export default function MyProfile() {
                             <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Reputasi</h3>
 
                             {profile?.reputation ? (
-                                <div className="mt-3 grid grid-cols-2 gap-3">
+                                <div className="mt-3 space-y-3">
                                     <div className="flex items-center gap-2.5">
                                         <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-500">
                                             <LuStar className="size-4" aria-hidden />
@@ -527,13 +527,13 @@ export default function MyProfile() {
                                         </div>
                                     </div>
 
-                                    <div className="border-l border-slate-100 pl-3">
-                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Penyelesaian</p>
+                                    <div className="rounded-xl bg-slate-50 p-3">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Tingkat penyelesaian</p>
 
                                         {profile.reputation.enough_data && profile.reputation.completion_rate != null ? (
-                                            <p className="mt-1 text-base font-extrabold text-slate-800">{Math.round(profile.reputation.completion_rate)}%</p>
+                                            <p className="mt-1 text-sm font-bold text-slate-800">{Math.round(profile.reputation.completion_rate)}%</p>
                                         ) : (
-                                            <p className="mt-1 text-xs leading-4 text-slate-500">Belum cukup data</p>
+                                            <p className="mt-1 text-xs leading-4 text-slate-500">Belum cukup data untuk menampilkan tingkat penyelesaian.</p>
                                         )}
                                     </div>
                                 </div>
