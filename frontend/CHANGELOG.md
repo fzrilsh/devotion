@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Mencegah pencarian subkontraktor memakai deadline masa lampau. Input tanggal sekarang memiliki batas minimum tanggal hari ini di Asia/Jakarta, handler submit memvalidasi ulang nilai tersebut, dan helper tanggal beserta test ditambahkan.
+
 * Menyesuaikan kembali widget Profil Usaha. Reputasi kembali memakai dua baris, sementara widget atas mengikuti tinggi kontennya masing-masing agar banner kelengkapan tidak menyisakan ruang kosong. Layout mobile tetap tersusun vertikal.
 
 * Mengcompactkan widget Profil Usaha. Widget Akun kini memakai baris kanal yang ringkas, Reputasi menampilkan rating dan tingkat penyelesaian berdampingan, banner kelengkapan dipadatkan, dan grid memakai `items-start` agar kartu tidak dipaksa setinggi widget Akun.
