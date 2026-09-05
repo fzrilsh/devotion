@@ -1,4 +1,10 @@
-import { formatDateId, formatDateTimeId, formatRupiah, parseApiDate } from "./datetime";
+import { formatDateId, formatDateTimeId, formatRupiah, parseApiDate, todayJakarta } from "./datetime";
+
+describe("todayJakarta", () => {
+    it("menghasilkan tanggal dengan format YYYY-MM-DD", () => {
+        expect(todayJakarta()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+});
 
 describe("parseApiDate", () => {
     it("mengurai RFC 3339 dari backend", () => {

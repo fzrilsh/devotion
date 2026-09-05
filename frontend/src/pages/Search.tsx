@@ -5,6 +5,7 @@ import { useProfile } from "@hooks/useProfile";
 import { useSearch } from "@hooks/useQuota";
 import { useWilayah } from "@hooks/useWilayah";
 import { cn } from "@lib/utils";
+import { todayJakarta } from "@lib/datetime";
 import { useState } from "react";
 import { LuCheck, LuCircleAlert, LuMapPin, LuMaximize2, LuSearch, LuShieldCheck, LuStar, LuX } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
@@ -179,6 +180,7 @@ export default function Search() {
 
     const products = (productsQuery.data ?? []).filter((item) => item.active);
     const machines = (machinesQuery.data ?? []).filter((item) => item.active);
+    const minimumDeadline = todayJakarta();
 
     const cityName = profile?.city_code ? getCityName(profile.city_code) : "";
     const provinceName = profile?.province_code ? getProvinceName(profile.province_code) : "";
@@ -241,6 +243,11 @@ export default function Search() {
 
         if (!deadline) {
             setFormError("Tentukan tanggal deadline produksi.");
+            return;
+        }
+
+        if (deadline < minimumDeadline) {
+            setFormError("Deadline produksi tidak boleh berada di masa lampau.");
             return;
         }
 
@@ -337,7 +344,7 @@ export default function Search() {
                         <label htmlFor="deadline" className={labelClassName}>
                             Deadline Produksi <span className="text-red-500">*</span>
                         </label>
-                        <input id="deadline" type="date" value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClassName} />
+                        <input id="deadline" type="date" min={minimumDeadline} value={deadline} onChange={(event) => setDeadline(event.target.value)} className={inputClassName} />
                     </div>
 
                     <div>
