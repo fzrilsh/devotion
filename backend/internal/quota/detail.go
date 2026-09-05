@@ -82,6 +82,7 @@ func validCandidateStatus(raw string) bool {
 type detailCandidateView struct {
 	CandidateID     string      `json:"candidate_id"`
 	ListingID       string      `json:"listing_id"`
+	ProductItemID   string      `json:"product_item_id"`
 	ProfileID       string      `json:"profile_id"`
 	BusinessName    string      `json:"business_name"`
 	Status          string      `json:"status"`
@@ -119,6 +120,7 @@ type detailView struct {
 type incomingCandidateView struct {
 	CandidateID     string      `json:"candidate_id"`
 	ListingID       string      `json:"listing_id"`
+	ProductItemID   string      `json:"product_item_id"`
 	ProfileID       string      `json:"profile_id"`
 	BusinessName    string      `json:"business_name"`
 	Status          string      `json:"status"`
@@ -179,6 +181,7 @@ func (s *Service) requestDetail(ctx context.Context, accountID, requestID pgtype
 		view := detailCandidateView{
 			CandidateID:     uuidString(c.CandidateID),
 			ListingID:       uuidString(c.ListingID),
+			ProductItemID:   uuidString(c.ProductItemID),
 			ProfileID:       uuidString(c.SubcontractorID),
 			BusinessName:    c.BusinessName,
 			Status:          string(c.Status),
@@ -230,6 +233,7 @@ func (s *Service) incomingDetail(ctx context.Context, accountID, candidateID pgt
 	view := incomingCandidateView{
 		CandidateID:     uuidString(c.CandidateID),
 		ListingID:       uuidString(c.ListingID),
+		ProductItemID:   uuidString(c.ProductItemID),
 		ProfileID:       uuidString(c.SubcontractorID),
 		BusinessName:    c.BusinessName,
 		Status:          string(c.Status),
@@ -308,6 +312,7 @@ func (s *Service) listIncoming(ctx context.Context, accountID pgtype.UUID, q inc
 		item := incomingCandidateView{
 			CandidateID:     uuidString(c.CandidateID),
 			ListingID:       uuidString(c.ListingID),
+			ProductItemID:   uuidString(c.ProductItemID),
 			ProfileID:       uuidString(c.SubcontractorID),
 			BusinessName:    c.BusinessName,
 			Status:          string(c.Status),

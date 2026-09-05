@@ -2357,7 +2357,7 @@ components:
 
     IncomingCandidate:
       type: object
-      required: [candidate_id, listing_id, profile_id, status, quantity, material, deadline, capacity_in_range, can_fulfill]
+      required: [candidate_id, listing_id, profile_id, status, product_item_id, quantity, material, deadline, capacity_in_range, can_fulfill]
       properties:
         candidate_id: { type: string, format: uuid }
         listing_id: { type: string, format: uuid }
@@ -2367,6 +2367,10 @@ components:
           description: Profil pemesan yang mengirim permintaan ini.
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
+        product_item_id:
+          type: string
+          format: uuid
+          description: Produk dari daftar baku yang diminta pemesan.
         material:
           type: string
           description: Bahan yang diminta pemesan.

@@ -43,9 +43,10 @@ LIMIT $4;
 -- candidates group together deterministically.
 -- name: ListCandidatesByRequests :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
-       c.status, c.rejection_reason, p.business_name
+       c.status, c.rejection_reason, p.business_name, r.product_item_id
 FROM request_candidate c
 JOIN business_profile p ON p.id = c.subcontractor_id
+JOIN quota_request r ON r.id = c.request_id
 WHERE c.request_id = ANY($1::uuid[])
 ORDER BY c.request_id, c.id;
 
@@ -231,7 +232,7 @@ ORDER BY o.candidate_id, o.sequence ASC;
 -- name: GetIncomingCandidate :one
 SELECT c.id AS candidate_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.quantity, r.material, r.deadline, r.note,
+       r.product_item_id, r.quantity, r.material, r.deadline, r.note,
        l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
@@ -251,7 +252,7 @@ WHERE c.id = $1 AND owner.account_id = $2;
 -- name: ListIncomingCandidates :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.created_at, r.quantity, r.material, r.note, r.deadline,
+       r.product_item_id, r.created_at, r.quantity, r.material, r.note, r.deadline,
        l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
