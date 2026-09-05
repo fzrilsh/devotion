@@ -2406,6 +2406,9 @@ components:
         subcontractor_profile_id: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer }
+        material:
+          type: string
+          description: Bahan yang diminta pada request kuota.
         deadline: { type: string, format: date }
         total_price: { type: integer, format: int64 }
         readiness_lead_days: { type: integer }

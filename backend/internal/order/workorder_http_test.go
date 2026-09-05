@@ -98,6 +98,15 @@ func TestWorkOrderDetail_PartySeesOrder_FR038(t *testing.T) {
 	if body.SelfCancellable == nil {
 		t.Fatal("self_cancellable tidak ada di respons (FR-066)")
 	}
+	var detail struct {
+		Material string `json:"material"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &detail); err != nil {
+		t.Fatalf("decode material WorkOrderDetail %q: %v", rec.Body.String(), err)
+	}
+	if detail.Material != "Katun" {
+		t.Fatalf("material = %q, mau %q", detail.Material, "Katun")
+	}
 }
 
 // TestWorkOrderDetail_DatesAreISO_FR038_FR039 pins the wire format of every date
