@@ -753,6 +753,7 @@ paths:
         - name: deadline
           in: query
           required: true
+          description: Tidak boleh berada di masa lampau menurut tanggal Asia/Jakarta.
           schema: { type: string, format: date }
         - name: max_lead_days
           in: query
@@ -879,6 +880,22 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotaRequestDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /candidates/{candidateId}:
+    get:
+      tags: [request]
+      summary: Detail request kuota yang masuk ke kandidat saya
+      description: Memuat detail kandidat dan seluruh riwayat penawarannya tanpa bergantung pada daftar yang sudah dibuka (FR-030, FR-031).
+      x-fr: [FR-030, FR-031]
+      parameters:
+        - { name: candidateId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IncomingCandidate' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -2341,7 +2358,7 @@ components:
 
     IncomingCandidate:
       type: object
-      required: [candidate_id, listing_id, profile_id, status, quantity, material, deadline, capacity_in_range, can_fulfill]
+      required: [candidate_id, listing_id, profile_id, status, product_item_id, quantity, material, deadline, capacity_in_range, can_fulfill]
       properties:
         candidate_id: { type: string, format: uuid }
         listing_id: { type: string, format: uuid }
@@ -2351,6 +2368,10 @@ components:
           description: Profil pemesan yang mengirim permintaan ini.
         business_name: { type: string }
         status: { $ref: '#/components/schemas/CandidateStatus' }
+        product_item_id:
+          type: string
+          format: uuid
+          description: Produk dari daftar baku yang diminta pemesan.
         material:
           type: string
           description: Bahan yang diminta pemesan.
@@ -2398,7 +2419,7 @@ components:
 
     WorkOrderDetail:
       type: object
-      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, deadline, allowed_transitions, self_cancellable, can_record_payment, can_review, payment_mismatch]
+      required: [work_order_id, status, buyer_profile_id, subcontractor_profile_id, quantity, material, deadline, allowed_transitions, self_cancellable, can_record_payment, can_review, payment_mismatch]
       properties:
         work_order_id: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/WorkOrderStatus' }
@@ -2406,6 +2427,9 @@ components:
         subcontractor_profile_id: { type: string, format: uuid }
         product_item_id: { type: string, format: uuid }
         quantity: { type: integer }
+        material:
+          type: string
+          description: Bahan yang diminta pada request kuota.
         deadline: { type: string, format: date }
         total_price: { type: integer, format: int64 }
         readiness_lead_days: { type: integer }

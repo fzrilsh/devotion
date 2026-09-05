@@ -4,6 +4,24 @@
 
 ### Diperbaiki
 
+* Mencegah pencarian subkontraktor memakai deadline masa lampau. Input tanggal sekarang memiliki batas minimum tanggal hari ini di Asia/Jakarta, handler submit memvalidasi ulang nilai tersebut, dan helper tanggal beserta test ditambahkan.
+
+* Menyesuaikan kembali widget Profil Usaha. Reputasi kembali memakai dua baris, sementara widget atas mengikuti tinggi kontennya masing-masing agar banner kelengkapan tidak menyisakan ruang kosong. Layout mobile tetap tersusun vertikal.
+
+* Mengcompactkan widget Profil Usaha. Widget Akun kini memakai baris kanal yang ringkas, Reputasi menampilkan rating dan tingkat penyelesaian berdampingan, banner kelengkapan dipadatkan, dan grid memakai `items-start` agar kartu tidak dipaksa setinggi widget Akun.
+
+* Memperbaiki tampilan responsif halaman notifikasi pada layar mobile. Kartu kini membatasi lebar konten, memecah judul dan isi yang panjang, serta membungkus aksi dan waktu agar tidak melewati viewport.
+
+* Mendesain ulang layout Profil Usaha pada desktop. Widget Akun, Reputasi, dan kelengkapan profil kini tampil horizontal di bagian atas, sedangkan Tentang Usaha berada di kolom utama dan Peran Usaha di kolom kanan. Pada mobile seluruh bagian tetap tersusun vertikal.
+
+* Melengkapi halaman detail pesanan admin dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Halaman admin tetap baca saja dan tidak mengambil kontak pihak karena admin bukan pihak transaksi.
+
+* Melengkapi detail request masuk dengan jenis produk dari master data, jumlah, bahan, deadline produksi, kapasitas tersedia, dan catatan kebutuhan dalam field berlabel. Respons IncomingCandidate kini membawa `product_item_id`, lalu halaman menyelesaikan id tersebut ke nama produk melalui daftar master.
+
+* Melengkapi halaman detail pesanan dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Sebelumnya header hanya menampilkan jumlah dan deadline, sementara bahan belum tersedia pada respons pesanan. Tipe API diregenerasi setelah kontrak WorkOrderDetail diperluas.
+
+* Memperjelas halaman detail request terkirim. Jenis produk kini dicari dari daftar master, lalu jenis produk, jumlah, bahan, deadline produksi, waktu kirim, batas balasan, jumlah kandidat, dan catatan kebutuhan ditampilkan sebagai field berlabel, bukan digabung dalam judul atau teks kecil. Kartu kandidat juga menyebut "Jeda kesiapan" secara eksplisit dan menjelaskan ketika belum ada penawaran.
+
 * Alur request masuk subkontraktor diperbaiki pada empat titik. Pertama, halaman detail kandidat tidak lagi bergantung pada cache daftar: `useIncomingCandidate` kini memuat langsung dari endpoint baru `GET /candidates/{candidateId}` (dikontrak dan diimplementasikan backend di branch backend), sehingga tautan dari notifikasi maupun refresh browser selalu bisa memuat detail, bukan lagi menampilkan pesan "Kandidat belum dibuka dari daftar request masuk". Kedua, halaman `IncomingDetail.tsx` kini merender detail permintaan dari pembeli yang selama ini tidak tampil di sisi subkontraktor: jumlah dan bahan, tenggat pesanan, catatan pembeli, penilaian kapasitas `capacity_in_range`/`can_fulfill` dengan penjelasan bahasa Indonesia, dan alasan penolakan. Ketiga, setelah menolak kandidat, `useRejectCandidate` kini me-refetch daftar request masuk lalu detail kandidat secara eksplisit, sehingga halaman langsung berubah menjadi status "Ditolak" tanpa perlu refresh manual. Keempat, tipe `src/api/types.ts` diregenerasi dari `openapi.yaml` yang memuat endpoint baru dan field `material`/`note` pada `IncomingCandidate`. Tes baru di `useQuota.test.tsx` (FR-030, FR-031) memuat kandidat tanpa daftar tersimpan dan memverifikasi refetch pasca penolakan; tes tautan notifikasi (`notificationLinks.test.ts`, FR-033) mematok pemetaan tautan `/requests/incoming/{candidateId}` ke rute request masuk dengan label yang benar.
 
 * Menambahkan `UnverifiedRoute` untuk halaman `/auth/verify-email` dan `/auth/verify-phone`. Sesi yang belum terbaca menampilkan loading, pengguna yang belum masuk diarahkan ke login, akun dengan setidaknya satu kanal belum terverifikasi tetap dapat memasukkan OTP, dan akun yang sudah memverifikasi email serta nomor telepon diarahkan ke `/profile/me` tanpa menampilkan formulir yang sudah tidak diperlukan.

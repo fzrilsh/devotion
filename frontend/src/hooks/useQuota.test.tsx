@@ -25,6 +25,7 @@ function candidate(id: string, status: CandidateStatus): IncomingCandidate {
         candidate_id: id,
         listing_id: "11111111-1111-4111-8111-111111111111",
         profile_id: "22222222-2222-4222-8222-222222222222",
+        product_item_id: "33333333-3333-4333-8333-333333333333",
         business_name: "Konveksi Contoh",
         status,
         material: "Katun combed 30s",

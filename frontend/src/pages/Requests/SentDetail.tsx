@@ -1,5 +1,6 @@
 import type { Offer, RequestCandidate } from "@api/search";
 import Loading from "@components/common/Loading";
+import { useMasterProducts } from "@hooks/useListing";
 import { useAcceptOffer, useCounterOffer, useQuotaRequest } from "@hooks/useQuota";
 import { canAcceptOffer, latestOffer, resolveOfferChain } from "@lib/offers";
 import { getProblemMessage } from "@lib/problem";
@@ -86,9 +87,11 @@ function CandidateCard({ candidate, agreed, onAccept, accepting }: { candidate: 
                 {latest ? (
                     <div className="text-right">
                         <p className="text-lg font-extrabold tabular-nums text-slate-900">{formatRupiah(latest.total_price)}</p>
-                        <p className="text-xs text-slate-400">kesiapan {latest.readiness_lead_days} hari</p>
+                        <p className="text-xs text-slate-400">Jeda kesiapan {latest.readiness_lead_days} hari</p>
                     </div>
-                ) : null}
+                ) : (
+                    <p className="text-right text-xs text-slate-400">Jeda kesiapan belum ditawarkan</p>
+                )}
             </div>
 
             <OfferHistory offers={offers} />
@@ -157,6 +160,7 @@ export default function SentDetail() {
     const { requestId = "" } = useParams();
     const navigate = useNavigate();
     const requestQuery = useQuotaRequest(requestId);
+    const productsQuery = useMasterProducts();
 
     // Gunakan satu mutasi penerimaan untuk seluruh request. Saat satu kandidat
     // diterima, pesanan bersama dibuat, semua kartu kandidat dinonaktifkan,
@@ -181,6 +185,9 @@ export default function SentDetail() {
     }
 
     const request = requestQuery.data;
+    const productName = productsQuery.isLoading
+        ? "Memuat jenis produk..."
+        : productsQuery.data?.find((product) => product.item_id === request.product_item_id)?.name ?? "Jenis produk tidak tersedia";
     const agreedCandidate = request.candidates.find((candidate) => candidate.status === "agreed");
     const agreedOrder = acceptMutation.data;
 
@@ -202,26 +209,52 @@ export default function SentDetail() {
                     </span>
 
                     <div className="min-w-0 flex-1">
-                        <p className="text-lg font-extrabold text-slate-900">
-                            {request.quantity.toLocaleString("id-ID")} unit {request.material}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-400">
-                            Deadline {formatDateShort(request.deadline)} · Dikirim {formatDateShort(request.created_at)}
-                        </p>
-                        {request.note ? <p className="mt-2 text-sm leading-6 text-slate-600">{request.note}</p> : null}
+                        <p className="text-lg font-extrabold text-slate-900">Detail permintaan kuota</p>
+                        <p className="mt-0.5 text-xs text-slate-400">Informasi yang Anda kirim ke kandidat terpilih</p>
                     </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5">
-                        <LuClock className="size-3.5" aria-hidden />
-                        Batas balasan {formatDateTimeId(request.expires_at)}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <LuHourglass className="size-3.5" aria-hidden />
-                        {request.candidates.length} kandidat tujuan
-                    </span>
+                <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jenis Produk</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{productName}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Jumlah</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{request.quantity.toLocaleString("id-ID")} unit</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Bahan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{request.material}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Deadline Produksi</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateShort(request.deadline)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Dikirim</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-900">{formatDateShort(request.created_at)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">Batas Balasan</dt>
+                        <dd className="mt-1 flex items-center gap-1.5 text-sm font-bold text-slate-900">
+                            <LuClock className="size-3.5 text-slate-400" aria-hidden />
+                            {formatDateTimeId(request.expires_at)}
+                        </dd>
+                    </div>
+                </dl>
+
+                <div className="mt-5 flex items-center gap-1.5 border-t border-slate-100 pt-4 text-sm text-slate-600">
+                    <LuHourglass className="size-4 text-slate-400" aria-hidden />
+                    <span><strong className="font-bold text-slate-900">{request.candidates.length}</strong> kandidat tujuan</span>
                 </div>
+
+                {request.note ? (
+                    <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Catatan Kebutuhan</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">{request.note}</p>
+                    </div>
+                ) : null}
             </div>
 
             {agreedOrder ? (

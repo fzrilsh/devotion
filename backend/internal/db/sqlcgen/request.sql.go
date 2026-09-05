@@ -153,7 +153,7 @@ func (q *Queries) GetCandidateListings(ctx context.Context, dollar_1 []pgtype.UU
 const getIncomingCandidate = `-- name: GetIncomingCandidate :one
 SELECT c.id AS candidate_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.quantity, r.material, r.deadline, r.note,
+       r.product_item_id, r.quantity, r.material, r.deadline, r.note,
        l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
@@ -175,6 +175,7 @@ type GetIncomingCandidateRow struct {
 	Status            CandidateStatus
 	RejectionReason   pgtype.Text
 	BusinessName      string
+	ProductItemID     pgtype.UUID
 	Quantity          int32
 	Material          string
 	Deadline          pgtype.Date
@@ -199,6 +200,7 @@ func (q *Queries) GetIncomingCandidate(ctx context.Context, arg GetIncomingCandi
 		&i.Status,
 		&i.RejectionReason,
 		&i.BusinessName,
+		&i.ProductItemID,
 		&i.Quantity,
 		&i.Material,
 		&i.Deadline,
@@ -427,9 +429,10 @@ func (q *Queries) InsertRequestCandidate(ctx context.Context, arg InsertRequestC
 
 const listCandidatesByRequests = `-- name: ListCandidatesByRequests :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
-       c.status, c.rejection_reason, p.business_name
+       c.status, c.rejection_reason, p.business_name, r.product_item_id
 FROM request_candidate c
 JOIN business_profile p ON p.id = c.subcontractor_id
+JOIN quota_request r ON r.id = c.request_id
 WHERE c.request_id = ANY($1::uuid[])
 ORDER BY c.request_id, c.id
 `
@@ -442,6 +445,7 @@ type ListCandidatesByRequestsRow struct {
 	Status          CandidateStatus
 	RejectionReason pgtype.Text
 	BusinessName    string
+	ProductItemID   pgtype.UUID
 }
 
 // ListCandidatesByRequests returns every candidate of the given requests, joined
@@ -464,6 +468,7 @@ func (q *Queries) ListCandidatesByRequests(ctx context.Context, dollar_1 []pgtyp
 			&i.Status,
 			&i.RejectionReason,
 			&i.BusinessName,
+			&i.ProductItemID,
 		); err != nil {
 			return nil, err
 		}
@@ -521,7 +526,7 @@ func (q *Queries) ListCandidatesToExpire(ctx context.Context, beforeCutoff pgtyp
 const listIncomingCandidates = `-- name: ListIncomingCandidates :many
 SELECT c.id AS candidate_id, c.request_id, c.listing_id, c.subcontractor_id,
        c.status, c.rejection_reason, p.business_name,
-       r.created_at, r.quantity, r.material, r.note, r.deadline,
+       r.product_item_id, r.created_at, r.quantity, r.material, r.note, r.deadline,
        l.weekly_capacity, l.readiness_lead_days, l.horizon_until
 FROM request_candidate c
 JOIN capacity_listing l ON l.id = c.listing_id
@@ -551,6 +556,7 @@ type ListIncomingCandidatesRow struct {
 	Status            CandidateStatus
 	RejectionReason   pgtype.Text
 	BusinessName      string
+	ProductItemID     pgtype.UUID
 	CreatedAt         pgtype.Timestamptz
 	Quantity          int32
 	Material          string
@@ -592,6 +598,7 @@ func (q *Queries) ListIncomingCandidates(ctx context.Context, arg ListIncomingCa
 			&i.Status,
 			&i.RejectionReason,
 			&i.BusinessName,
+			&i.ProductItemID,
 			&i.CreatedAt,
 			&i.Quantity,
 			&i.Material,

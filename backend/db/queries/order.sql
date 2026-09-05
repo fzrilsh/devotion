@@ -49,6 +49,7 @@ SELECT
     r.id                        AS request_id,
     r.buyer_id,
     r.product_item_id,
+    r.material,
     r.quantity,
     r.deadline,
     r.reply_due_at,
@@ -197,6 +198,7 @@ SELECT
     buyer.account_id AS buyer_account,
     sub.account_id   AS subcontractor_account,
     r.product_item_id,
+    r.material,
     o.readiness_lead_days,
     EXISTS (
         SELECT 1 FROM dispute d
