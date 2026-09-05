@@ -276,6 +276,7 @@ SELECT
     r.id                        AS request_id,
     r.buyer_id,
     r.product_item_id,
+    r.material,
     r.quantity,
     r.deadline,
     r.reply_due_at,
@@ -310,6 +311,7 @@ type GetOfferForAcceptRow struct {
 	RequestID            pgtype.UUID
 	BuyerID              pgtype.UUID
 	ProductItemID        pgtype.UUID
+	Material             string
 	Quantity             int32
 	Deadline             pgtype.Date
 	ReplyDueAt           pgtype.Timestamptz
@@ -342,6 +344,7 @@ func (q *Queries) GetOfferForAccept(ctx context.Context, id pgtype.UUID) (GetOff
 		&i.RequestID,
 		&i.BuyerID,
 		&i.ProductItemID,
+		&i.Material,
 		&i.Quantity,
 		&i.Deadline,
 		&i.ReplyDueAt,
@@ -454,6 +457,7 @@ SELECT
     buyer.account_id AS buyer_account,
     sub.account_id   AS subcontractor_account,
     r.product_item_id,
+    r.material,
     o.readiness_lead_days,
     EXISTS (
         SELECT 1 FROM dispute d
@@ -490,6 +494,7 @@ type GetWorkOrderForViewRow struct {
 	BuyerAccount         pgtype.UUID
 	SubcontractorAccount pgtype.UUID
 	ProductItemID        pgtype.UUID
+	Material             string
 	ReadinessLeadDays    int32
 	HasOpenDispute       bool
 }
@@ -527,6 +532,7 @@ func (q *Queries) GetWorkOrderForView(ctx context.Context, id pgtype.UUID) (GetW
 		&i.BuyerAccount,
 		&i.SubcontractorAccount,
 		&i.ProductItemID,
+		&i.Material,
 		&i.ReadinessLeadDays,
 		&i.HasOpenDispute,
 	)
