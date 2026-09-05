@@ -4,6 +4,10 @@
 
 ### Diperbaiki
 
+* Memperbaiki tampilan responsif halaman notifikasi pada layar mobile. Kartu kini membatasi lebar konten, memecah judul dan isi yang panjang, serta membungkus aksi dan waktu agar tidak melewati viewport.
+
+* Mendesain ulang layout Profil Usaha pada desktop. Widget Akun, Reputasi, dan kelengkapan profil kini tampil horizontal di bagian atas, sedangkan Tentang Usaha berada di kolom utama dan Peran Usaha di kolom kanan. Pada mobile seluruh bagian tetap tersusun vertikal.
+
 * Melengkapi halaman detail pesanan admin dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Halaman admin tetap baca saja dan tidak mengambil kontak pihak karena admin bukan pihak transaksi.
 
 * Melengkapi detail request masuk dengan jenis produk dari master data, jumlah, bahan, deadline produksi, kapasitas tersedia, dan catatan kebutuhan dalam field berlabel. Respons IncomingCandidate kini membawa `product_item_id`, lalu halaman menyelesaikan id tersebut ke nama produk melalui daftar master.
