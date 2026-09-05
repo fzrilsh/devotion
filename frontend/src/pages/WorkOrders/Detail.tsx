@@ -1,6 +1,7 @@
 import { ApiError } from "@api/client";
 import type { WorkOrderDetail } from "@api/workOrders";
 import Loading from "@components/common/Loading";
+import { useMasterProducts } from "@hooks/useListing";
 import PaymentMismatchNotice from "@components/common/PaymentMismatchNotice";
 import { useAuth } from "@hooks/useAuth";
 import { useCancelWorkOrder, useChangeWorkOrderStatus, useConfirmWorkOrder, useRecordPayment, useReportDispute, useSubmitReview, useWorkOrder, useWorkOrderContacts } from "@hooks/useWorkOrders";
@@ -132,6 +133,7 @@ export default function Detail() {
     const { workOrderId = "" } = useParams();
     const { user } = useAuth();
     const orderQuery = useWorkOrder(workOrderId);
+    const productsQuery = useMasterProducts();
 
     const changeStatus = useChangeWorkOrderStatus(workOrderId);
     const confirmOrder = useConfirmWorkOrder(workOrderId);
@@ -199,6 +201,9 @@ export default function Detail() {
     }
 
     const order: WorkOrderDetail = orderQuery.data;
+    const productName = productsQuery.isLoading
+        ? "Memuat jenis produk..."
+        : productsQuery.data?.find((product) => product.item_id === order.product_item_id)?.name ?? "Jenis produk tidak tersedia";
     const meta = workOrderStatusMeta[order.status];
     const side = getWorkOrderSide(order, user?.profile_id ?? null);
     const transitions = transitionsForSide(order.allowed_transitions ?? [], side);
@@ -230,8 +235,8 @@ export default function Detail() {
                         </span>
 
                         <div>
-                            <p className="text-lg font-extrabold text-slate-900">{order.quantity.toLocaleString("id-ID")} unit</p>
-                            <p className="mt-0.5 text-xs text-slate-400">Tenggat {formatDateId(order.deadline)}</p>
+                            <p className="text-lg font-extrabold text-slate-900">{productName}</p>
+                            <p className="mt-0.5 text-xs text-slate-400">{order.quantity.toLocaleString("id-ID")} unit · Deadline {formatDateId(order.deadline)}</p>
                         </div>
                     </div>
 
@@ -241,22 +246,36 @@ export default function Detail() {
                     </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-3">
+                <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-slate-100 pt-6 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Nilai Pesanan</p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">{formatRupiah(order.total_price)}</p>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Jenis Produk</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{productName}</dd>
                     </div>
-
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Jeda Kesiapan</p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">{order.readiness_lead_days != null ? `${order.readiness_lead_days} hari` : "-"}</p>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Jumlah</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{order.quantity.toLocaleString("id-ID")} unit</dd>
                     </div>
-
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tenggat Kesiapan</p>
-                        <p className="mt-1 text-sm font-bold text-slate-800">{formatDateId(order.readiness_deadline)}</p>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Bahan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{order.material || "-"}</dd>
                     </div>
-                </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Deadline Produksi</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{formatDateId(order.deadline)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Nilai Pesanan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{formatRupiah(order.total_price)}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Jeda Kesiapan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{order.readiness_lead_days != null ? `${order.readiness_lead_days} hari` : "-"}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tenggat Kesiapan</dt>
+                        <dd className="mt-1 text-sm font-bold text-slate-800">{formatDateId(order.readiness_deadline)}</dd>
+                    </div>
+                </dl>
             </div>
 
             {order.status === "shipped" && order.auto_confirm_at ? (
