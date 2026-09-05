@@ -579,6 +579,8 @@ func TestSearch_RejectsInvalidInput_FR022(t *testing.T) {
 			"&quantity=0&deadline=" + deadlineParam(4) + "&region_level=city&city_code=3273",
 		"bad deadline": "/api/search?product_item_id=" + uuidString(h.productID) +
 			"&quantity=1&deadline=bukan-tanggal&region_level=city&city_code=3273",
+		"past deadline": "/api/search?product_item_id=" + uuidString(h.productID) +
+			"&quantity=1&deadline=2026-08-02&region_level=city&city_code=3273",
 		"missing city_code": "/api/search?product_item_id=" + uuidString(h.productID) +
 			"&quantity=1&deadline=" + deadlineParam(4) + "&region_level=city",
 		"bad region_level": "/api/search?product_item_id=" + uuidString(h.productID) +

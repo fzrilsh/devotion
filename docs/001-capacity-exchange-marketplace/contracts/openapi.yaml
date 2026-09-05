@@ -753,6 +753,7 @@ paths:
         - name: deadline
           in: query
           required: true
+          description: Tidak boleh berada di masa lampau menurut tanggal Asia/Jakarta.
           schema: { type: string, format: date }
         - name: max_lead_days
           in: query
