@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Melengkapi halaman detail pesanan admin dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Halaman admin tetap baca saja dan tidak mengambil kontak pihak karena admin bukan pihak transaksi.
+
 * Melengkapi detail request masuk dengan jenis produk dari master data, jumlah, bahan, deadline produksi, kapasitas tersedia, dan catatan kebutuhan dalam field berlabel. Respons IncomingCandidate kini membawa `product_item_id`, lalu halaman menyelesaikan id tersebut ke nama produk melalui daftar master.
 
 * Melengkapi halaman detail pesanan dengan jenis produk dari master data, jumlah, bahan, deadline produksi, nilai pesanan, jeda kesiapan, dan tenggat kesiapan sebagai field berlabel. Sebelumnya header hanya menampilkan jumlah dan deadline, sementara bahan belum tersedia pada respons pesanan. Tipe API diregenerasi setelah kontrak WorkOrderDetail diperluas.
