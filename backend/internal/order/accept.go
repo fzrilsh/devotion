@@ -103,6 +103,7 @@ type workOrderView struct {
 	BuyerProfileID         string           `json:"buyer_profile_id"`
 	SubcontractorProfileID string           `json:"subcontractor_profile_id"`
 	ProductItemID          string           `json:"product_item_id,omitempty"`
+	Material               string           `json:"material,omitempty"`
 	Quantity               int32            `json:"quantity"`
 	Deadline               string           `json:"deadline"`
 	TotalPrice             int64            `json:"total_price"`
@@ -450,6 +451,7 @@ func (s *Service) accept(ctx context.Context, accountID, offerID pgtype.UUID) (w
 			BuyerProfileID:         uuidString(row.BuyerID),
 			SubcontractorProfileID: uuidString(row.SubcontractorID),
 			ProductItemID:          uuidString(row.ProductItemID),
+			Material:               row.Material,
 			Quantity:               wo.Quantity,
 			Deadline:               platform.FormatDate(wo.Deadline.Time),
 			TotalPrice:             wo.TotalPrice,

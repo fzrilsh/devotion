@@ -205,6 +205,7 @@ func (s *Service) buildDetailView(ctx context.Context, row sqlcgen.GetWorkOrderF
 		BuyerProfileID:         uuidString(row.BuyerID),
 		SubcontractorProfileID: uuidString(row.SubcontractorID),
 		ProductItemID:          uuidString(row.ProductItemID),
+		Material:               row.Material,
 		Quantity:               row.Quantity,
 		Deadline:               platform.FormatDate(row.Deadline.Time),
 		TotalPrice:             row.TotalPrice,
