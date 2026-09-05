@@ -4,6 +4,8 @@
 
 ### Diperbaiki
 
+* Menyesuaikan kembali widget Profil Usaha. Reputasi kembali memakai dua baris, sementara widget atas mengikuti tinggi kontennya masing-masing agar banner kelengkapan tidak menyisakan ruang kosong. Layout mobile tetap tersusun vertikal.
+
 * Mengcompactkan widget Profil Usaha. Widget Akun kini memakai baris kanal yang ringkas, Reputasi menampilkan rating dan tingkat penyelesaian berdampingan, banner kelengkapan dipadatkan, dan grid memakai `items-start` agar kartu tidak dipaksa setinggi widget Akun.
 
 * Memperbaiki tampilan responsif halaman notifikasi pada layar mobile. Kartu kini membatasi lebar konten, memecah judul dan isi yang panjang, serta membungkus aksi dan waktu agar tidak melewati viewport.
