@@ -7,6 +7,7 @@ perubahannya.
 ## [Belum dirilis]
 
 ### Diperbaiki
+- Kontrak OpenAPI menghapus definisi duplikat `GET /candidates/{candidateId}` yang membuat Swagger UI gagal mem-parsing `/docs/openapi.yaml`; salinan yang disematkan dan regresi parser ikut diperbarui.
 - Salinan OpenAPI yang disematkan kini disinkronkan kembali dengan kontrak utama setelah rilis. Perubahan ini menutup kegagalan pemeriksaan CI pada job verifikasi salinan `/docs`; tidak ada perubahan perilaku endpoint.
 - Endpoint pencarian kini menolak deadline produksi yang sudah lewat menurut tanggal Asia/Jakarta. Validasi memakai Clock yang diinjeksikan agar aturan dapat diuji deterministik, kontrak `/search` menjelaskan batasnya, dan test input invalid mencakup deadline lampau.
 - Detail request masuk kini membawa `product_item_id` dari request kuota pada endpoint daftar dan detail kandidat. Query sqlc, serializer, kontrak OpenAPI, salinan `/docs`, dan uji HTTP diperbarui agar subcontractor dapat menampilkan jenis produk yang diminta.
