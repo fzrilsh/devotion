@@ -202,7 +202,7 @@ Operasional platform, seluruhnya lewat antarmuka tanpa menyentuh database.
 
 ### Video Demo
 
-📹 **Link video demo: belum tersedia.**
+📹 **Link video demo: https://www.youtube.com/watch?v=u7FIAiUQOng**
 
 ---
 
