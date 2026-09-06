@@ -278,6 +278,8 @@ Satu batasan menentukan hampir semua pilihan: aturan panitia yang membatasi serv
 Backend  github.com/jackc/pgx/v5 v5.7.5
          github.com/golang-migrate/migrate/v4 v4.18.3
          golang.org/x/crypto v0.54.0
+         golang.org/x/term v0.45.0
+         google.golang.org/protobuf v1.36.11
          go.mau.fi/whatsmeow
          github.com/getsentry/sentry-go v0.35.3
 ```
@@ -889,7 +891,7 @@ Semua request memakai session cookie `httpOnly`, tanpa token di body response. P
 
 ### Endpoints
 
-Kontrak memuat **66 operasi pada 58 path**. Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
+Kontrak memuat **67 operasi pada 59 path**. Setiap pola `/api` wajib punya keputusan peran, publik atau bergerbang, dan `serve` menolak menyala bila ada satu pola tanpa keputusan itu.
 
 #### Authentication
 
@@ -927,6 +929,7 @@ GET /api/listing/me/periods           PUT  /api/listing/me/periods
 GET  /api/search
 POST /api/quota-requests              GET  /api/quota-requests
 GET  /api/quota-requests/incoming     GET  /api/quota-requests/{requestId}
+GET  /api/candidates/{candidateId}
 POST /api/candidates/{candidateId}/offers
 POST /api/candidates/{candidateId}/reject
 POST /api/offers/{offerId}/counter    POST /api/offers/{offerId}/accept
@@ -936,6 +939,7 @@ POST /api/offers/{offerId}/counter    POST /api/offers/{offerId}/accept
 
 ```http
 GET  /api/work-orders                 GET  /api/work-orders/{workOrderId}
+GET  /api/work-orders/{workOrderId}/contacts
 POST /api/work-orders/{workOrderId}/status
 POST /api/work-orders/{workOrderId}/confirm
 POST /api/work-orders/{workOrderId}/cancel
@@ -960,6 +964,7 @@ POST  /api/admin/disputes/{disputeId}/mediate
 POST  /api/admin/disputes/{disputeId}/resolve
 POST  /api/admin/reviews/{reviewId}/hide
 GET   /api/admin/whatsapp
+POST  /api/admin/whatsapp/reconnect
 ```
 
 ### Example Request
@@ -1081,49 +1086,31 @@ Integration test memakai schema terpisah pada service PostgreSQL yang sama, buka
 ---
 ### Test Coverage
 
-Hasil eksekusi pada branch `staging`, commit `8f7bb51`, Go 1.25.0 dengan `DATABASE_URL_TEST` aktif.
+Angka di bawah diverifikasi terhadap tree ini, bukan disalin dari commit historis.
 
 **Backend (Go)**
 
 ```text
-Statements   : 68.1% (kode aplikasi, 3.546/5.204)
-             : 55.4% (termasuk sqlcgen hasil generate)
-Packages     : 23 ok, 0 gagal
-Test files   : 75 file, 419 fungsi Test
-go vet       : lulus, tanpa temuan
+Go packages   : 29
+Test files    : 75
+Test functions: 427
+go test ./...  : lulus
+go vet ./...   : lulus
 ```
 
 **Frontend (TypeScript)**
 
 ```text
-Statements   : 76.87% (768/999)
-Branches     : 58.42% (312/534)
-Functions    : 64.91% (161/248)
-Lines        : 77.31% (702/908)
+Statements   : 76.41%
+Branches     : 57.70%
+Functions    : 63.67%
+Lines        : 77.22%
 Test suites  : 26 lulus, 159 test lulus
 ESLint       : lulus, tanpa error
-tsc + build  : lulus (TypeScript 5.8, 723 modul)
+tsc + build  : lulus (TypeScript 5.8, 750 modul ditransformasi)
 ```
 
-Angka backend disajikan dua kali dengan alasan: `internal/db/sqlcgen` berisi 1.132 statement hasil generate sqlc yang tidak pernah dipanggil langsung oleh test, dan menyertakannya menurunkan angka tanpa menambah informasi. **68,1%** adalah coverage kode yang benar-benar ditulis tim.
-
-**Coverage per paket backend, lima tertinggi dan tiga terendah**
-
-| Paket | Coverage |
-|---|---|
-| `apidocs` | 100,0% |
-| `platform/health` | 97,9% |
-| `platform/cloudflare` | 95,0% |
-| `platform/config` | 91,3% |
-| `platform/httpx` | 90,1% |
-| `internal/quota` | 81,9% |
-| `internal/search` | 80,2% |
-| ... | ... |
-| `internal/admin` | 50,9% |
-| `platform/scheduler` | 43,3% |
-| `cmd/devotion` | 34,7% |
-
-Tiga paket terbawah memang bukan target utama: `cmd/devotion` sebagian besar wiring subcommand, `scheduler` diverifikasi lewat integration test pada domain yang dipicunya, dan `admin` sebagian besar CRUD tipis di atas query yang sudah teruji di paketnya masing-masing.
+Coverage frontend dijalankan dengan `npm run test:coverage -- --runInBand --testTimeout=30000`. Pengujian backend dijalankan dengan `go test ./... -p 1`, dan pengujian integrasi memakai `DATABASE_URL_TEST` seperti pada perintah di atas.
 
 ---
 
