@@ -883,22 +883,6 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
-  /candidates/{candidateId}:
-    get:
-      tags: [request]
-      summary: Detail request kuota yang masuk ke kandidat saya
-      description: Memuat detail kandidat dan seluruh riwayat penawarannya tanpa bergantung pada daftar yang sudah dibuka (FR-030, FR-031).
-      x-fr: [FR-030, FR-031]
-      parameters:
-        - { name: candidateId, in: path, required: true, schema: { type: string, format: uuid } }
-      responses:
-        '200':
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/IncomingCandidate' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-
   /candidates/{candidateId}/offers:
     post:
       tags: [request]
