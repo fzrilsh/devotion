@@ -1017,6 +1017,12 @@ Cloudflare, Mailjet, Sentry, dan WhatsApp bukan API data, dicatat di [layanan-lu
 
 ## 🧪 Testing
 
+### Dokumentasi & Hasil Pengujian
+
+Laporan hasil pengujian, dokumen skenario uji manual, dan dokumentasi saat testing tersedia di Google Drive:
+
+**[Google Drive - Hasil & Dokumentasi Pengujian Devotion](https://drive.google.com/drive/u/0/folders/1y0VGpy0uIE4rsz-nqkw64EtGGN4GmZYb)**
+
 ### Data Dummy untuk Pengujian
 
 **[Devotion, data dummy produksi](https://gist.github.com/fzrilsh/80783d8b07ac57dc2af454bc8796dd0d)**, disimpan di luar repository supaya dump besar tidak ikut ke riwayat kode. Isinya 60 usaha konveksi, 47 listing, dan 34 pesanan di tujuh status, plus antrean admin yang tidak kosong. Semua fiktif, tidak ada data pribadi orang sungguhan.
