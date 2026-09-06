@@ -106,3 +106,21 @@ func TestDocs_ServedSpecIdenticalToSource(t *testing.T) {
 		}
 	}
 }
+
+// TestDocs_CanonicalContractHasUniqueCandidatePath_T082 prevents Swagger UI from
+// rejecting the contract when a path block is accidentally copied twice.
+func TestDocs_CanonicalContractHasUniqueCandidatePath_T082(t *testing.T) {
+	_, thisFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("tidak dapat menentukan path berkas uji")
+	}
+	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
+	src := filepath.Join(repoRoot, "docs", "001-capacity-exchange-marketplace", "contracts", "openapi.yaml")
+	contract, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("baca sumber kontrak: %v", err)
+	}
+	if got := strings.Count(string(contract), "\n  /candidates/{candidateId}:\n"); got != 1 {
+		t.Fatalf("path kandidat muncul %d kali, mau tepat satu", got)
+	}
+}
